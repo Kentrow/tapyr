@@ -393,12 +393,19 @@ func TestOutOfOrderSplitIsBounded(t *testing.T) {
 	h := newHarness(t, n, n)
 	h.sender.refuse = refuseValues(seq(1, n)...)
 	h.q.Add(points(seq(1, n)...))
+	// Drain the send notifications (more than the channel holds) until the
+	// queue is empty. The sender notifies before the queue records the
+	// result, so the last notification can come before the queue is empty:
+	// the wait is bounded, never a bare receive.
 	deadline := time.Now().Add(5 * time.Second)
 	for h.q.State().Queue > 0 {
 		if time.Now().After(deadline) {
 			t.Fatalf("the batch is still queued after %d sends", len(h.sender.got()))
 		}
-		<-h.sender.sent
+		select {
+		case <-h.sender.sent:
+		case <-time.After(time.Millisecond):
+		}
 	}
 	h.waitIdle()
 	// Splitting stops at maxSplitSends requests; the halves left are sent
