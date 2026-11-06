@@ -16,7 +16,7 @@ A provider package holds everything Tapyr knows about an API: the `Provider` (ba
 
 <!-- end provider table -->
 
-`tapyr provider list` lists them with the packages of `providerPaths`, which override built-in packages of the same name.
+`tapyr provider list` lists them with the packages of `providerPaths`, which override built-in packages of the same name; `--output json` adds their catalog metadata, templates and limits ([provider catalog output](spec/09-cli-api-ui.md#provider-catalog-output)).
 
 Looking for an API to package? [Provider ideas](provider-ideas.md) lists candidates in other domains, with their rate-limit patterns and the engine features some of them still need.
 

@@ -43,11 +43,15 @@ tapyr provider lint <dir> [flags]
 
 ## tapyr provider list
 
-List the built-in provider packages and, when a configuration is given, the packages of its providerPaths, in precedence order.
+List the built-in provider packages and, when a configuration is given, the packages of its providerPaths, in precedence order. --output json adds the catalog metadata, the templates and the limits of every package, and the catalog categories (the input of the provider catalog).
 
 ```text
-tapyr provider list
+tapyr provider list [flags]
 ```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--output string` | `table` | output format: table or json |
 
 ## tapyr record
 
