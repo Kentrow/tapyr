@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A push output (remote write or OTLP) dropped the whole batch when the backend refused it for one out-of-order or out-of-bounds sample, as Prometheus does without out-of-order window: the fresh samples of the other jobs sent with it were lost. The batch is now split until only the refused samples are left, and only those are dropped and counted in `tapyr_output_samples_dropped_total{reason="out_of_order"}`.
+
 ## [0.1.1] - 2026-11-05
 
 ### Added

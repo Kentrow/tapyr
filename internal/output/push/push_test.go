@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net/http"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -18,11 +19,13 @@ import (
 
 var start = time.Date(2026, time.November, 3, 12, 0, 0, 0, time.UTC)
 
-// fakeSender records the batches and answers with the queued results.
+// fakeSender records the batches and answers with the queued results; a
+// nil result, or none queued, leaves the answer to refuse when set.
 type fakeSender struct {
 	mu      sync.Mutex
 	batches [][]float64
 	results []error
+	refuse  func(values []float64) error
 	partial Result
 	sent    chan struct{}
 	block   chan struct{}
@@ -43,6 +46,9 @@ func (s *fakeSender) Send(_ context.Context, points []Point) (Result, error) {
 	var err error
 	if len(s.results) > 0 {
 		err, s.results = s.results[0], s.results[1:]
+	}
+	if err == nil && s.refuse != nil {
+		err = s.refuse(values)
 	}
 	res := s.partial
 	s.mu.Unlock()
@@ -269,7 +275,7 @@ func TestRetries(t *testing.T) {
 
 func TestRejections(t *testing.T) {
 	h := newHarness(t, 100, 2)
-	h.sender.results = []error{&Error{Class: ClassOutOfOrder, Status: 400, Err: errors.New("out of order sample")}}
+	h.sender.results = []error{&Error{Class: ClassRejected, Status: 400, Err: errors.New("invalid label")}}
 	h.q.Add(points(1, 2, 3))
 	h.waitSent(1) // the full batch is dropped, not retried
 	h.sender.mu.Lock()
@@ -287,8 +293,163 @@ func TestRejections(t *testing.T) {
 	}
 	h.obs.mu.Lock()
 	defer h.obs.mu.Unlock()
-	if !cmp.Equal(h.obs.dropped, map[string]int{ClassOutOfOrder: 2, ClassRejected: 1}) {
+	if !cmp.Equal(h.obs.dropped, map[string]int{ClassRejected: 3}) {
 		t.Errorf("dropped = %v", h.obs.dropped)
+	}
+}
+
+// refuseValues refuses a batch holding any of the values, as Prometheus
+// refuses a whole request for one sample out of bounds.
+func refuseValues(bad ...float64) func([]float64) error {
+	return func(values []float64) error {
+		for _, v := range values {
+			if slices.Contains(bad, v) {
+				return &Error{Class: ClassOutOfOrder, Status: 400, Err: errors.New("out of bounds")}
+			}
+		}
+		return nil
+	}
+}
+
+func seq(from, to float64) []float64 {
+	var out []float64
+	for v := from; v <= to; v++ {
+		out = append(out, v)
+	}
+	return out
+}
+
+func TestOutOfOrderSplit(t *testing.T) {
+	tests := []struct {
+		name        string
+		values      []float64
+		bad         []float64
+		wantBatches [][]float64
+		wantSent    int
+		wantFailed  int
+	}{
+		{
+			name: "one point refused", values: seq(1, 8), bad: []float64{6},
+			wantBatches: [][]float64{seq(1, 8), seq(1, 4), seq(5, 8), {5, 6}, {5}, {6}, {7, 8}},
+			wantSent:    7, wantFailed: 4,
+		},
+		{
+			name: "points apart", values: seq(1, 8), bad: []float64{2, 7},
+			wantBatches: [][]float64{seq(1, 8), seq(1, 4), {1, 2}, {1}, {2}, {3, 4}, seq(5, 8), {5, 6}, {7, 8}, {7}, {8}},
+			wantSent:    6, wantFailed: 7,
+		},
+		{
+			name: "a block refused", values: seq(1, 8), bad: seq(1, 4),
+			wantBatches: [][]float64{seq(1, 8), seq(1, 4), {1, 2}, {1}, {2}, {3, 4}, {3}, {4}, seq(5, 8)},
+			wantSent:    4, wantFailed: 8,
+		},
+		{
+			name: "all refused", values: seq(1, 2), bad: seq(1, 2),
+			wantBatches: [][]float64{{1, 2}, {1}, {2}},
+			wantFailed:  3,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t, 100, len(tt.values))
+			h.sender.refuse = refuseValues(tt.bad...)
+			h.q.Add(points(tt.values...))
+			h.waitSent(len(tt.wantBatches))
+			h.waitIdle()
+			got := h.sender.got()
+			if !cmp.Equal(got, tt.wantBatches) {
+				t.Errorf("batches = %v", got)
+			}
+			dropped := len(tt.values) - tt.wantSent
+			if st := h.q.State(); st.Sent != int64(tt.wantSent) || st.Dropped != int64(dropped) || st.Queue != 0 {
+				t.Errorf("state = %+v", st)
+			}
+			h.obs.mu.Lock()
+			defer h.obs.mu.Unlock()
+			wantDropped := map[string]int{ClassOutOfOrder: dropped}
+			if dropped == 0 {
+				wantDropped = map[string]int{}
+			}
+			if h.obs.sent != tt.wantSent || !cmp.Equal(h.obs.dropped, wantDropped) ||
+				!cmp.Equal(h.obs.failures, map[string]int{ClassOutOfOrder: tt.wantFailed}) {
+				t.Errorf("observer: sent %d, dropped %v, failures %v", h.obs.sent, h.obs.dropped, h.obs.failures)
+			}
+			// The points accepted leave in order.
+			var accepted []float64
+			for _, b := range got {
+				if refuseValues(tt.bad...)(b) == nil {
+					accepted = append(accepted, b...)
+				}
+			}
+			if !slices.IsSorted(accepted) {
+				t.Errorf("points accepted out of order: %v", accepted)
+			}
+		})
+	}
+}
+
+func TestOutOfOrderSplitIsBounded(t *testing.T) {
+	const n = 1000
+	h := newHarness(t, n, n)
+	h.sender.refuse = refuseValues(seq(1, n)...)
+	h.q.Add(points(seq(1, n)...))
+	deadline := time.Now().Add(5 * time.Second)
+	for h.q.State().Queue > 0 {
+		if time.Now().After(deadline) {
+			t.Fatalf("the batch is still queued after %d sends", len(h.sender.got()))
+		}
+		<-h.sender.sent
+	}
+	h.waitIdle()
+	// Splitting stops at maxSplitSends requests; the halves left are sent
+	// once each.
+	if sends := len(h.sender.got()); sends < maxSplitSends || sends > 2*maxSplitSends {
+		t.Errorf("%d sends for a batch refused point by point", sends)
+	}
+	if st := h.q.State(); st.Sent != 0 || st.Dropped != n {
+		t.Errorf("state = %+v", st)
+	}
+}
+
+func TestOutOfOrderSplitRetries(t *testing.T) {
+	h := newHarness(t, 100, 4)
+	h.sender.refuse = refuseValues(3)
+	// The first half meets the backend down once: it is retried after the
+	// backoff, and the split goes on.
+	h.sender.results = []error{nil, &Error{Class: ClassTransient, Err: errors.New("connection refused")}}
+	h.q.Add(points(1, 2, 3, 4))
+	h.waitSent(2)
+	h.waitIdle()
+	h.clk.Advance(time.Second)
+	h.waitSent(4)
+	h.waitIdle()
+	if got := h.sender.got(); !cmp.Equal(got, [][]float64{{1, 2, 3, 4}, {1, 2}, {1, 2}, {3, 4}, {3}, {4}}) {
+		t.Errorf("batches = %v", got)
+	}
+	if st := h.q.State(); st.Sent != 3 || st.Dropped != 1 || st.Queue != 0 {
+		t.Errorf("state = %+v", st)
+	}
+}
+
+func TestOutOfOrderSplitPushedOut(t *testing.T) {
+	h := newHarness(t, 4, 4)
+	h.sender.refuse = refuseValues(1)
+	h.sender.results = []error{nil, &Error{Class: ClassTransient, Err: errors.New("connection refused")}}
+	h.q.Add(points(1, 2, 3, 4))
+	h.waitSent(2)
+	h.waitIdle()
+	// During the backoff, newer points push the batch being split out.
+	h.q.Add(points(5, 6, 7, 8))
+	h.clk.Advance(5 * time.Second)
+	h.waitSent(1)
+	h.waitIdle()
+	if got := h.sender.got(); !cmp.Equal(got, [][]float64{{1, 2, 3, 4}, {1, 2}, {5, 6, 7, 8}}) {
+		t.Errorf("batches = %v", got)
+	}
+	h.obs.mu.Lock()
+	defer h.obs.mu.Unlock()
+	if h.obs.sent != 4 || h.obs.dropped["queue_full"] != 4 {
+		t.Errorf("observer: sent %d, dropped %v", h.obs.sent, h.obs.dropped)
 	}
 }
 

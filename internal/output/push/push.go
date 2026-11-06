@@ -83,6 +83,12 @@ const (
 	maxBackoff     = time.Minute
 )
 
+// maxSplitSends bounds the requests spent on a batch refused for out of
+// order samples: the batch is split in halves, sent again, and the refused
+// halves split further down to the points really refused, as long as the
+// requests of the batch stay under this bound.
+const maxSplitSends = 64
+
 // HTTPError classifies an HTTP response: nil for 2xx; retryable reports
 // whether a status other than 429 is retried (5xx for remote write, 502,
 // 503 and 504 for OTLP). Rejections mentioning out of order, too old or
@@ -183,6 +189,12 @@ type Queue struct {
 	drained chan struct{}
 	wake    chan struct{}
 	state   output.State
+
+	// The batch refused for out of order samples, being split: the spans
+	// left to send, in order, its last seq and the requests spent on it.
+	spans      []span
+	splitLast  uint64
+	splitSends int
 }
 
 type entry struct {
@@ -190,6 +202,9 @@ type entry struct {
 	seq uint64
 	at  time.Time
 }
+
+// span is a range of seqs of the batch being split, bounds included.
+type span struct{ first, last uint64 }
 
 // New returns a Queue.
 func New(opts Options) *Queue {
@@ -297,6 +312,9 @@ func (q *Queue) next() ([]entry, time.Duration) {
 	if len(q.points) == 0 {
 		return nil, 0
 	}
+	if batch := q.nextSpan(); batch != nil {
+		return batch, 0
+	}
 	now := q.opts.Clock.Now()
 	due := q.points[0].at.Add(q.opts.FlushInterval)
 	if len(q.points) < q.opts.MaxBatch && q.flushes == 0 && now.Before(due) {
@@ -306,6 +324,62 @@ func (q *Queue) next() ([]entry, time.Duration) {
 	copy(batch, q.points)
 	q.sending = batch[len(batch)-1].seq
 	return batch, 0
+}
+
+// nextSpan returns the points of the next span of the batch being split,
+// nil when no batch is split; q.mu must be held.
+func (q *Queue) nextSpan() []entry {
+	for len(q.spans) > 0 {
+		sp := q.spans[0]
+		var batch []entry
+		for _, e := range q.points {
+			if e.seq > sp.last {
+				break
+			}
+			if e.seq >= sp.first {
+				batch = append(batch, e)
+			}
+		}
+		if len(batch) > 0 {
+			q.sending = q.splitLast
+			return batch
+		}
+		q.spans = q.spans[1:] // its points were dropped meanwhile
+	}
+	q.splitLast, q.splitSends = 0, 0
+	return nil
+}
+
+// split replaces the span of batch, refused for out of order samples, by
+// its halves; it reports false when batch is one point or the requests of
+// the batch reached maxSplitSends. q.mu must be held.
+func (q *Queue) split(batch []entry) bool {
+	if len(batch) < 2 || q.splitSends >= maxSplitSends {
+		return false
+	}
+	mid := len(batch) / 2
+	halves := []span{{batch[0].seq, batch[mid-1].seq}, {batch[mid].seq, batch[len(batch)-1].seq}}
+	if len(q.spans) == 0 {
+		q.spans, q.splitLast = halves, batch[len(batch)-1].seq
+	} else {
+		q.spans = append(halves, q.spans[1:]...)
+	}
+	q.sending = q.splitLast
+	return true
+}
+
+// done removes the points of a batch delivered or dropped, up to seq; q.mu
+// must be held.
+func (q *Queue) done(seq uint64) {
+	if len(q.spans) > 0 {
+		q.spans = q.spans[1:]
+	}
+	q.remove(seq)
+	if len(q.spans) > 0 {
+		q.sending = q.splitLast
+	} else {
+		q.splitLast, q.splitSends = 0, 0
+	}
 }
 
 // send sends one batch and returns the delay before the next attempt when
@@ -320,10 +394,15 @@ func (q *Queue) send(ctx context.Context, batch []entry) time.Duration {
 	now := q.opts.Clock.Now()
 	q.opts.Observer.OutputSendDuration(q.opts.Name, now.Sub(started))
 	last := batch[len(batch)-1].seq
+	q.mu.Lock()
+	if len(q.spans) > 0 {
+		q.splitSends++
+	}
+	q.mu.Unlock()
 	if err == nil {
 		sent := len(batch) - res.Rejected
 		q.mu.Lock()
-		q.remove(last)
+		q.done(last)
 		q.attempt = 0
 		q.state.Sent += int64(sent)
 		q.state.Dropped += int64(res.Rejected)
@@ -345,8 +424,19 @@ func (q *Queue) send(ctx context.Context, batch []entry) time.Duration {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	q.state.LastError, q.state.LastErrorAt = se.Error(), now
+	if se.Class == ClassOutOfOrder {
+		if len(q.spans) == 0 {
+			q.splitSends = 1
+		}
+		if q.split(batch) {
+			q.attempt = 0
+			q.opts.Logger.Debug("batch refused for out of order samples: sending its halves", "component", "output",
+				"output", q.opts.Name, "samples", len(batch), "requests", q.splitSends)
+			return 0
+		}
+	}
 	if !se.Retryable() {
-		q.remove(last)
+		q.done(last)
 		q.attempt = 0
 		q.state.Dropped += int64(len(batch))
 		q.opts.Observer.OutputDropped(q.opts.Name, se.Class, len(batch))

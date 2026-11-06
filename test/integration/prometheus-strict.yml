@@ -1,0 +1,7 @@
+# Second Prometheus of the integration test (make integration): the default
+# storage, without out-of-order window, so that it refuses the samples with
+# source timestamps older than its head (the simulator fixtures carry fixed
+# ones). It receives remote write and OTLP pushes, and scrapes nothing.
+otlp:
+  # The resource attributes the test filters on become labels.
+  promote_resource_attributes: [tapyr.run, tapyr.protocol]

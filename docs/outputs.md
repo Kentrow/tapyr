@@ -47,7 +47,7 @@ spec:
 - A series that goes away (absent from the next successful run, its job instance removed by discovery or a reload, or withdrawn after `staleAfter`) receives one staleness marker, so that queries stop returning it at once instead of after the lookback delta.
 - Samples whose source timestamp was already sent for the same series are not sent again (APIs often return overlapping windows); see `tapyr_samples_deduplicated_total`.
 - Metric metadata (type, help, unit) is sent on the first request and every minute.
-- Network errors, `5xx` and `429` are retried with exponential backoff (1 second doubling up to 1 minute), honoring `Retry-After`. Other `4xx` drop the batch.
+- Network errors, `5xx` and `429` are retried with exponential backoff (1 second doubling up to 1 minute), honoring `Retry-After`. Other `4xx` drop the batch, except a batch refused for out-of-order samples ([below](#out-of-order-samples)).
 
 ### Out-of-order samples
 
@@ -62,7 +62,9 @@ storage:
     out_of_order_time_window: 7d
 ```
 
-Without it, **one** sample out of bounds makes Prometheus refuse the whole request (`400`), over remote write and OTLP alike, and the whole batch is dropped: the fresh samples of the other jobs sent with it are lost too. Mimir and Thanos have equivalent settings; VictoriaMetrics accepts such samples. Rejected batches are counted in `tapyr_output_samples_dropped_total{reason="out_of_order"}`, and logged as `samples dropped: the backend rejected the batch` with `class=out_of_order`.
+Without it, **one** sample out of bounds makes Prometheus refuse the whole request (`400`), over remote write and OTLP alike, and it ingests none of its samples. Tapyr then splits the batch: it sends both halves again, one after the other, and splits a refused half further, down to the samples really refused. The other samples of the batch, the fresh ones of the other jobs included, arrive, in order. A batch costs a few more requests to the backend (about two per halving, 13 halvings at most for the default `maxBatch` of 5000), never API quota. Splitting stops after 64 requests for one batch: the halves left are sent once more each, and dropped if refused.
+
+The samples refused are counted in `tapyr_output_samples_dropped_total{reason="out_of_order"}`, and logged as `samples dropped: the backend rejected the batch` with `class=out_of_order`; every refused request counts in `tapyr_output_send_failures_total{class="out_of_order"}`. Mimir and Thanos have settings equivalent to the out-of-order window; VictoriaMetrics accepts such samples.
 
 ## `otlp`
 
@@ -106,4 +108,4 @@ The queue holds `capacity` samples per output. While a backend is down, the batc
 
 ## Testing against real backends
 
-`make integration` starts VictoriaMetrics, an OpenTelemetry Collector and Prometheus with Docker Compose (`test/integration/compose.yaml`) and checks that samples and staleness markers land in all of them: remote write to VictoriaMetrics and Prometheus, OTLP/HTTP and OTLP/gRPC to the collector, OTLP to Prometheus, and the scrape of `/metrics` and `/metrics/self` (with `honor_labels: true`) by Prometheus. The Prometheus of the test enables out-of-order ingestion, since the simulator fixtures carry fixed source timestamps.
+`make integration` starts VictoriaMetrics, an OpenTelemetry Collector and Prometheus with Docker Compose (`test/integration/compose.yaml`) and checks that samples and staleness markers land in all of them: remote write to VictoriaMetrics and Prometheus, OTLP/HTTP and OTLP/gRPC to the collector, OTLP to Prometheus, and the scrape of `/metrics` and `/metrics/self` (with `honor_labels: true`) by Prometheus. The Prometheus of the test enables out-of-order ingestion, since the simulator fixtures carry fixed source timestamps; a second one, without out-of-order window, receives remote write and OTLP too, and the test checks that it gets every sample stamped with the collection time while it refuses the samples with old source timestamps.
