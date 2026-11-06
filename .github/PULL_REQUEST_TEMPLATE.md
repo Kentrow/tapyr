@@ -4,7 +4,7 @@
 
 ## How it was tested
 
-<!-- Tests added, checks run, simulator scenarios, real platform (which version, when). -->
+<!-- Tests added, checks run, simulator scenarios, real platform (which version, when). Only what you actually ran: the commands, their output or a link to the run. -->
 
 ## Checklist
 
