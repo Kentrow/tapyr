@@ -17,7 +17,7 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
 
 ## A release
 
-1. Check `main`: CI green, including the release snapshot job (every platform, both images).
+1. Check `main`: CI green, including the release snapshot job (every platform, both images). Check the [versions updated by hand](#versions-updated-by-hand) too; a bump goes through its own pull request before the release.
 2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add an empty `## [Unreleased]` above it, and update the links at the bottom:
 
    ```
@@ -39,3 +39,17 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
 If the release job fails on an incident of GitHub (an upload answered 500 or 422, a timeout), rerun the failed job from the run page, and approve the `release` environment again: GoReleaser reuses the draft release the failed run left, replaces the assets it already uploaded, and the provenance asset is replaced as well. The tag stays as it is.
 
 Versions follow [Semantic Versioning](https://semver.org/); before 1.0, a breaking change bumps the minor version. A release candidate (`vX.Y.Z-rc.N`) goes through the same workflow, is published as a prerelease, and takes the `[Unreleased]` section of the changelog as its notes: use one to test the pipeline before a version.
+
+## Versions updated by hand
+
+Dependabot updates the Go modules, the actions, the images and the npm packages. These versions are written by hand, or held back on purpose, and nothing updates them: compare them with the latest releases before every release.
+
+| Version | Where | Rule |
+|---|---|---|
+| golangci-lint | `GOLANGCI_LINT_VERSION` in the [`Makefile`](../Makefile) (the CI reads it) | The latest v2 release; fix or justify the new findings in the same pull request. |
+| GoReleaser | `version:` of the GoReleaser steps in [`ci.yml`](../.github/workflows/ci.yml) and [`release.yml`](../.github/workflows/release.yml) | The same version in both; the release snapshot job of the CI checks it before a tag does. |
+| govulncheck | `golang.org/x/vuln/cmd/govulncheck@vX.Y.Z` in [`ci.yml`](../.github/workflows/ci.yml) | The latest release. |
+| Node.js major | `node-version` in the workflows, the `ui` stage of the [`Dockerfile`](../Dockerfile), `@types/node` in [`ui/package.json`](../ui/package.json) | The active LTS line, all together; Dependabot updates the minor versions only. |
+| TypeScript major | `typescript` in [`ui/package.json`](../ui/package.json) | Held back until typescript-eslint supports the new major. |
+
+A separate `tools/go.mod` module, with `tool` directives updated by Dependabot, was considered and set aside: the three Go tools pull about 500 modules into it (a `go.sum` of 1600 lines), whose advisories would raise Dependabot alerts on the repository for code that never enters the binary, and golangci-lint recommends its prebuilt binaries over `go tool`.
