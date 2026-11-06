@@ -14,6 +14,8 @@ A provider package holds everything Tapyr knows about an API: the `Provider` (ba
 
 `tapyr provider list` lists them with the packages of `providerPaths`, which override built-in packages of the same name.
 
+Looking for an API to package? [Provider ideas](provider-ideas.md) lists candidates in other domains, with their rate-limit patterns and the engine features some of them still need.
+
 ## Writing a package
 
 1. Read the vendor documentation and write `provider.yaml`. **Every limit cites its source** in its `description` and in the README, or is marked as measured or assumed. Prefer endpoints that return many objects per request (organization-wide lists, large pages): the budget engine spends quota deliberately, the templates should too.

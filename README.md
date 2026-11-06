@@ -22,7 +22,7 @@
   <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
-Tapyr is an open source, self-hosted **API-to-metrics gateway**. It collects data from the REST APIs of cloud-managed network gear (Aruba Central, Cisco Meraki, Teltonika...), turns it into clean metrics, and exposes or pushes them to Prometheus, VictoriaMetrics, Mimir or any OTLP backend. One declarative definition per API, no code to write.
+Tapyr is an open source, self-hosted **API-to-metrics gateway**. It collects data from the REST APIs of cloud-managed network gear (Aruba Central, Cisco Meraki, Teltonika...), turns it into clean metrics, and exposes or pushes them to Prometheus, VictoriaMetrics, Mimir or any OTLP backend. One declarative definition per API, no code to write. Network gear is the first use case, not the limit: the engine knows nothing about networks, and any API that serves metrics can be described the same way.
 
 Vendor APIs ration their calls: per second, per day, per month, per organization. Tapyr treats that quota as a budget it plans and spends deliberately, retries included, so that your monitoring never runs the quota of your account dry.
 
@@ -71,7 +71,7 @@ The planner computes an effective interval for every job so that the configurati
 | [`teltonika-rms`](providers/teltonika-rms/README.md) | Teltonika RMS cloud API | Real platform and simulator |
 | [`teltonika-rutos`](providers/teltonika-rutos/README.md) | Local RutOS API of Teltonika routers | Real router and simulator |
 
-Each package README lists what it collects, the credentials it needs, and its limits with their sources. Packages validated against their simulator only are waiting for reports from real accounts: see [`CONTRIBUTING.md`](CONTRIBUTING.md). [`docs/providers.md`](docs/providers.md) explains how to write a package for another API.
+Each package README lists what it collects, the credentials it needs, and its limits with their sources. Packages validated against their simulator only are waiting for reports from real accounts: see [`CONTRIBUTING.md`](CONTRIBUTING.md). [`docs/providers.md`](docs/providers.md) explains how to write a package for another API, and [`docs/provider-ideas.md`](docs/provider-ideas.md) lists candidates.
 
 ## Quick start
 

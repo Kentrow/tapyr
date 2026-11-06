@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Documentation: the strategy of the provider ecosystem ([ADR 0011](docs/adr/0011-provider-ecosystem.md)), and a page of [provider ideas](docs/provider-ideas.md) beyond networks, with their rate-limit patterns and the engine features some of them still need.
+
 ## [0.1.2] - 2026-11-06
 
 ### Fixed

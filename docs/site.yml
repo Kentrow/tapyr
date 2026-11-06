@@ -30,6 +30,7 @@ nav:
       - providers/meraki-dashboard/README.md
       - providers/aruba-central-classic/README.md
       - providers/example-sim/README.md
+      - docs/provider-ideas.md
   - Reference:
       - docs/reference/README.md
       - docs/reference/cli.md
@@ -65,6 +66,7 @@ nav:
           - docs/adr/0008-otlp-via-pdata.md
           - docs/adr/0009-window-values-as-gauges.md
           - docs/adr/0010-documentation-site.md
+          - docs/adr/0011-provider-ecosystem.md
 
 # Pages for contributors and maintainers, read on GitHub.
 unpublished:
