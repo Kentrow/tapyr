@@ -211,7 +211,7 @@ jobs:
         run: make smoke
 
   integration:
-    name: Integration (VictoriaMetrics, OpenTelemetry Collector)
+    name: Integration (VictoriaMetrics, OpenTelemetry Collector, Prometheus)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
