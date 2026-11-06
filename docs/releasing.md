@@ -6,7 +6,7 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
 
 - **Release environment**: Settings > Environments > New environment `release`, with the maintainers as required reviewers. The release job waits for their approval.
 - **Tag protection**: Settings > Rules > Rulesets, a tag ruleset on `v*` that only maintainers may create, update or delete.
-- **Branch protection**: Settings > Rules > Rulesets, a branch ruleset on `main`: changes through a pull request only, the jobs of the CI workflow required as status checks (`Conventional Commits`, `Lint`, `Test`, `Vulnerabilities`, `Dependency review`, `Build linux/amd64`, `Build linux/arm64`, `Release snapshot (every platform, images)`, `Web UI`, `Smoke test`, `Integration (VictoriaMetrics, OpenTelemetry Collector)`, `Alert rules`), no force push, no deletion.
+- **Branch protection**: Settings > Rules > Rulesets, a branch ruleset on `main`: changes through a pull request only, the jobs of the CI workflow required as status checks (`Conventional Commits`, `Lint`, `Test`, `Vulnerabilities`, `Dependency review`, `Release snapshot (every platform, images)`, `Web UI`, `Smoke test`, `Integration (VictoriaMetrics, OpenTelemetry Collector)`, `Alert rules`), no force push, no deletion.
 - **Private vulnerability reporting**: Settings > Code security, enabled (see [`SECURITY.md`](../SECURITY.md)).
 - **Secret scanning**: Settings > Code security, secret scanning and push protection enabled.
 - **Dependabot**: Settings > Code security, Dependabot alerts and security updates enabled; the version updates come from [`.github/dependabot.yml`](../.github/dependabot.yml).
