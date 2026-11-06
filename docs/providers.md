@@ -4,13 +4,17 @@ A provider package holds everything Tapyr knows about an API: the `Provider` (ba
 
 ## Built-in packages
 
-| Package | API | Validation | Notes |
+<!-- begin provider table: generated from the provider packages by TestProviderTables (go test ./cmd/tapyr -run TestProviderTables -update), do not edit -->
+
+| Package | API | Tier | Validation |
 |---|---|---|---|
-| [`teltonika-rms`](../providers/teltonika-rms/README.md) | Teltonika RMS cloud API | Real platform (e2e) and simulator | Monthly quota synced from the `X-RateLimit-*` headers |
-| [`teltonika-rutos`](../providers/teltonika-rutos/README.md) | Local RutOS API of Teltonika routers (07.06+) | Real router (e2e, RutOS 07.24.5) and simulator | One target per router, `session_login` with logout, self-signed TLS |
-| [`meraki-dashboard`](../providers/meraki-dashboard/README.md) | Cisco Meraki Dashboard API v1 | Simulator only | Organization-wide endpoints, per-organization rate |
-| [`aruba-central-classic`](../providers/aruba-central-classic/README.md) | HPE Aruba Networking Central (classic) | Simulator only | Daily quota, `aruba_central_classic` auth plugin (rotating refresh tokens) |
-| [`example-sim`](../providers/example-sim/README.md) | Vendor-neutral example | Simulator | Reference for package authors |
+| [`aruba-central-classic`](../providers/aruba-central-classic/README.md) | HPE Aruba Networking Central (classic platform) REST API | Official | Simulator only |
+| [`example-sim`](../providers/example-sim/README.md) | Vendor-neutral example API, served by tapyr sim, for development, tests and demos | Official | Simulator only |
+| [`meraki-dashboard`](../providers/meraki-dashboard/README.md) | Cisco Meraki Dashboard API v1 | Official | Simulator only |
+| [`teltonika-rms`](../providers/teltonika-rms/README.md) | Teltonika Remote Management System (RMS) cloud API | Official | Real platform (RMS API v3-BETA, 2026-11) and simulator |
+| [`teltonika-rutos`](../providers/teltonika-rutos/README.md) | Local REST API of Teltonika routers running RutOS 07.06 or later | Official | Real platform (RutOS 07.24.5, 2026-11) and simulator |
+
+<!-- end provider table -->
 
 `tapyr provider list` lists them with the packages of `providerPaths`, which override built-in packages of the same name.
 

@@ -20,7 +20,7 @@ One directory per API, everything Tapyr knows about it, in YAML and CEL. The lay
 - **Read-only**: templates use read endpoints only (`GET`, or `POST` for APIs whose queries are POSTs, never a mutation).
 - **The simulator follows the documented API**: same paths, pagination, envelopes and quota headers, with the limits of `provider.yaml` (the simulator enforces them itself). Where it cannot imitate the API (reset headers are sent as seconds, a route has a fixed status: see [`08-simulator.md`](../docs/spec/08-simulator.md#synthetic-inventory-and-templated-fixtures)), say so in the README. Synthetic inventories and template fixtures are preferred over large static fixtures.
 - **Fixtures hold no real data.** Recorded responses are anonymized with `tapyr record` and reviewed before they are committed ([`record-fixtures`](../.agents/skills/record-fixtures/SKILL.md)).
-- **New built-in packages** are added to the `//go:embed` pattern of [`embed.go`](embed.go), to the table of [`docs/providers.md`](../docs/providers.md) and to [`10-providers.md`](../docs/spec/10-providers.md) when they are part of the supported set.
+- **New built-in packages** are added to the `//go:embed` pattern of [`embed.go`](embed.go) and to [`10-providers.md`](../docs/spec/10-providers.md) when they are part of the supported set. The provider tables of the README and [`docs/providers.md`](../docs/providers.md) are generated from the metadata: `go test ./cmd/tapyr -run TestProviderTables -update`.
 
 ## Checks
 

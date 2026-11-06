@@ -79,7 +79,7 @@ Whether a package becomes built in (embedded in the binary) is decided with the 
 
 - Add the directory to the `//go:embed` pattern of `providers/embed.go`.
 - Declare `portOffset` in `sim/sim.yaml`: the largest offset of the built-in packages plus one (`grep -h portOffset providers/*/sim/sim.yaml`), so that `tapyr sim --all` serves it without moving the others. Add it to the list of `TestSimAll` (`cmd/tapyr/sim_all_test.go`), and to `examples/compose` (`tapyr/config.yaml`, `compose.yaml`, `README.md`) if it belongs in the demo.
-- Add the package to the table of `docs/providers.md`.
+- Regenerate the provider tables of the README and `docs/providers.md` from the metadata: `go test ./cmd/tapyr -run TestProviderTables -update`.
 - Add a `CHANGELOG.md` entry under `## [Unreleased]`, `### Added`.
 - Run the [`check-change`](../check-change/SKILL.md) skill.
 
