@@ -319,3 +319,19 @@ func TestParseDate(t *testing.T) {
 		}
 	}
 }
+
+func TestLimitWithDefaults(t *testing.T) {
+	l := Limit{
+		Kind:   LimitQuota,
+		Max:    &IntOrAuto{Value: 10},
+		Window: &Window{Period: "month"},
+		Scope:  &Scope{},
+	}
+	got := LimitWithDefaults(l)
+	if got.Window.ResetAt != "00:00" || got.Window.Timezone != "UTC" || got.Window.MonthDay != 1 || len(got.Scope.By) != 1 || got.Scope.By[0] != "instance" {
+		t.Errorf("defaults not applied: %+v %+v", got.Window, got.Scope)
+	}
+	if l.Window.ResetAt != "" || l.Window.MonthDay != 0 || len(l.Scope.By) != 0 || l.AppliesTo != nil {
+		t.Errorf("the limit was modified: %+v %+v", l.Window, l.Scope)
+	}
+}

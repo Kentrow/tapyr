@@ -11,13 +11,19 @@ import (
 )
 
 func newProviderListCmd(e *env, flags *globalFlags) *cobra.Command {
-	return &cobra.Command{
+	var format string
+	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List built-in and user provider packages",
 		Long: "List the built-in provider packages and, when a configuration is given,\n" +
-			"the packages of its providerPaths, in precedence order.",
+			"the packages of its providerPaths, in precedence order. --output json\n" +
+			"adds the catalog metadata, the templates and the limits of every package,\n" +
+			"and the catalog categories (the input of the provider catalog).",
 		Args: cobra.NoArgs,
 		RunE: func(*cobra.Command, []string) error {
+			if format != "table" && format != "json" {
+				return &exitError{code: exitFailure, err: fmt.Errorf("invalid --output %q (want table or json)", format)}
+			}
 			loader, builtin, err := newLoader()
 			if err != nil {
 				return err
@@ -28,26 +34,35 @@ func newProviderListCmd(e *env, flags *globalFlags) *cobra.Command {
 					return err
 				}
 			}
-			pkgs = append(pkgs, builtin...)
+			listed := make([]listedPackage, 0, len(pkgs)+len(builtin))
+			seen := map[config.Name]bool{}
+			for i, p := range append(pkgs, builtin...) {
+				name := p.Provider.Metadata.Name
+				listed = append(listed, listedPackage{pkg: p, builtin: i >= len(pkgs), overridden: seen[name]})
+				seen[name] = true
+			}
+			if format == "json" {
+				return printCatalogJSON(e, listed)
+			}
 			w := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
 			fmt.Fprintln(w, "NAME\tVERSION\tTEMPLATES\tSIMULATOR\tSTATUS\tORIGIN")
-			seen := map[config.Name]bool{}
-			for _, p := range pkgs {
+			for _, l := range listed {
 				status := "active"
-				if seen[p.Provider.Metadata.Name] {
+				if l.overridden {
 					status = "overridden"
 				}
-				seen[p.Provider.Metadata.Name] = true
 				sim := "no"
-				if p.Simulation != nil {
+				if l.pkg.Simulation != nil {
 					sim = "yes"
 				}
-				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", p.Provider.Metadata.Name, p.Provider.Metadata.Version,
-					len(p.JobTemplates), sim, status, p.Origin)
+				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", l.pkg.Provider.Metadata.Name, l.pkg.Provider.Metadata.Version,
+					len(l.pkg.JobTemplates), sim, status, l.pkg.Origin)
 			}
 			return w.Flush()
 		},
 	}
+	cmd.Flags().StringVar(&format, "output", "table", "output format: table or json")
+	return cmd
 }
 
 // userPackages loads the packages of the providerPaths of a configuration.

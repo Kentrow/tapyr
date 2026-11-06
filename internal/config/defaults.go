@@ -3,6 +3,7 @@ package config
 import (
 	"math"
 	"net/http"
+	"slices"
 	"time"
 )
 
@@ -99,6 +100,27 @@ func defaultProvider(spec *ProviderSpec) {
 	if e.Retryable == nil || len(e.Retryable.Statuses) == 0 {
 		e.Retryable = &StatusMatcher{Statuses: []int{500, 502, 503, 504}}
 	}
+}
+
+// LimitWithDefaults returns a copy of l with the defaults applied (burst,
+// scope, window reset), leaving l unchanged: provider packages are loaded
+// without them, defaults apply when a configuration is assembled.
+func LimitWithDefaults(l Limit) Limit {
+	if l.Scope != nil {
+		s := *l.Scope
+		s.By = slices.Clone(s.By)
+		l.Scope = &s
+	}
+	if l.AppliesTo != nil {
+		a := *l.AppliesTo
+		l.AppliesTo = &a
+	}
+	if l.Window != nil {
+		w := *l.Window
+		l.Window = &w
+	}
+	defaultLimit(&l)
+	return l
 }
 
 func defaultLimit(l *Limit) {

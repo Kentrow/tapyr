@@ -14,7 +14,7 @@ Common exit codes: `0` success, `1` usage error or internal error, `2` invalid c
 | `tapyr sim ...` | Run provider simulators (see `08-simulator.md`) | |
 | `tapyr record --job J [--job ...] --out DIR [--anonymize FILE] [--provider-path DIR ...]` | Run jobs once and record their responses, anonymized (see `08-simulator.md`) | 0 ok, 1 error, 2 invalid configuration |
 | `tapyr schema [--kind K] [--out dir]` | Print or write the JSON Schemas embedded in the binary | |
-| `tapyr provider list` | List built-in and user provider packages with versions | |
+| `tapyr provider list [--output table\|json]` | List built-in and user provider packages with versions; `json` is the [provider catalog output](#provider-catalog-output) | |
 | `tapyr provider lint <dir> [--update] [--catalog]` | Validate a provider package, lint its dashboards and run its contract tests (`--update` rewrites `tests/expected.prom`, `--catalog` also requires the catalog metadata) | 0 ok, 2 errors |
 | `tapyr version` | Version, revision, Go version | |
 
@@ -35,6 +35,23 @@ aruba-central-classic/daily  24h          4500           529                    
   job aruba-sites            desired 1h   effective 1h   24 runs x 1 page = 25
   job aruba-switches         desired 15m  effective 15m  96 runs x 1 page = 101
 ```
+
+### Provider catalog output
+
+`tapyr provider list --output json` describes the packages the command lists, in precedence order, for the provider catalog of tapyr.eu ([ADR 0011](../adr/0011-provider-ecosystem.md)): the site repository builds the catalog from the output of a tagged release, as it builds the documentation from `docsite export` ([ADR 0010](../adr/0010-documentation-site.md)). It is an interface of the site repository. The keys are the camelCase names of the configuration fields they come from; an optional field without a value is left out.
+
+- `schemaVersion` (1): changes when a field is removed, renamed or changes meaning, never when one is added. Readers ignore unknown fields.
+- `tapyrVersion`: the version of the binary.
+- `categories`: the controlled vocabulary of [`providers/categories.yaml`](../../providers/categories.yaml), `name` and `description`.
+- `providers`: one entry per package:
+  - from `metadata`: `name`, `version`, `displayName`, `description`, `docs`, `categories`, `maintainers`, `tier`, `validation` (`status`, `date`, `platformVersion`, `notes`);
+  - `origin`: `builtin`, or the directory of a user package; `status`: `active`, or `overridden` by a package of the same name listed before it;
+  - `readme`: for a built-in package, the path of its README in this repository (`providers/<name>/README.md`); the site maps it to the page of the documentation version it publishes;
+  - `simulator`: whether the package has one; `auth`: the auth type, `plugin:<name>` for an auth plugin;
+  - `templates`: `name`, `description`, the request `path`, `defaultInterval` (`5m`, `1h`) and the sorted `metrics` names it produces;
+  - `limits`: `name`, `kind`, `value` (for humans, defaults applied: `10/s, burst 20`, `4 concurrent requests`, `100000 per month, reset on day 1 at 00:00 UTC`, `auto (5000 until learned) per day, reset at 00:00 UTC`), `scope` (the dimensions of `scope.by`), `description` and `source` (`kind`, `url`, `date`).
+
+The output of the built-in packages is kept in `cmd/tapyr/testdata/provider-list.json` (`go test ./cmd/tapyr -run TestProviderListJSON -update`), so that a change of the interface shows in the diff of a pull request.
 
 ## HTTP server
 

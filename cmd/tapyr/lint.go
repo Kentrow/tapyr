@@ -480,18 +480,8 @@ func lintScenarios(pkg *config.Package) []string {
 func packageMetrics(pkg *config.Package) map[string]bool {
 	out := map[string]bool{}
 	for _, t := range pkg.JobTemplates {
-		e := t.Spec.Extract
-		if e == nil {
-			continue
-		}
-		for _, m := range e.Metrics {
-			out[m.Name] = true
-		}
-		for _, m := range e.Post {
-			out[m.Name] = true
-		}
-		for _, m := range e.Info {
-			out[m.Name] = true
+		for _, name := range templateMetrics(t) {
+			out[name] = true
 		}
 	}
 	return out

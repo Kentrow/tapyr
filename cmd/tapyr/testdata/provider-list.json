@@ -1,0 +1,600 @@
+{
+  "schemaVersion": 1,
+  "tapyrVersion": "0.0.0-test",
+  "categories": [
+    {
+      "name": "network",
+      "description": "Network equipment and services"
+    },
+    {
+      "name": "wireless",
+      "description": "Wi-Fi access points and controllers"
+    },
+    {
+      "name": "sd-wan",
+      "description": "SD-WAN appliances and their uplinks"
+    },
+    {
+      "name": "cellular",
+      "description": "4G and 5G routers and modems"
+    },
+    {
+      "name": "security",
+      "description": "Security services, threat intelligence and reputation"
+    },
+    {
+      "name": "internet-measurement",
+      "description": "Latency, routing and Internet health measured from probes"
+    },
+    {
+      "name": "cloud",
+      "description": "Cloud platforms and their resources"
+    },
+    {
+      "name": "cost",
+      "description": "Spending and billing"
+    },
+    {
+      "name": "developer",
+      "description": "Source hosting, CI and developer platforms"
+    },
+    {
+      "name": "identity",
+      "description": "Identity providers, sign-ins and device compliance"
+    },
+    {
+      "name": "energy",
+      "description": "Solar production, consumption and storage"
+    },
+    {
+      "name": "weather",
+      "description": "Weather and air quality"
+    },
+    {
+      "name": "sport",
+      "description": "Activities and training"
+    },
+    {
+      "name": "example",
+      "description": "Examples for package authors"
+    }
+  ],
+  "providers": [
+    {
+      "name": "aruba-central-classic",
+      "version": "0.1.0",
+      "displayName": "HPE Aruba Networking Central (classic)",
+      "description": "HPE Aruba Networking Central (classic platform) REST API",
+      "docs": "https://developer.arubanetworks.com/aruba-central/",
+      "categories": [
+        "network",
+        "wireless"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "simulator",
+        "notes": "Built from the Aruba developer hub and the pycentral SDK; not run against a real Central account yet"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/aruba-central-classic/README.md",
+      "simulator": true,
+      "auth": "plugin:aruba_central_classic",
+      "templates": [
+        {
+          "name": "aruba-aps",
+          "path": "/monitoring/v2/aps",
+          "defaultInterval": "5m",
+          "metrics": [
+            "aruba_ap_clients",
+            "aruba_ap_info",
+            "aruba_ap_up",
+            "aruba_ap_uptime_seconds",
+            "aruba_aps"
+          ]
+        },
+        {
+          "name": "aruba-gateways",
+          "path": "/monitoring/v1/gateways",
+          "defaultInterval": "15m",
+          "metrics": [
+            "aruba_gateway_aps",
+            "aruba_gateway_info",
+            "aruba_gateway_up"
+          ]
+        },
+        {
+          "name": "aruba-sites",
+          "path": "/central/v2/sites",
+          "defaultInterval": "1h",
+          "metrics": [
+            "aruba_site_info"
+          ]
+        },
+        {
+          "name": "aruba-switches",
+          "path": "/monitoring/v1/switches",
+          "defaultInterval": "15m",
+          "metrics": [
+            "aruba_switch_info",
+            "aruba_switch_up"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "daily",
+          "kind": "quota",
+          "value": "auto (5000 until learned) per day, reset at 00:00 UTC",
+          "scope": [
+            "account"
+          ],
+          "description": "Calls per account and day: the maximum of 5000 and 30 per Foundation device plus 90 per Advanced device, reset at midnight GMT, reported in X-RateLimit-*-day headers (developer.arubanetworks.com, Usage and Rate Limits)",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developer.arubanetworks.com/hpe-aruba-networking-central/docs/usage-and-rate-limits",
+            "date": "2026-11"
+          }
+        },
+        {
+          "name": "second",
+          "kind": "rate",
+          "value": "7/s, burst 7",
+          "scope": [
+            "account"
+          ],
+          "description": "7 calls per account per second (developer.arubanetworks.com, Usage and Rate Limits)",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developer.arubanetworks.com/hpe-aruba-networking-central/docs/usage-and-rate-limits",
+            "date": "2026-11"
+          }
+        }
+      ]
+    },
+    {
+      "name": "example-sim",
+      "version": "0.1.0",
+      "displayName": "Example simulator",
+      "description": "Vendor-neutral example API, served by tapyr sim, for development, tests and demos",
+      "docs": "https://github.com/kentrow/tapyr/blob/main/docs/providers.md",
+      "categories": [
+        "example"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "simulator",
+        "notes": "Synthetic data, by design"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/example-sim/README.md",
+      "simulator": true,
+      "auth": "bearer",
+      "templates": [
+        {
+          "name": "example-sim-devices",
+          "path": "/devices",
+          "defaultInterval": "5m",
+          "metrics": [
+            "example_device_clients",
+            "example_device_info",
+            "example_device_received_bytes_total",
+            "example_device_up",
+            "example_devices"
+          ]
+        },
+        {
+          "name": "example-sim-network-devices",
+          "path": "/sites/{siteId}/networks/{networkId}/devices",
+          "defaultInterval": "5m",
+          "metrics": [
+            "example_network_device_up"
+          ]
+        },
+        {
+          "name": "example-sim-networks",
+          "path": "/sites/{siteId}/networks",
+          "defaultInterval": "30m",
+          "metrics": [
+            "example_network_info"
+          ]
+        },
+        {
+          "name": "example-sim-sites",
+          "path": "/sites",
+          "defaultInterval": "1h",
+          "metrics": [
+            "example_site_devices",
+            "example_site_info"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "account-rate",
+          "kind": "rate",
+          "value": "10/s, burst 10",
+          "scope": [
+            "account"
+          ],
+          "description": "Per-account throughput (assumed, example only)",
+          "source": {
+            "kind": "assumed"
+          }
+        },
+        {
+          "name": "concurrency",
+          "kind": "concurrency",
+          "value": "4 concurrent requests",
+          "scope": [
+            "instance"
+          ],
+          "description": "Concurrent requests per source (assumed, example only)",
+          "source": {
+            "kind": "assumed"
+          }
+        },
+        {
+          "name": "daily",
+          "kind": "quota",
+          "value": "auto (5000 until learned) per day, reset at 00:00 UTC",
+          "scope": [
+            "account"
+          ],
+          "description": "Daily quota, learned from response headers (example only)",
+          "source": {
+            "kind": "assumed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "meraki-dashboard",
+      "version": "0.1.0",
+      "displayName": "Cisco Meraki Dashboard",
+      "description": "Cisco Meraki Dashboard API v1",
+      "docs": "https://developer.cisco.com/meraki/api-v1/",
+      "categories": [
+        "network",
+        "wireless",
+        "sd-wan"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "simulator",
+        "notes": "Built from the official documentation and OpenAPI description v1.75.1; not run against a real Dashboard yet"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/meraki-dashboard/README.md",
+      "simulator": true,
+      "auth": "bearer",
+      "templates": [
+        {
+          "name": "meraki-appliance-uplink-statuses",
+          "path": "/organizations/{organizationId}/appliance/uplink/statuses",
+          "defaultInterval": "5m",
+          "metrics": [
+            "meraki_appliance_uplink_active",
+            "meraki_appliance_uplink_up"
+          ]
+        },
+        {
+          "name": "meraki-device-availabilities",
+          "path": "/organizations/{organizationId}/devices/availabilities",
+          "defaultInterval": "5m",
+          "metrics": [
+            "meraki_device_alerting",
+            "meraki_device_up"
+          ]
+        },
+        {
+          "name": "meraki-devices",
+          "path": "/organizations/{organizationId}/devices",
+          "defaultInterval": "1h",
+          "metrics": [
+            "meraki_device_info"
+          ]
+        },
+        {
+          "name": "meraki-networks",
+          "path": "/organizations/{organizationId}/networks",
+          "defaultInterval": "1h",
+          "metrics": [
+            "meraki_network_info"
+          ]
+        },
+        {
+          "name": "meraki-organizations",
+          "path": "/organizations",
+          "defaultInterval": "1h",
+          "metrics": [
+            "meraki_organization_api_enabled",
+            "meraki_organization_info"
+          ]
+        },
+        {
+          "name": "meraki-wireless-client-counts",
+          "path": "/organizations/{organizationId}/wireless/clients/overview/byDevice",
+          "defaultInterval": "5m",
+          "metrics": [
+            "meraki_wireless_device_clients"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "org-rate",
+          "kind": "rate",
+          "value": "10/s, burst 20",
+          "scope": [
+            "var:organizationId"
+          ],
+          "description": "10 requests per second per organization, plus 10 more in the first second (token bucket), shared by every application of the organization (developer.cisco.com/meraki/api-v1/rate-limit)",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developer.cisco.com/meraki/api-v1/rate-limit/",
+            "date": "2026-11"
+          }
+        },
+        {
+          "name": "ip-rate",
+          "kind": "rate",
+          "value": "100/s, burst 100",
+          "scope": [
+            "instance"
+          ],
+          "description": "100 requests per second per source IP address (developer.cisco.com/meraki/api-v1/rate-limit)",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developer.cisco.com/meraki/api-v1/rate-limit/",
+            "date": "2026-11"
+          }
+        },
+        {
+          "name": "ip-concurrency",
+          "kind": "concurrency",
+          "value": "10 concurrent requests",
+          "scope": [
+            "instance"
+          ],
+          "description": "Concurrent requests per source IP (assumed; not documented officially, 10 is community knowledge)",
+          "source": {
+            "kind": "assumed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "teltonika-rms",
+      "version": "0.1.0",
+      "displayName": "Teltonika RMS",
+      "description": "Teltonika Remote Management System (RMS) cloud API",
+      "docs": "https://developers.rms.teltonika-networks.com/",
+      "categories": [
+        "network",
+        "cellular"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "real-platform",
+        "date": "2026-11",
+        "platformVersion": "RMS API v3-BETA",
+        "notes": "Every template run against the real platform by the e2e test"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/teltonika-rms/README.md",
+      "simulator": true,
+      "auth": "bearer",
+      "templates": [
+        {
+          "name": "rms-device-data-usage",
+          "path": "/devices/{deviceId}/data-usage",
+          "defaultInterval": "6h",
+          "metrics": [
+            "rms_device_mobile_received_bytes_today",
+            "rms_device_mobile_transmitted_bytes_today"
+          ]
+        },
+        {
+          "name": "rms-devices",
+          "path": "/devices",
+          "defaultInterval": "5m",
+          "metrics": [
+            "rms_device_info",
+            "rms_device_last_connection_timestamp_seconds",
+            "rms_device_last_update_timestamp_seconds",
+            "rms_device_mobile_connected",
+            "rms_device_mobile_info",
+            "rms_device_mobile_roaming",
+            "rms_device_mobile_rsrp_dbm",
+            "rms_device_mobile_rsrq_db",
+            "rms_device_mobile_rssi_dbm",
+            "rms_device_mobile_sinr_db",
+            "rms_device_temperature_celsius",
+            "rms_device_up",
+            "rms_device_uptime_seconds",
+            "rms_devices"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "monthly",
+          "kind": "quota",
+          "value": "auto (100000 until learned) per month, reset on day 1 at 00:00 UTC",
+          "scope": [
+            "credential"
+          ],
+          "description": "100000 requests per month (developers.rms.teltonika-networks.com/pages/web-api.html); the platform reports the limit, the remaining requests and the reset time in X-RateLimit-* headers (measured), the window starting at the first request",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developers.rms.teltonika-networks.com/pages/web-api.html",
+            "date": "2026-11"
+          }
+        },
+        {
+          "name": "rate",
+          "kind": "rate",
+          "value": "2/s, burst 4",
+          "scope": [
+            "credential"
+          ],
+          "description": "Throughput per token (assumed, none documented)",
+          "source": {
+            "kind": "assumed"
+          }
+        },
+        {
+          "name": "concurrency",
+          "kind": "concurrency",
+          "value": "2 concurrent requests",
+          "scope": [
+            "credential"
+          ],
+          "description": "Concurrent requests per token (assumed, none documented)",
+          "source": {
+            "kind": "assumed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "teltonika-rutos",
+      "version": "0.1.0",
+      "displayName": "Teltonika RutOS",
+      "description": "Local REST API of Teltonika routers running RutOS 07.06 or later",
+      "docs": "https://developers.teltonika-networks.com/",
+      "categories": [
+        "network",
+        "cellular"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "real-platform",
+        "date": "2026-11",
+        "platformVersion": "RutOS 07.24.5",
+        "notes": "A Teltonika CAP7xx router, every template, login and logout"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/teltonika-rutos/README.md",
+      "simulator": true,
+      "auth": "session_login",
+      "templates": [
+        {
+          "name": "rutos-device",
+          "path": "/system/device/status",
+          "defaultInterval": "30m",
+          "metrics": [
+            "rutos_device_info"
+          ]
+        },
+        {
+          "name": "rutos-failover",
+          "path": "/failover/status",
+          "defaultInterval": "1m",
+          "metrics": [
+            "rutos_failover_interface_enabled",
+            "rutos_failover_interface_lost_probes",
+            "rutos_failover_interface_online",
+            "rutos_failover_interface_score"
+          ]
+        },
+        {
+          "name": "rutos-interfaces",
+          "path": "/interfaces/status",
+          "defaultInterval": "1m",
+          "metrics": [
+            "rutos_interface_info",
+            "rutos_interface_received_bytes_total",
+            "rutos_interface_received_packets_total",
+            "rutos_interface_transmitted_bytes_total",
+            "rutos_interface_transmitted_packets_total",
+            "rutos_interface_up",
+            "rutos_interface_uptime_seconds"
+          ]
+        },
+        {
+          "name": "rutos-modems",
+          "path": "/modems/status",
+          "defaultInterval": "1m",
+          "metrics": [
+            "rutos_modem_active_sim",
+            "rutos_modem_connected",
+            "rutos_modem_info",
+            "rutos_modem_received_bytes_total",
+            "rutos_modem_registered",
+            "rutos_modem_roaming",
+            "rutos_modem_rsrp_dbm",
+            "rutos_modem_rsrq_db",
+            "rutos_modem_rssi_dbm",
+            "rutos_modem_signal_quality_ratio",
+            "rutos_modem_sim_inserted",
+            "rutos_modem_sinr_db",
+            "rutos_modem_temperature_celsius",
+            "rutos_modem_transmitted_bytes_total"
+          ]
+        },
+        {
+          "name": "rutos-system",
+          "path": "/system/device/usage/status",
+          "defaultInterval": "1m",
+          "metrics": [
+            "rutos_flash_free_bytes",
+            "rutos_flash_total_bytes",
+            "rutos_memory_free_bytes",
+            "rutos_memory_total_bytes",
+            "rutos_system_load1",
+            "rutos_system_load15",
+            "rutos_system_load5",
+            "rutos_system_uptime_seconds"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "rate",
+          "kind": "rate",
+          "value": "2/s, burst 2",
+          "scope": [
+            "target"
+          ],
+          "description": "Requests per router per second (assumed; routers are resource-constrained, no limit is documented)",
+          "source": {
+            "kind": "assumed"
+          }
+        },
+        {
+          "name": "concurrency",
+          "kind": "concurrency",
+          "value": "2 concurrent requests",
+          "scope": [
+            "target"
+          ],
+          "description": "Concurrent requests per router (assumed)",
+          "source": {
+            "kind": "assumed"
+          }
+        }
+      ]
+    }
+  ]
+}

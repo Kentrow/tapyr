@@ -34,6 +34,6 @@ The documentation describes behavior: a pull request that changes behavior updat
 
 - Writing documentation does not change: Markdown here, relative links, `make lint` catches a broken link or anchor before the site does.
 - A new Markdown file in `docs/` must be added to `docs/site.yml`, in `nav` or in `unpublished`.
-- The output of `docsite export` (paths, link rewriting, index file) is an interface: changing it means a coordinated change of the site repository.
+- The output of `docsite export` (paths, link rewriting, index file) is an interface: changing it means a coordinated change of the site repository. So is the output of `tapyr provider list --output json`, from which the site builds the provider catalog ([ADR 0011](0011-provider-ecosystem.md), versioned by its `schemaVersion`).
 - Zensical is young (0.0.x) and its native versioning is on its roadmap; the site repository pins its version and uses the `mike` fork it documents meanwhile.
 - v0.1.0 has no documentation version on the site.

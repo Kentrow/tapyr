@@ -185,6 +185,12 @@ func TestCLI(t *testing.T) {
 			wantStdout: []string{"NAME", "example-sim", "0.1.0", "the built-in package"},
 		},
 		{
+			name:       "provider list with an unknown output",
+			args:       []string{"provider", "list", "--output", "yaml"},
+			wantCode:   exitFailure,
+			wantStderr: []string{`invalid --output "yaml" (want table or json)`},
+		},
+		{
 			name:       "schema prints the combined schema",
 			args:       []string{"schema"},
 			wantCode:   exitOK,
