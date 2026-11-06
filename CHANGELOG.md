@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-06
+
 ### Fixed
 
 - A push output (remote write or OTLP) dropped the whole batch when the backend refused it for one out-of-order or out-of-bounds sample, as Prometheus does without out-of-order window: the fresh samples of the other jobs sent with it were lost. The batch is now split until only the refused samples are left, and only those are dropped and counted in `tapyr_output_samples_dropped_total{reason="out_of_order"}`.
@@ -50,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/kentrow/tapyr/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kentrow/tapyr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kentrow/tapyr/releases/tag/v0.1.0

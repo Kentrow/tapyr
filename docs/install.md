@@ -7,7 +7,7 @@ Tapyr is a single static binary with the web UI embedded. Releases ship it for L
 Download the archive of your platform and `checksums.txt` from the [releases page](https://github.com/kentrow/tapyr/releases), check it, then put `tapyr` in your `PATH`:
 
 ```sh
-VERSION=0.1.1
+VERSION=0.1.2
 curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/tapyr_${VERSION}_linux_amd64.tar.gz
 curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/checksums.txt
 sha256sum --ignore-missing -c checksums.txt
@@ -26,7 +26,7 @@ docker run -d --name tapyr \
   -v "$PWD/config:/etc/tapyr:ro" \
   -v tapyr-data:/home/nonroot/data \
   -p 9790:9790 \
-  ghcr.io/kentrow/tapyr:0.1.1
+  ghcr.io/kentrow/tapyr:0.1.2
 ```
 
 - The image runs `tapyr run --config /etc/tapyr` as the `nonroot` user (uid 65532), on `gcr.io/distroless/static-debian12`.

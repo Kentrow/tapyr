@@ -20,4 +20,4 @@ configMapGenerator:
     files: [config.yaml]
 images:
   - name: ghcr.io/kentrow/tapyr
-    newTag: "0.1.1"
+    newTag: "0.1.2"
