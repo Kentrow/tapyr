@@ -40,6 +40,9 @@ type Limit struct {
 	AppliesTo *AppliesTo `json:"appliesTo,omitempty"`
 	// Sync reads quota state from response headers.
 	Sync *QuotaSync `json:"sync,omitempty"`
+	// Source of the limit. Optional, and required on every limit by
+	// tapyr provider lint --catalog.
+	Source *LimitSource `json:"source,omitempty"`
 }
 
 // JSONSchemaExtend implements the schema reflector hook.
@@ -120,4 +123,21 @@ type QuotaSync struct {
 	RemainingHeader string `json:"remainingHeader,omitempty"`
 	// ResetHeader carries the reset time (epoch seconds or delta seconds).
 	ResetHeader string `json:"resetHeader,omitempty"`
+}
+
+// LimitSource says where a limit comes from.
+type LimitSource struct {
+	// Kind is vendor-docs (the vendor documentation, with its url), measured
+	// (against the real API, with its date) or assumed (nothing documented).
+	Kind string `json:"kind" jsonschema:"required,enum=vendor-docs,enum=measured,enum=assumed"`
+	// URL of the vendor documentation, or of the notes of a measurement.
+	URL string `json:"url,omitempty" jsonschema:"format=uri"`
+	// Date the source was checked or the measurement made, YYYY-MM-DD or
+	// YYYY-MM.
+	Date string `json:"date,omitempty"`
+}
+
+// JSONSchemaExtend implements the schema reflector hook.
+func (LimitSource) JSONSchemaExtend(s *jsonschema.Schema) {
+	setPattern(s, "date", datePattern)
 }

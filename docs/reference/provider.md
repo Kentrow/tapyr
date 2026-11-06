@@ -19,9 +19,14 @@ ProviderMeta identifies a provider package.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `categories` | list of [Name](#name) |  | Categories of the provider, from providers/categories.yaml, the main one first. Unique items. |
 | `description` | string |  | Description is free text for humans. |
+| `displayName` | string |  | `displayName` is the name of the provider in the catalog, for example "Cisco Meraki Dashboard". Like categories, maintainers, tier and validation, it is optional, and required by tapyr provider lint --catalog (ADR 0011). |
 | `docs` | string |  | Docs links to the vendor API documentation. Format uri. |
+| `maintainers` | list of string |  | Maintainers are the GitHub handles, without @, of the people who answer for the package. Unique items. Each item: pattern `^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$`. |
 | `name` | [Name](#name) | yes | Name of the provider, unique across built-in and user packages. |
+| `tier` | string |  | Tier says who maintains the package: official (the Tapyr maintainers) or community (the maintainers listed). One of `official`, `community`. |
+| `validation` | [Validation](#validation) |  | Validation says how the package was last tested. |
 | `version` | string | yes | Version of the provider package (semver). Breaking changes to metric names or labels bump the major version. Pattern <code>^(0&#124;&#91;1-9&#93;&#91;0-9&#93;&#42;)&#92;.(0&#124;&#91;1-9&#93;&#91;0-9&#93;&#42;)&#92;.(0&#124;&#91;1-9&#93;&#91;0-9&#93;&#42;)(-&#91;0-9A-Za-z.-&#93;+)?(&#92;+&#91;0-9A-Za-z.-&#93;+)?$</code>. |
 
 ## ProviderSpec
@@ -43,6 +48,17 @@ ProviderSpec is the specification of a Provider.
 ## Name
 
 Type: string. Pattern `^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$`.
+
+## Validation
+
+Validation records the last validation of a provider package.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `date` | string |  | Date of the validation, YYYY-MM-DD or YYYY-MM. Required by tapyr provider lint --catalog with status real-platform. Pattern <code>^&#91;0-9&#93;{4}-(0&#91;1-9&#93;&#124;1&#91;0-2&#93;)(-(0&#91;1-9&#93;&#124;&#91;12&#93;&#91;0-9&#93;&#124;3&#91;01&#93;))?$</code>. |
+| `notes` | string |  | Notes is free text: what was covered, what the package was built from. |
+| `platformVersion` | string |  | `platformVersion` is the version of the API, platform or firmware validated against, for example "RutOS 07.24.5". Required by tapyr provider lint --catalog with status real-platform. |
+| `status` | string | yes | Status is simulator (tested against its simulator only) or real-platform (run against the real API). One of `simulator`, `real-platform`. |
 
 ## Auth
 
@@ -105,6 +121,7 @@ Limit is a constraint of the provider API, enforced by the budget engine for eve
 | `name` | [Name](#name) | yes | Name of the limit, unique within the provider. |
 | `rate` | [Rate](#rate) |  | Rate is the refill rate of a rate limit, for example 10/s. |
 | `scope` | [Scope](#scope) |  | Scope partitions the limit (one counter per scope key). |
+| `source` | [LimitSource](#limitsource) |  | Source of the limit. Optional, and required on every limit by tapyr provider lint --catalog. |
 | `sync` | [QuotaSync](#quotasync) |  | Sync reads quota state from response headers. |
 | `window` | [Window](#window) |  | Window of a quota: a calendar period or a rolling duration. |
 
@@ -261,6 +278,16 @@ Scope partitions a limit.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `by` | list of string |  | By lists the scope dimensions: instance, provider, account, target, credential, endpoint or var:&lt;name&gt;. Empty means instance. Unique items. Each item: pattern <code>^(instance&#124;provider&#124;account&#124;target&#124;credential&#124;endpoint&#124;var:&#91;A-Za-z&#95;&#93;&#91;A-Za-z0-9&#95;&#93;&#42;)$</code>. |
+
+## LimitSource
+
+LimitSource says where a limit comes from.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `date` | string |  | Date the source was checked or the measurement made, YYYY-MM-DD or YYYY-MM. Pattern <code>^&#91;0-9&#93;{4}-(0&#91;1-9&#93;&#124;1&#91;0-2&#93;)(-(0&#91;1-9&#93;&#124;&#91;12&#93;&#91;0-9&#93;&#124;3&#91;01&#93;))?$</code>. |
+| `kind` | string | yes | Kind is vendor-docs (the vendor documentation, with its url), measured (against the real API, with its date) or assumed (nothing documented). One of `vendor-docs`, `measured`, `assumed`. |
+| `url` | string |  | `url` of the vendor documentation, or of the notes of a measurement. Format uri. |
 
 ## QuotaSync
 

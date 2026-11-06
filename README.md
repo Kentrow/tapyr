@@ -64,12 +64,17 @@ The planner computes an effective interval for every job so that the configurati
 
 ## Built-in providers
 
-| Provider | API | Validation |
-|---|---|---|
-| [`aruba-central-classic`](providers/aruba-central-classic/README.md) | HPE Aruba Networking Central (classic) | Simulator |
-| [`meraki-dashboard`](providers/meraki-dashboard/README.md) | Cisco Meraki Dashboard API v1 | Simulator |
-| [`teltonika-rms`](providers/teltonika-rms/README.md) | Teltonika RMS cloud API | Real platform and simulator |
-| [`teltonika-rutos`](providers/teltonika-rutos/README.md) | Local RutOS API of Teltonika routers | Real router and simulator |
+<!-- begin provider table: generated from the provider packages by TestProviderTables (go test ./cmd/tapyr -run TestProviderTables -update), do not edit -->
+
+| Package | API | Tier | Validation |
+|---|---|---|---|
+| [`aruba-central-classic`](providers/aruba-central-classic/README.md) | HPE Aruba Networking Central (classic platform) REST API | Official | Simulator only |
+| [`example-sim`](providers/example-sim/README.md) | Vendor-neutral example API, served by tapyr sim, for development, tests and demos | Official | Simulator only |
+| [`meraki-dashboard`](providers/meraki-dashboard/README.md) | Cisco Meraki Dashboard API v1 | Official | Simulator only |
+| [`teltonika-rms`](providers/teltonika-rms/README.md) | Teltonika Remote Management System (RMS) cloud API | Official | Real platform (RMS API v3-BETA, 2026-11) and simulator |
+| [`teltonika-rutos`](providers/teltonika-rutos/README.md) | Local REST API of Teltonika routers running RutOS 07.06 or later | Official | Real platform (RutOS 07.24.5, 2026-11) and simulator |
+
+<!-- end provider table -->
 
 Each package README lists what it collects, the credentials it needs, and its limits with their sources. Packages validated against their simulator only are waiting for reports from real accounts: see [`CONTRIBUTING.md`](CONTRIBUTING.md). [`docs/providers.md`](docs/providers.md) explains how to write a package for another API, and [`docs/provider-ideas.md`](docs/provider-ideas.md) lists candidates.
 

@@ -27,6 +27,8 @@ const (
 	infoNamePattern   = `^[a-zA-Z_:][a-zA-Z0-9_:]*_info$`
 	resetAtPattern    = `^([01][0-9]|2[0-3]):[0-5][0-9]$`
 	semverPattern     = `^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$`
+	datePattern       = `^[0-9]{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?$`
+	handlePattern     = `^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$`
 )
 
 // patternHints turns schema patterns into human-readable error messages.
@@ -41,6 +43,8 @@ var patternHints = map[string]string{
 	infoNamePattern:   "must be a valid metric name ending with _info",
 	resetAtPattern:    "must be a time of day in 24h HH:MM format",
 	semverPattern:     "must be a semantic version such as 0.1.0",
+	datePattern:       "must be a date such as 2026-11-04 or 2026-11",
+	handlePattern:     "must be a GitHub handle, without @",
 	`^/`:              "must start with /",
 	`^auto$`:          `must be a positive integer or "auto"`,
 }
@@ -378,3 +382,15 @@ func strictUnmarshal(b []byte, v any) error {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// ParseDate parses a date of the catalog metadata: YYYY-MM-DD, or YYYY-MM
+// when the day is not known.
+func ParseDate(s string) (time.Time, error) {
+	if t, err := time.Parse(time.DateOnly, s); err == nil {
+		return t, nil
+	}
+	if t, err := time.Parse("2006-01", s); err == nil {
+		return t, nil
+	}
+	return time.Time{}, fmt.Errorf("%q is not a date (YYYY-MM-DD or YYYY-MM)", s)
+}

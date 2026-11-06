@@ -53,6 +53,16 @@ metadata:
   version: 0.1.0                       # provider package version (semver)
   description: Cisco Meraki Dashboard API v1
   docs: https://developer.cisco.com/meraki/api-v1/
+  # Catalog metadata (ADR 0011): optional, required by tapyr provider lint --catalog
+  displayName: Cisco Meraki Dashboard
+  categories: [network, wireless, sd-wan]   # from providers/categories.yaml, the main one first
+  maintainers: [Kentrow]               # GitHub handles, without @
+  tier: official                       # official | community
+  validation:
+    status: simulator                  # simulator | real-platform
+    # date: 2026-11-04                 # YYYY-MM-DD or YYYY-MM; with platformVersion, required for real-platform
+    # platformVersion: Dashboard API v1.75.1
+    notes: Built from the official documentation and OpenAPI description v1.75.1
 spec:
   baseURL: "{{ .params.baseURL | default \"https://api.meraki.com/api/v1\" }}"
 
@@ -84,6 +94,10 @@ spec:
   limits:
     - name: org-rate
       description: Per-organization throughput
+      source:                          # optional, required by tapyr provider lint --catalog
+        kind: vendor-docs              # vendor-docs (with url) | measured (with date) | assumed
+        url: https://developer.cisco.com/meraki/api-v1/rate-limit/
+        date: 2026-11-04               # when the source was checked or the measurement made
       kind: rate
       rate: 10/s
       burst: 10
@@ -120,6 +134,7 @@ Notes:
 - `auth.type` is one of `none`, `header`, `bearer`, `basic`, `oauth2_client_credentials`, `session_login`, `plugin`. The configuration block of a type is named after the type in camelCase (`bearer`, `oauth2ClientCredentials`, `sessionLogin`, `plugin`). Pagination follows the same rule (`linkHeader` for `link_header`).
 - Auth plugins (Go code, for flows that cannot be expressed declaratively) are selected with `type: plugin` and `plugin: { name: <plugin>, config: {...} }`. The core schema treats `config` as free-form; the plugin validates it at compile time. This keeps vendor names out of the core schema.
 - `params` and `secrets` declare what an Account may or must provide. An Account providing an undeclared param or secret is an error.
+- The catalog metadata (`displayName`, `categories`, `maintainers`, `tier`, `validation`) and the `source` of the limits describe the package for the provider catalog ([ADR 0011](../adr/0011-provider-ecosystem.md)); the engine ignores them. Two axes describe a package: `tier` says who maintains it (`official`: the Tapyr maintainers, `community`: the maintainers listed), `validation` how it was last tested. They are optional, so that user packages need none; `tapyr provider lint --catalog` requires them (see [Provider packages](#provider-packages)).
 
 ## JobTemplate
 
@@ -434,7 +449,7 @@ providers/<name>/
 - Precedence, highest first: `Provider` documents written directly in the configuration paths, then packages from `providerPaths` (in order), then built-in packages. A package that is overridden is dropped entirely, its job templates included. Every override is reported as a warning by `validate` and `run`.
 - Each `providerPaths` entry is either a package directory (it contains `provider.yaml`) or a directory of packages (each subdirectory containing a `provider.yaml` is a package).
 - In a package, `provider.yaml` holds exactly one `Provider`, `templates/*.yaml` hold only `JobTemplate` documents whose `spec.provider` is the package name, and `sim/sim.yaml` holds at most one `Simulation`. The package directory name must equal the provider name.
-- `tapyr provider lint <dir>` validates a package and runs its contract test (see [`08-simulator.md`](08-simulator.md#contract-tests)).
+- `tapyr provider lint <dir>` validates a package and runs its contract test (see [`08-simulator.md`](08-simulator.md#contract-tests)). With `--catalog`, it also requires the catalog metadata: a `displayName`, at least one category of [`providers/categories.yaml`](../../providers/categories.yaml), at least one maintainer, a `tier`, a `validation` (with its `date` and `platformVersion` when its status is `real-platform`), and a `source` on every limit (with its `url` for `vendor-docs`, its `date` for `measured`); dates must exist. The CI runs it on the built-in packages.
 
 ## Validation rules (non-exhaustive)
 

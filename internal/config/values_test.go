@@ -237,6 +237,10 @@ func TestSchemaPatternsMatchParsers(t *testing.T) {
 			percentPattern, func(s string) error { _, err := parsePercent(s); return err },
 			[]string{"10%", "2.5%", "0%", "100%"},
 		},
+		{
+			datePattern, func(s string) error { _, err := ParseDate(s); return err },
+			[]string{"2026-11-04", "2026-11", "2028-02-29", "1999-12-31"},
+		},
 	}
 	for _, tt := range tests {
 		re := regexp.MustCompile(tt.pattern)
@@ -292,5 +296,26 @@ func TestRenderTemplate(t *testing.T) {
 	}
 	if got := PathVars("/orgs/{orgId}/devices/{serial}"); len(got) != 2 || got[0] != "orgId" || got[1] != "serial" {
 		t.Errorf("PathVars() = %v", got)
+	}
+}
+
+func TestParseDate(t *testing.T) {
+	tests := []struct {
+		in   string
+		want time.Time
+		ok   bool
+	}{
+		{"2026-11-04", time.Date(2026, time.November, 4, 0, 0, 0, 0, time.UTC), true},
+		{"2026-11", time.Date(2026, time.November, 1, 0, 0, 0, 0, time.UTC), true},
+		{"2026-02-30", time.Time{}, false},
+		{"2026-13", time.Time{}, false},
+		{"November 2026", time.Time{}, false},
+		{"", time.Time{}, false},
+	}
+	for _, tt := range tests {
+		got, err := ParseDate(tt.in)
+		if (err == nil) != tt.ok || !got.Equal(tt.want) {
+			t.Errorf("ParseDate(%q) = %v, %v; want %v, ok %v", tt.in, got, err, tt.want, tt.ok)
+		}
 	}
 }

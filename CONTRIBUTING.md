@@ -72,8 +72,8 @@ A provider package is a directory of YAML and CEL in [`providers/`](providers/):
 - **Every limit cites its source**: the vendor documentation (link), a measurement (date and method), or "assumed". Limits are what makes Tapyr trustworthy: an invented one makes `tapyr plan` wrong.
 - **No real data** in fixtures: record real responses only with `tapyr record`, which anonymizes them, and review the result before committing (see [`docs/providers.md`](docs/providers.md#recording-real-responses)).
 - **Never commit credentials**, even expired ones. Simulator credentials are obviously fake (`sim-...`).
-- `tapyr provider lint providers/<name>` must pass.
-- Say in the README and the pull request how the package was validated: against the simulator only, or against a real platform (which version, when).
+- `tapyr provider lint --catalog providers/<name>` must pass: it also checks the catalog metadata (display name, categories, maintainers, tier, validation, the source of every limit).
+- Say in the README, in `metadata.validation` and in the pull request how the package was validated: against the simulator only, or against a real platform (which version, when).
 
 ## Contributions assisted by AI
 

@@ -54,7 +54,7 @@ jobs:
       - name: Check the documentation links and the site manifest
         run: make docs-check
       - name: Lint the built-in provider packages
-        run: go run ./cmd/tapyr provider lint providers
+        run: go run ./cmd/tapyr provider lint --catalog providers
 
   test:
     name: Test

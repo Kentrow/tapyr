@@ -30,7 +30,7 @@ tapyr plan [flags]
 
 ## tapyr provider lint
 
-Validate a provider package (or every package of a directory): schema, CEL compilation, dashboards, and the contract test of tests/contract.yaml, run once against the package simulator at a fixed simulated time. The samples must equal tests/expected.prom; --update rewrites it instead.
+Validate a provider package (or every package of a directory): schema, CEL compilation, dashboards, and the contract test of tests/contract.yaml, run once against the package simulator at a fixed simulated time. The samples must equal tests/expected.prom; --update rewrites it instead. --catalog also requires the catalog metadata: display name, categories, maintainers, tier, validation and the source of every limit.
 
 ```text
 tapyr provider lint <dir> [flags]
@@ -38,6 +38,7 @@ tapyr provider lint <dir> [flags]
 
 | Flag | Default | Description |
 |---|---|---|
+| `--catalog` |  | also require the catalog metadata (ADR 0011) |
 | `--update` |  | write tests/expected.prom instead of comparing |
 
 ## tapyr provider list

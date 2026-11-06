@@ -5,6 +5,13 @@ metadata:
   version: 0.1.0
   description: Cisco Meraki Dashboard API v1
   docs: https://developer.cisco.com/meraki/api-v1/
+  displayName: Cisco Meraki Dashboard
+  categories: [network, wireless, sd-wan]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: simulator
+    notes: Built from the official documentation and OpenAPI description v1.75.1; not run against a real Dashboard yet
 spec:
   baseURL: '{{ .params.baseURL | default "https://api.meraki.com/api/v1" | trimSuffix "/" }}'
   params:
@@ -41,6 +48,10 @@ spec:
         10 requests per second per organization, plus 10 more in the first
         second (token bucket), shared by every application of the organization
         (developer.cisco.com/meraki/api-v1/rate-limit)
+      source:
+        kind: vendor-docs
+        url: https://developer.cisco.com/meraki/api-v1/rate-limit/
+        date: 2026-11
       kind: rate
       rate: 10/s
       burst: 20
@@ -48,11 +59,17 @@ spec:
       appliesTo: { requestsWithVar: organizationId }
     - name: ip-rate
       description: 100 requests per second per source IP address (developer.cisco.com/meraki/api-v1/rate-limit)
+      source:
+        kind: vendor-docs
+        url: https://developer.cisco.com/meraki/api-v1/rate-limit/
+        date: 2026-11
       kind: rate
       rate: 100/s
       scope: { by: [instance] }
     - name: ip-concurrency
       description: Concurrent requests per source IP (assumed; not documented officially, 10 is community knowledge)
+      source:
+        kind: assumed
       kind: concurrency
       max: 10
       scope: { by: [instance] }

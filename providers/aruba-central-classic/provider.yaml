@@ -5,6 +5,13 @@ metadata:
   version: 0.1.0
   description: HPE Aruba Networking Central (classic platform) REST API
   docs: https://developer.arubanetworks.com/aruba-central/
+  displayName: HPE Aruba Networking Central (classic)
+  categories: [network, wireless]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: simulator
+    notes: Built from the Aruba developer hub and the pycentral SDK; not run against a real Central account yet
 spec:
   baseURL: '{{ .params.baseURL | trimSuffix "/" }}'
   params:
@@ -50,6 +57,10 @@ spec:
         device plus 90 per Advanced device, reset at midnight GMT, reported in
         X-RateLimit-*-day headers (developer.arubanetworks.com, Usage and Rate
         Limits)
+      source:
+        kind: vendor-docs
+        url: https://developer.arubanetworks.com/hpe-aruba-networking-central/docs/usage-and-rate-limits
+        date: 2026-11
       kind: quota
       max: auto
       initialMax: 5000
@@ -60,6 +71,10 @@ spec:
         remainingHeader: X-RateLimit-Remaining-day
     - name: second
       description: 7 calls per account per second (developer.arubanetworks.com, Usage and Rate Limits)
+      source:
+        kind: vendor-docs
+        url: https://developer.arubanetworks.com/hpe-aruba-networking-central/docs/usage-and-rate-limits
+        date: 2026-11
       kind: rate
       rate: 7/s
       burst: 7

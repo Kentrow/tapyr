@@ -37,7 +37,7 @@ Pick the endpoints that return the most objects per request (organization-wide l
 
 Create the layout of `providers/AGENTS.md`. Name the package after the vendor and product (`vendor-product`), and pick one metric prefix.
 
-1. `provider.yaml`: `baseURL` from a param, `params` for what varies per account (a path variable such as `{org}` can come from an account param), `secrets` with descriptions, `auth`, `defaults`, `pagination`, `limits` (each with a `description` naming its source, `scope.by`, `sync` headers when the API sends them, `max: auto` and `initialMax` when the maximum depends on the account), `errors.rateLimited`. Scope dimensions ([`04-budget-engine.md`](../../../docs/spec/04-budget-engine.md#scope-dimensions)) are `instance` (the whole process, which approximates "per source IP"), `provider`, `account`, `target`, `credential`, `endpoint` and `var:<name>`: a limit "per user" or "per token" is `credential` (accounts sharing a secret share it); say in the README when the vendor scope is wider (all the tokens of a user, for example).
+1. `provider.yaml`: the catalog metadata (`displayName`, `categories` from `providers/categories.yaml`, `maintainers`, `tier`, `validation` with `status: simulator` until a run against the real API, see `providers/AGENTS.md`), `baseURL` from a param, `params` for what varies per account (a path variable such as `{org}` can come from an account param), `secrets` with descriptions, `auth`, `defaults`, `pagination`, `limits` (each with a `source` and a `description` naming it, `scope.by`, `sync` headers when the API sends them, `max: auto` and `initialMax` when the maximum depends on the account), `errors.rateLimited`. Scope dimensions ([`04-budget-engine.md`](../../../docs/spec/04-budget-engine.md#scope-dimensions)) are `instance` (the whole process, which approximates "per source IP"), `provider`, `account`, `target`, `credential`, `endpoint` and `var:<name>`: a limit "per user" or "per token" is `credential` (accounts sharing a secret share it); say in the README when the vendor scope is wider (all the tokens of a user, for example).
 2. `templates/*.yaml`: one JobTemplate per endpoint, with `defaultInterval`, `defaultPriority`, `estimate.pagesPerRun` and the `extract` (`items`, `filter`, `metrics`, `info`, `post`). Metric names `<prefix>_<object>_<measure>_<unit>` in base units; descriptive attributes in `<prefix>_<object>_info`; no high-cardinality label. Use `inventory` and `forEach` for per-object endpoints (see `meraki-dashboard` and `example-sim`).
 3. `sim/sim.yaml`: the same paths, pagination and envelopes as the real API, `auth.accept` with obviously fake credentials (`sim-...`), a synthetic `inventory` and template fixtures (`sim/fixtures/*.json.tmpl`) in the documented response shape. `example-sim` uses static fixtures; for template fixtures, copy `teltonika-rms` or `meraki-dashboard`, and use the helpers of [`08-simulator.md`](../../../docs/spec/08-simulator.md#synthetic-inventory-and-templated-fixtures) (`num` for integers, `rand` and `walk` return floats). Quota headers in `headers` when the API sends them. The simulator enforces the limits of `provider.yaml` by itself; its known gaps (reset headers as seconds, a fixed status per route) are listed in the spec, mention them in the README when the real API differs.
 4. `sim/scenarios/`: `default.yaml` (no fault), `quota-tight.yaml` (a quota smaller than the plan, or another client consuming it), `bad-day.yaml` (errors, latency or an outage on the main routes). Copy the shape of an existing package.
@@ -50,7 +50,7 @@ Create the layout of `providers/AGENTS.md`. Name the package after the vendor an
 
 ```sh
 go run ./cmd/tapyr provider lint --update providers/<name>   # writes tests/expected.prom
-go run ./cmd/tapyr provider lint providers/<name>            # must pass
+go run ./cmd/tapyr provider lint --catalog providers/<name>  # must pass
 go run ./cmd/tapyr sim --provider <name> --provider-path providers/<name>   # try it by hand
 ```
 
@@ -79,13 +79,13 @@ Whether a package becomes built in (embedded in the binary) is decided with the 
 
 - Add the directory to the `//go:embed` pattern of `providers/embed.go`.
 - Declare `portOffset` in `sim/sim.yaml`: the largest offset of the built-in packages plus one (`grep -h portOffset providers/*/sim/sim.yaml`), so that `tapyr sim --all` serves it without moving the others. Add it to the list of `TestSimAll` (`cmd/tapyr/sim_all_test.go`), and to `examples/compose` (`tapyr/config.yaml`, `compose.yaml`, `README.md`) if it belongs in the demo.
-- Add the package to the table of `docs/providers.md`.
+- Regenerate the provider tables of the README and `docs/providers.md` from the metadata: `go test ./cmd/tapyr -run TestProviderTables -update`.
 - Add a `CHANGELOG.md` entry under `## [Unreleased]`, `### Added`.
 - Run the [`check-change`](../check-change/SKILL.md) skill.
 
 ## Done when
 
-- `tapyr provider lint providers/<name>` and `make lint test` pass.
-- Every limit has a source (documented with a link, measured with a date, or assumed) in `provider.yaml` and the README.
+- `tapyr provider lint --catalog providers/<name>` and `make lint test` pass.
+- Every limit has a `source` (documented with a link, measured with a date, or assumed) in `provider.yaml`, also in the README.
 - The fixtures follow the documented response shapes and hold no real data.
 - The pull request lists the documentation pages used and what was validated against the real API, if anything.

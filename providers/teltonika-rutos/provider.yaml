@@ -5,6 +5,15 @@ metadata:
   version: 0.1.0
   description: Local REST API of Teltonika routers running RutOS 07.06 or later
   docs: https://developers.teltonika-networks.com/
+  displayName: Teltonika RutOS
+  categories: [network, cellular]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: real-platform
+    date: 2026-11
+    platformVersion: RutOS 07.24.5
+    notes: A Teltonika CAP7xx router, every template, login and logout
 spec:
   # One target per router: its baseURL is the address of the router.
   baseURL: '{{ .params.baseURL | trimSuffix "/" }}/api'
@@ -44,12 +53,16 @@ spec:
   limits:
     - name: rate
       description: Requests per router per second (assumed; routers are resource-constrained, no limit is documented)
+      source:
+        kind: assumed
       kind: rate
       rate: 2/s
       burst: 2
       scope: { by: [target] }
     - name: concurrency
       description: Concurrent requests per router (assumed)
+      source:
+        kind: assumed
       kind: concurrency
       max: 2
       scope: { by: [target] }
