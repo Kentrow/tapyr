@@ -436,6 +436,10 @@
           "$ref": "#/$defs/Scope",
           "description": "Scope partitions the limit (one counter per scope key)."
         },
+        "source": {
+          "$ref": "#/$defs/LimitSource",
+          "description": "Source of the limit. Optional, and required on every limit by\ntapyr provider lint --catalog."
+        },
         "sync": {
           "$ref": "#/$defs/QuotaSync",
           "description": "Sync reads quota state from response headers."
@@ -447,6 +451,35 @@
       },
       "required": [
         "name",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "LimitSource": {
+      "additionalProperties": false,
+      "description": "LimitSource says where a limit comes from.",
+      "properties": {
+        "date": {
+          "description": "Date the source was checked or the measurement made, YYYY-MM-DD or\nYYYY-MM.",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?$",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Kind is vendor-docs (the vendor documentation, with its url), measured\n(against the real API, with its date) or assumed (nothing documented).",
+          "enum": [
+            "vendor-docs",
+            "measured",
+            "assumed"
+          ],
+          "type": "string"
+        },
+        "url": {
+          "description": "URL of the vendor documentation, or of the notes of a measurement.",
+          "format": "uri",
+          "type": "string"
+        }
+      },
+      "required": [
         "kind"
       ],
       "type": "object"
@@ -832,8 +865,20 @@
       "additionalProperties": false,
       "description": "ProviderMeta identifies a provider package.",
       "properties": {
+        "categories": {
+          "description": "Categories of the provider, from providers/categories.yaml, the main\none first.",
+          "items": {
+            "$ref": "#/$defs/Name"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
         "description": {
           "description": "Description is free text for humans.",
+          "type": "string"
+        },
+        "displayName": {
+          "description": "DisplayName is the name of the provider in the catalog, for example\n\"Cisco Meraki Dashboard\". Like categories, maintainers, tier and\nvalidation, it is optional, and required by tapyr provider lint\n--catalog (ADR 0011).",
           "type": "string"
         },
         "docs": {
@@ -841,9 +886,30 @@
           "format": "uri",
           "type": "string"
         },
+        "maintainers": {
+          "description": "Maintainers are the GitHub handles, without @, of the people who answer\nfor the package.",
+          "items": {
+            "pattern": "^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?$",
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
         "name": {
           "$ref": "#/$defs/Name",
           "description": "Name of the provider, unique across built-in and user packages."
+        },
+        "tier": {
+          "description": "Tier says who maintains the package: official (the Tapyr maintainers)\nor community (the maintainers listed).",
+          "enum": [
+            "official",
+            "community"
+          ],
+          "type": "string"
+        },
+        "validation": {
+          "$ref": "#/$defs/Validation",
+          "description": "Validation says how the package was last tested."
         },
         "version": {
           "description": "Version of the provider package (semver). Breaking changes to metric\nnames or labels bump the major version.",
@@ -1107,6 +1173,37 @@
           "type": "string"
         }
       },
+      "type": "object"
+    },
+    "Validation": {
+      "additionalProperties": false,
+      "description": "Validation records the last validation of a provider package.",
+      "properties": {
+        "date": {
+          "description": "Date of the validation, YYYY-MM-DD or YYYY-MM. Required by\ntapyr provider lint --catalog with status real-platform.",
+          "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12][0-9]|3[01]))?$",
+          "type": "string"
+        },
+        "notes": {
+          "description": "Notes is free text: what was covered, what the package was built from.",
+          "type": "string"
+        },
+        "platformVersion": {
+          "description": "PlatformVersion is the version of the API, platform or firmware\nvalidated against, for example \"RutOS 07.24.5\". Required by\ntapyr provider lint --catalog with status real-platform.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Status is simulator (tested against its simulator only) or\nreal-platform (run against the real API).",
+          "enum": [
+            "simulator",
+            "real-platform"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
       "type": "object"
     },
     "Value": {

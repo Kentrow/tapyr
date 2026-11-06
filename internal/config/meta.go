@@ -106,11 +106,51 @@ type ProviderMeta struct {
 	Description string `json:"description,omitempty"`
 	// Docs links to the vendor API documentation.
 	Docs string `json:"docs,omitempty" jsonschema:"format=uri"`
+	// DisplayName is the name of the provider in the catalog, for example
+	// "Cisco Meraki Dashboard". Like categories, maintainers, tier and
+	// validation, it is optional, and required by tapyr provider lint
+	// --catalog (ADR 0011).
+	DisplayName string `json:"displayName,omitempty"`
+	// Categories of the provider, from providers/categories.yaml, the main
+	// one first.
+	Categories []Name `json:"categories,omitempty" jsonschema:"uniqueItems=true"`
+	// Maintainers are the GitHub handles, without @, of the people who answer
+	// for the package.
+	Maintainers []string `json:"maintainers,omitempty" jsonschema:"uniqueItems=true"`
+	// Tier says who maintains the package: official (the Tapyr maintainers)
+	// or community (the maintainers listed).
+	Tier string `json:"tier,omitempty" jsonschema:"enum=official,enum=community"`
+	// Validation says how the package was last tested.
+	Validation *Validation `json:"validation,omitempty"`
 }
 
 // JSONSchemaExtend implements the schema reflector hook.
 func (ProviderMeta) JSONSchemaExtend(s *jsonschema.Schema) {
 	setPattern(s, "version", semverPattern)
+	if p, ok := s.Properties.Get("maintainers"); ok && p.Items != nil {
+		p.Items.Pattern = handlePattern
+	}
+}
+
+// Validation records the last validation of a provider package.
+type Validation struct {
+	// Status is simulator (tested against its simulator only) or
+	// real-platform (run against the real API).
+	Status string `json:"status" jsonschema:"required,enum=simulator,enum=real-platform"`
+	// Date of the validation, YYYY-MM-DD or YYYY-MM. Required by
+	// tapyr provider lint --catalog with status real-platform.
+	Date string `json:"date,omitempty"`
+	// PlatformVersion is the version of the API, platform or firmware
+	// validated against, for example "RutOS 07.24.5". Required by
+	// tapyr provider lint --catalog with status real-platform.
+	PlatformVersion string `json:"platformVersion,omitempty"`
+	// Notes is free text: what was covered, what the package was built from.
+	Notes string `json:"notes,omitempty"`
+}
+
+// JSONSchemaExtend implements the schema reflector hook.
+func (Validation) JSONSchemaExtend(s *jsonschema.Schema) {
+	setPattern(s, "date", datePattern)
 }
 
 // Source records where a document was loaded from, so that semantic errors
