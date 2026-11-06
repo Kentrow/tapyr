@@ -5,6 +5,13 @@ metadata:
   version: 0.1.0
   description: Vendor-neutral example API, served by tapyr sim, for development, tests and demos
   docs: https://github.com/kentrow/tapyr/blob/main/docs/providers.md
+  displayName: Example simulator
+  categories: [example]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: simulator
+    notes: Synthetic data, by design
 spec:
   baseURL: '{{ .params.baseURL | default "http://127.0.0.1:8081/api/v1" | trimSuffix "/" }}'
   params:
@@ -30,16 +37,22 @@ spec:
   limits:
     - name: account-rate
       description: Per-account throughput (assumed, example only)
+      source:
+        kind: assumed
       kind: rate
       rate: 10/s
       scope: { by: [account] }
     - name: concurrency
       description: Concurrent requests per source (assumed, example only)
+      source:
+        kind: assumed
       kind: concurrency
       max: 4
       scope: { by: [instance] }
     - name: daily
       description: Daily quota, learned from response headers (example only)
+      source:
+        kind: assumed
       kind: quota
       max: auto
       initialMax: 5000

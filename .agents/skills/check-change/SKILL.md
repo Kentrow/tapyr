@@ -25,7 +25,7 @@ Then, depending on the diff:
 | configuration types (`internal/config`) | `make schema` and commit the regenerated `schemas/` and `docs/reference/`; `make schema-check` must pass |
 | `go.mod` | `make tidy-check`; say why the dependency is needed in the pull request |
 | `internal/budget`, the planner, pacing | `go test -cover ./internal/budget/...` (90% or more) and `go test -run TwentyFourHours ./cmd/tapyr` |
-| a provider package, the mapping, the executor | `go run ./cmd/tapyr provider lint providers`; if samples changed, `make providers-update` and read the `expected.prom` diff |
+| a provider package, the mapping, the executor | `go run ./cmd/tapyr provider lint --catalog providers`; if samples changed, `make providers-update` and read the `expected.prom` diff |
 | `ui/` | `make ui-check`, and a look at the pages in both themes |
 | outputs | `make integration` (Docker) |
 | alert rules or self-metrics | `make alerts-check` (Docker), and the [`add-self-metric`](../add-self-metric/SKILL.md) checklist |

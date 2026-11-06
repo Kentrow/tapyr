@@ -50,14 +50,16 @@ const (
 var contractStart = time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
 
 func newProviderLintCmd(e *env) *cobra.Command {
-	var update bool
+	var update, catalog bool
 	cmd := &cobra.Command{
 		Use:   "lint <dir>",
 		Short: "Validate a provider package and run its contract tests",
 		Long: "Validate a provider package (or every package of a directory): schema, CEL\n" +
 			"compilation, dashboards, and the contract test of tests/contract.yaml, run\n" +
 			"once against the package simulator at a fixed simulated time. The samples\n" +
-			"must equal tests/expected.prom; --update rewrites it instead.",
+			"must equal tests/expected.prom; --update rewrites it instead. --catalog also\n" +
+			"requires the catalog metadata: display name, categories, maintainers, tier,\n" +
+			"validation and the source of every limit.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			loader, builtin, err := newLoader()
@@ -71,6 +73,12 @@ func newProviderLintCmd(e *env) *cobra.Command {
 			if len(pkgs) == 0 {
 				return &exitError{code: exitInvalidConfig, err: fmt.Errorf("%s holds no provider package", args[0])}
 			}
+			var cats []category
+			if catalog {
+				if cats, err = catalogCategories(); err != nil {
+					return err
+				}
+			}
 			failed := 0
 			for _, pkg := range pkgs {
 				dir := args[0]
@@ -78,6 +86,9 @@ func newProviderLintCmd(e *env) *cobra.Command {
 					dir = filepath.Join(args[0], string(pkg.Provider.Metadata.Name))
 				}
 				problems := lintPackage(cmd.Context(), loader, pkg, builtin, dir, update)
+				if catalog {
+					problems = append(problems, lintCatalog(pkg, cats)...)
+				}
 				name := pkg.Provider.Metadata.Name
 				if len(problems) == 0 {
 					fmt.Fprintf(e.stdout, "%s: ok\n", name)
@@ -95,6 +106,7 @@ func newProviderLintCmd(e *env) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&update, "update", false, "write tests/expected.prom instead of comparing")
+	cmd.Flags().BoolVar(&catalog, "catalog", false, "also require the catalog metadata (ADR 0011)")
 	return cmd
 }
 

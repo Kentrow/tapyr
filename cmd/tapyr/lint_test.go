@@ -164,3 +164,122 @@ func TestProviderLint(t *testing.T) {
 		}
 	})
 }
+
+func TestProviderLintCatalog(t *testing.T) {
+	res := execute(t, nil, "provider", "lint", "--catalog", filepath.Join("..", "..", "providers"))
+	if res.code != 0 {
+		t.Fatalf("built-in packages: exit %d\n%s%s", res.code, res.stdout, res.stderr)
+	}
+
+	provider := func(dir string) string { return filepath.Join(dir, "provider.yaml") }
+	validation := "  validation:\n    status: simulator\n    notes: Synthetic data, by design\n"
+	tests := []struct {
+		name   string
+		change func(t *testing.T, dir string)
+		want   []string
+	}{
+		{
+			name:   "no display name",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "  displayName: Example simulator\n", "") },
+			want:   []string{"catalog: no metadata.displayName"},
+		},
+		{
+			name:   "no category",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "  categories: [example]\n", "") },
+			want:   []string{"catalog: no metadata.categories"},
+		},
+		{
+			name:   "unknown category",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "[example]", "[example, games]") },
+			want:   []string{`catalog: unknown category "games" (see providers/categories.yaml)`},
+		},
+		{
+			name:   "no maintainer",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "  maintainers: [Kentrow]\n", "") },
+			want:   []string{"catalog: no metadata.maintainers"},
+		},
+		{
+			name:   "no tier",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "  tier: official\n", "") },
+			want:   []string{"catalog: no metadata.tier"},
+		},
+		{
+			name:   "no validation",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), validation, "") },
+			want:   []string{"catalog: no metadata.validation"},
+		},
+		{
+			name: "real platform without date",
+			change: func(t *testing.T, dir string) {
+				edit(t, provider(dir), "status: simulator", "status: real-platform\n    platformVersion: v1")
+			},
+			want: []string{"catalog: metadata.validation needs a date and a platformVersion with status real-platform"},
+		},
+		{
+			name: "validation date that does not exist",
+			change: func(t *testing.T, dir string) {
+				edit(t, provider(dir), "status: simulator", "status: simulator\n    date: 2026-02-30")
+			},
+			want: []string{`catalog: metadata.validation.date: "2026-02-30" is not a date (YYYY-MM-DD or YYYY-MM)`},
+		},
+		{
+			name:   "limit without source",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "      source:\n        kind: assumed\n", "") },
+			want:   []string{"catalog: limit account-rate has no source"},
+		},
+		{
+			name:   "vendor documentation without url",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "kind: assumed", "kind: vendor-docs") },
+			want:   []string{"catalog: limit account-rate: a vendor-docs source needs a url"},
+		},
+		{
+			name:   "measurement without date",
+			change: func(t *testing.T, dir string) { edit(t, provider(dir), "kind: assumed", "kind: measured") },
+			want:   []string{"catalog: limit account-rate: a measured source needs a date"},
+		},
+		{
+			name: "source date that does not exist",
+			change: func(t *testing.T, dir string) {
+				edit(t, provider(dir), "kind: assumed", "kind: measured\n        date: 2026-04-31")
+			},
+			want: []string{`catalog: limit account-rate: source.date: "2026-04-31" is not a date`},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := examplePackage(t)
+			tt.change(t, dir)
+			if res := execute(t, nil, "provider", "lint", dir); res.code != 0 {
+				t.Errorf("without --catalog: exit %d\n%s", res.code, res.stderr)
+			}
+			res := execute(t, nil, "provider", "lint", "--catalog", dir)
+			if res.code != exitInvalidConfig {
+				t.Errorf("exit %d, want %d", res.code, exitInvalidConfig)
+			}
+			for _, w := range tt.want {
+				if !strings.Contains(res.stderr, w) {
+					t.Errorf("output does not contain %q:\n%s", w, res.stderr)
+				}
+			}
+		})
+	}
+
+	// The schema rejects invalid values, with or without --catalog.
+	schema := []struct{ name, old, replacement, want string }{
+		{"unknown tier", "tier: official", "tier: gold", "tier"},
+		{"malformed date", "status: simulator", "status: simulator\n    date: November 2026", "must be a date such as 2026-11-04 or 2026-11"},
+		{"handle with @", "maintainers: [Kentrow]", "maintainers: ['@Kentrow']", "must be a GitHub handle, without @"},
+		{"unknown source kind", "kind: assumed", "kind: guessed", "kind"},
+		{"source without kind", "      source:\n        kind: assumed\n", "      source: {}\n", "kind"},
+	}
+	for _, tt := range schema {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := examplePackage(t)
+			edit(t, provider(dir), tt.old, tt.replacement)
+			res := execute(t, nil, "provider", "lint", dir)
+			if res.code != exitInvalidConfig || !strings.Contains(res.stderr, "provider.yaml:") || !strings.Contains(res.stderr, tt.want) {
+				t.Errorf("exit %d, want %d and %q:\n%s", res.code, exitInvalidConfig, tt.want, res.stderr)
+			}
+		})
+	}
+}

@@ -47,7 +47,7 @@ lint: ## Run golangci-lint and repository checks
 	$(GOLANGCI_LINT) run
 	./scripts/check-emdash.sh
 	$(GO) run ./internal/tools/docsite check
-	$(GO) run ./cmd/tapyr provider lint providers
+	$(GO) run ./cmd/tapyr provider lint --catalog providers
 
 .PHONY: docs-check
 docs-check: ## Check the documentation site manifest and the links of the Markdown files (part of make lint)

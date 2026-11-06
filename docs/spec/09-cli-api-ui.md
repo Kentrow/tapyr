@@ -15,7 +15,7 @@ Common exit codes: `0` success, `1` usage error or internal error, `2` invalid c
 | `tapyr record --job J [--job ...] --out DIR [--anonymize FILE] [--provider-path DIR ...]` | Run jobs once and record their responses, anonymized (see `08-simulator.md`) | 0 ok, 1 error, 2 invalid configuration |
 | `tapyr schema [--kind K] [--out dir]` | Print or write the JSON Schemas embedded in the binary | |
 | `tapyr provider list` | List built-in and user provider packages with versions | |
-| `tapyr provider lint <dir> [--update]` | Validate a provider package, lint its dashboards and run its contract tests (`--update` rewrites `tests/expected.prom`) | 0 ok, 2 errors |
+| `tapyr provider lint <dir> [--update] [--catalog]` | Validate a provider package, lint its dashboards and run its contract tests (`--update` rewrites `tests/expected.prom`, `--catalog` also requires the catalog metadata) | 0 ok, 2 errors |
 | `tapyr version` | Version, revision, Go version | |
 
 `--provider-path` (validate, plan, record, and sim) loads the provider packages of a directory in addition to the built-in ones and to the `providerPaths` of the configuration, after the latter: it serves a package being written, before it is built in or referenced by a configuration.

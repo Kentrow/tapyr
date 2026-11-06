@@ -5,6 +5,15 @@ metadata:
   version: 0.1.0
   description: Teltonika Remote Management System (RMS) cloud API
   docs: https://developers.rms.teltonika-networks.com/
+  displayName: Teltonika RMS
+  categories: [network, cellular]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: real-platform
+    date: 2026-11
+    platformVersion: RMS API v3-BETA
+    notes: Every template run against the real platform by the e2e test
 spec:
   baseURL: '{{ .params.baseURL | default "https://api.rms.teltonika-networks.com" | trimSuffix "/" }}'
   params:
@@ -36,6 +45,10 @@ spec:
         (developers.rms.teltonika-networks.com/pages/web-api.html); the platform
         reports the limit, the remaining requests and the reset time in
         X-RateLimit-* headers (measured), the window starting at the first request
+      source:
+        kind: vendor-docs
+        url: https://developers.rms.teltonika-networks.com/pages/web-api.html
+        date: 2026-11
       kind: quota
       max: auto
       initialMax: 100000
@@ -47,12 +60,16 @@ spec:
         resetHeader: X-RateLimit-Reset
     - name: rate
       description: Throughput per token (assumed, none documented)
+      source:
+        kind: assumed
       kind: rate
       rate: 2/s
       burst: 4
       scope: { by: [credential] }
     - name: concurrency
       description: Concurrent requests per token (assumed, none documented)
+      source:
+        kind: assumed
       kind: concurrency
       max: 2
       scope: { by: [credential] }

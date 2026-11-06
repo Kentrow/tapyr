@@ -18,7 +18,7 @@ Looking for an API to package? [Provider ideas](provider-ideas.md) lists candida
 
 ## Writing a package
 
-1. Read the vendor documentation and write `provider.yaml`. **Every limit cites its source** in its `description` and in the README, or is marked as measured or assumed. Prefer endpoints that return many objects per request (organization-wide lists, large pages): the budget engine spends quota deliberately, the templates should too.
+1. Read the vendor documentation and write `provider.yaml`. **Every limit cites its source** in its `source` (`vendor-docs` with the link, `measured` with the date, or `assumed`), and in its `description` and the README for humans. The metadata describes the package in the catalog: `displayName`, `categories` from [`providers/categories.yaml`](../providers/categories.yaml), `maintainers` (GitHub handles), `tier` (`official` or `community`) and `validation` (`simulator`, or `real-platform` with a date and the platform version), see [`03-configuration.md`](spec/03-configuration.md#provider). Prefer endpoints that return many objects per request (organization-wide lists, large pages): the budget engine spends quota deliberately, the templates should too.
 2. Write the job templates (`templates/*.yaml`) with `estimate.pagesPerRun`. Metric names follow `<prefix>_<object>_<measure>_<unit>` in base units, descriptive attributes go to `_info` metrics, and no high-cardinality label (client MAC addresses, IPs) is used.
 3. Build the simulator (`sim/sim.yaml`): a synthetic inventory with template fixtures (see [`08-simulator.md`](spec/08-simulator.md#synthetic-inventory-and-templated-fixtures)), or static fixtures from a recording. Ship the `default`, `quota-tight` and `bad-day` scenarios.
 4. Write the contract test (`tests/contract.yaml`, `tests/contract.env`) and generate `tests/expected.prom` with `tapyr provider lint --update <dir>`. Review the samples: they are the contract of the package.
@@ -30,7 +30,7 @@ Looking for an API to package? [Provider ideas](provider-ideas.md) lists candida
    - `Limits`: a table `Limit | Value | Source`, then the quota maths with the default intervals;
    - `Simulator`: the command, with the port the simulator gets under `tapyr sim --all --listen-base 127.0.0.1:8081` (8081 plus its `portOffset`), the credentials it accepts and a `Scenario | Effect` table;
    - `Dashboard`, `Known caveats`, and `End-to-end test` when there is one.
-6. `tapyr provider lint <dir>` must pass.
+6. `tapyr provider lint --catalog <dir>` must pass.
 
 ## CEL mapping recipes
 
@@ -116,9 +116,10 @@ The `teltonika-rms` fixtures follow the shape of such a recording.
 tapyr provider lint providers/teltonika-rms        # one package
 tapyr provider lint providers                      # every package of a directory
 tapyr provider lint --update providers/my-api      # accept the new samples
+tapyr provider lint --catalog providers/my-api     # also require the catalog metadata
 ```
 
-The lint loads the package, compiles every template, checks the dashboards (valid JSON, a datasource variable, only metrics of the package or `tapyr_` self-metrics), the examples, the required scenarios, then runs the contract test: the jobs of `tests/contract.yaml` run once against the simulator, on a fake clock starting at `2026-01-01T00:00:00Z`, and their samples must equal `tests/expected.prom`. Every template must be exercised. `make lint` and the CI lint the built-in packages.
+The lint loads the package, compiles every template, checks the dashboards (valid JSON, a datasource variable, only metrics of the package or `tapyr_` self-metrics), the examples, the required scenarios, then runs the contract test: the jobs of `tests/contract.yaml` run once against the simulator, on a fake clock starting at `2026-01-01T00:00:00Z`, and their samples must equal `tests/expected.prom`. Every template must be exercised. With `--catalog`, the catalog metadata of the package and the `source` of every limit are required too, with existing categories and dates. `make lint` and the CI lint the built-in packages with `--catalog`.
 
 ## End-to-end tests
 

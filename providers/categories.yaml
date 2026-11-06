@@ -1,0 +1,32 @@
+# Categories of the provider catalog (ADR 0011). A package lists at least one
+# in metadata.categories, the main one first, and tapyr provider lint
+# --catalog rejects any other. A new category is one entry here, added in the
+# pull request of the first package that needs it.
+- name: network
+  description: Network equipment and services
+- name: wireless
+  description: Wi-Fi access points and controllers
+- name: sd-wan
+  description: SD-WAN appliances and their uplinks
+- name: cellular
+  description: 4G and 5G routers and modems
+- name: security
+  description: Security services, threat intelligence and reputation
+- name: internet-measurement
+  description: Latency, routing and Internet health measured from probes
+- name: cloud
+  description: Cloud platforms and their resources
+- name: cost
+  description: Spending and billing
+- name: developer
+  description: Source hosting, CI and developer platforms
+- name: identity
+  description: Identity providers, sign-ins and device compliance
+- name: energy
+  description: Solar production, consumption and storage
+- name: weather
+  description: Weather and air quality
+- name: sport
+  description: Activities and training
+- name: example
+  description: Examples for package authors
