@@ -2,7 +2,7 @@
 
 ## Problem
 
-Many network and infrastructure platforms are now cloud-managed and expose their telemetry only through REST APIs: Aruba Central, Cisco Meraki, Teltonika RMS, and many others. Getting that telemetry into an open observability stack (Prometheus, VictoriaMetrics, Mimir, any OTLP backend) is surprisingly painful:
+Many platforms are now cloud-managed and expose their telemetry only through REST APIs: network equipment first (Aruba Central, Cisco Meraki, Teltonika RMS, and many others), but also security services, Internet measurement, cloud costs, developer platforms and energy. Getting that telemetry into an open observability stack (Prometheus, VictoriaMetrics, Mimir, any OTLP backend) is surprisingly painful:
 
 - **Vertical exporters** exist for some vendors (one project per vendor, hardcoded endpoints, inconsistent quality). Many vendors have none.
 - **Generic tools** (Telegraf `inputs.http`, Redpanda Connect, Vector) can call HTTP APIs, but treat rate limits as an afterthought: at best a per-input interval or a simple token bucket. None of them understands a **daily or monthly quota**, a limit **scoped per organization**, a quota **shared with other consumers**, or the need to **plan** polling to fit a budget.
@@ -20,7 +20,9 @@ Tapyr is a **declarative API-to-metrics gateway** where:
 6. Tapyr **observes itself** and exposes rich self-metrics.
 7. Every provider ships with a **simulator** driven by the same definition, enforcing the same limits, so that providers can be developed and tested without access to the vendor platform.
 
-Long-term, provider packages (definition + default jobs + simulator fixtures + dashboards + tests) become a **community ecosystem**, in the spirit of Terraform providers or snmp_exporter modules, but declarative and therefore accessible to network engineers who do not write Go.
+**Network first, not network only.** Networks are the first use case: the built-in packages, the examples and the documentation start there. The core makes no network-specific assumption, and any metric-oriented API must be expressible as a provider package; a mechanism another domain needs is added to the engine as a generic feature ([ADR 0011](../adr/0011-provider-ecosystem.md)).
+
+Long-term, provider packages (definition + default jobs + simulator fixtures + dashboards + tests) become a **community ecosystem**, in the spirit of Terraform providers or snmp_exporter modules, but declarative and therefore accessible to engineers who do not write Go. It grows in phases: first a static catalog on tapyr.eu generated from the packages of this repository, with catalog metadata on every package (who maintains it, how it was validated, the source of every limit); later, if justified, packages distributed as OCI artifacts.
 
 ## Positioning
 
@@ -33,7 +35,8 @@ Long-term, provider packages (definition + default jobs + simulator fixtures + d
 
 ## Target users
 
-- Network and infrastructure engineers who manage cloud-managed equipment and run an open observability stack.
+- Network and infrastructure engineers who manage cloud-managed equipment and run an open observability stack (the first use case).
+- Engineers who monitor any other platform through a metric-oriented API with scarce quotas: security, energy, cloud costs, developer tools.
 - Observability consultants who need to integrate many vendor APIs quickly and must size API consumption upfront.
 - Contributors who know a vendor API well and want to package it for others.
 
@@ -75,12 +78,11 @@ Delivery:
 - Push-based sources: webhooks (Meraki), streaming APIs (Aruba Central websocket/protobuf).
 - Logs and events as outputs (metrics only).
 - Write operations against provider APIs.
-- Provider registry and distribution as OCI artifacts.
+- Provider registry and distribution as OCI artifacts (phase 2 of the provider ecosystem, [ADR 0011](../adr/0011-provider-ecosystem.md)).
 - Generation of provider skeletons from OpenAPI specifications.
 - Aruba Central "new" (HPE GreenLake-based) provider.
 - Prometheus remote write 2.0.
 - Tracing of Tapyr runs (OpenTelemetry traces).
-- Static documentation website (agreed after v0.1.0: [ADR 0010](../adr/0010-documentation-site.md)).
 
 These items need an issue and an agreement before any code, but the design must not prevent them. In particular: the status API is the only interface the UI uses; state access goes through an interface so another backend can be added; outputs are pluggable; the provider package format is versioned.
 

@@ -1,6 +1,6 @@
 # Roadmap
 
-v0.1.0 (milestones M0 to M7) is complete.
+v0.1.0 (milestones M0 to M7) is complete. v0.1.1 added the documentation site docs.tapyr.eu, built from `docs/` and the JSON Schemas ([ADR 0010](adr/0010-documentation-site.md), [#7](https://github.com/Kentrow/tapyr/issues/7)).
 
 ## After v0.1.0
 
@@ -8,13 +8,15 @@ Candidates, not committed. Each one starts with an issue and an agreement on its
 
 - Validation of `meraki-dashboard` and `aruba-central-classic` against real platforms (reports welcome).
 - Move the collector orchestration out of `cmd/tapyr` into an internal package (see [`02-architecture.md`](spec/02-architecture.md#repository-layout)).
-- Documentation site docs.tapyr.eu built from `docs/` and the JSON Schemas ([ADR 0010](adr/0010-documentation-site.md), [#7](https://github.com/Kentrow/tapyr/issues/7)).
+- Provider catalog ([ADR 0011](adr/0011-provider-ecosystem.md)): catalog metadata on provider packages (tier, validation, maintainers, categories, structured sources of limits) checked by `tapyr provider lint --catalog`, then `tapyr provider list --output json` for a static catalog on tapyr.eu.
+- New provider packages, network and beyond ([provider ideas](provider-ideas.md)).
+- Engine features for APIs beyond networks ([engine gaps](provider-ideas.md#engine-gaps)): request cost, quota windows aligned on any duration, quota sync from expressions, windows starting at the first request, rate limiting signaled other than by a status.
 - Aruba Central "new" (GreenLake) provider.
 - UI: budget impact simulation, mapping authoring assistant.
 - Webhook and streaming sources.
 - Persistent output buffering (WAL), Prometheus remote write 2.0.
 - Distributed mode (workers, shared state backend, leader election).
-- Provider distribution as OCI artifacts and a community registry.
+- Provider distribution as OCI artifacts and a community registry (phase 2 of [ADR 0011](adr/0011-provider-ecosystem.md)).
 - Provider skeleton generation from OpenAPI specs.
 
 ## Delivered in v0.1.0
