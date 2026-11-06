@@ -139,39 +139,6 @@ jobs:
         with:
           fail-on-severity: high
 
-  build:
-    name: Build linux/${{ matrix.goarch }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      matrix:
-        goarch: [amd64, arm64]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0 # tags are needed for the version
-          persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 26
-          cache: npm
-          cache-dependency-path: ui/package-lock.json
-      - name: Build
-        env:
-          GOOS: linux
-          GOARCH: ${{ matrix.goarch }}
-        run: make build
-      - name: Check the binary is static
-        run: go version -m bin/tapyr | grep -q 'CGO_ENABLED=0'
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: tapyr-linux-${{ matrix.goarch }}
-          path: bin/tapyr
-          retention-days: 7
-
   release-snapshot:
     name: Release snapshot (every platform, images)
     runs-on: ubuntu-latest
@@ -195,6 +162,13 @@ jobs:
           distribution: goreleaser
           version: "v2.19.0"
           args: release --snapshot --clean --skip=sign,sbom
+      - name: Every binary is static
+        run: |
+          bins=$(jq -r '.[] | select(.type == "Binary") | .path' dist/artifacts.json)
+          test -n "$bins"
+          for bin in $bins; do
+            go version -m "$bin" | grep -q 'CGO_ENABLED=0' || { echo "::error::$bin is not static"; exit 1; }
+          done
       - name: Image built from source
         run: make docker
 
@@ -237,7 +211,7 @@ jobs:
         run: make smoke
 
   integration:
-    name: Integration (VictoriaMetrics, OpenTelemetry Collector)
+    name: Integration (VictoriaMetrics, OpenTelemetry Collector, Prometheus)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
