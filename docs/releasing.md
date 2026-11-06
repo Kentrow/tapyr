@@ -18,7 +18,8 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
 ## A release
 
 1. Check `main`: CI green, including the release snapshot job (every platform, both images). Check the [versions updated by hand](#versions-updated-by-hand) too; a bump goes through its own pull request before the release.
-2. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add an empty `## [Unreleased]` above it, and update the links at the bottom:
+2. Release a candidate first when the release itself changed: `release.yml`, `.goreleaser.yaml` or the `Dockerfile` changed since the last tag (`git diff --stat vPREVIOUS -- .github/workflows/release.yml .goreleaser.yaml Dockerfile`), or the version is a minor one that changes the behavior or the configuration. Tag `vX.Y.Z-rc.N` on `main` before the release commit, as in steps 4 to 6: its release notes are the `[Unreleased]` section, the GitHub release is a prerelease and the image gets the tag `X.Y.Z-rc.N` only (not `X.Y` nor `latest`). Go on once it is checked. Otherwise, tag the version directly: a candidate would only repeat a release that already worked, and the CI checks the code of every pull request, release snapshot included.
+3. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add an empty `## [Unreleased]` above it, and update the links at the bottom:
 
    ```
    [Unreleased]: https://github.com/kentrow/tapyr/compare/vX.Y.Z...HEAD
@@ -26,15 +27,15 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
    ```
 
    (for the first release: `[0.1.0]: https://github.com/kentrow/tapyr/releases/tag/v0.1.0`). In the same commit, update the version the docs and examples pin (`git grep -n "tapyr:PREVIOUS\|VERSION=PREVIOUS\|newTag"`: the README, `docs/install.md`, `docs/operations.md`, the demo compose and the Kustomize example). Commit it as `chore(release): vX.Y.Z` through a pull request.
-3. Tag the merge commit on `main` and push the tag:
+4. Tag the merge commit on `main` and push the tag:
 
    ```sh
    git tag -s vX.Y.Z -m "vX.Y.Z"
    git push origin vX.Y.Z
    ```
 
-4. The workflow checks that the commit is on `main`, runs the tests, builds the UI without permissions, then waits for the approval of the `release` environment. Approve it.
-5. Check the release: the archives, `checksums.txt` and its `.sigstore.json` bundle, `tapyr_X.Y.Z_provenance.intoto.jsonl`, the image tags, the signatures and the provenance with the commands of [`docs/install.md`](install.md#verify-the-signatures) and [the next section](install.md#verify-the-provenance). The certificate identity holds the repository name as GitHub spells it (`Kentrow/tapyr`): if the repository moves or is renamed, update those commands.
+5. The workflow checks that the commit is on `main`, runs the tests, builds the UI without permissions, then waits for the approval of the `release` environment. Approve it.
+6. Check the release: the archives, `checksums.txt` and its `.sigstore.json` bundle, `tapyr_X.Y.Z_provenance.intoto.jsonl`, the image tags, the signatures and the provenance with the commands of [`docs/install.md`](install.md#verify-the-signatures) and [the next section](install.md#verify-the-provenance). The certificate identity holds the repository name as GitHub spells it (`Kentrow/tapyr`): if the repository moves or is renamed, update those commands.
 
 If the release job fails on an incident of GitHub (an upload answered 500 or 422, a timeout), rerun the failed job from the run page, and approve the `release` environment again: GoReleaser reuses the draft release the failed run left, replaces the assets it already uploaded, and the provenance asset is replaced as well. The tag stays as it is.
 
