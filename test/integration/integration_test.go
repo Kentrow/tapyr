@@ -4,8 +4,10 @@
 // of tapyr run land in VictoriaMetrics (remote write), in an OpenTelemetry
 // Collector (OTLP over HTTP and gRPC) and in Prometheus (a scrape of
 // /metrics and /metrics/self, remote write and OTLP), and series that go
-// away are marked stale in all of them. Run it with make integration, which
-// starts the backends of compose.yaml.
+// away are marked stale in all of them. A Prometheus without out-of-order
+// window refuses the samples with old source timestamps, and gets the
+// others. Run it with make integration, which starts the backends of
+// compose.yaml.
 package integration
 
 import (
@@ -42,6 +44,8 @@ var (
 	otlpGRPC = env("TAPYR_IT_OTLP_GRPC", "http://127.0.0.1:4317")
 	otelOut  = env("TAPYR_IT_OTEL_OUT", "out/metrics.json")
 	promURL  = env("TAPYR_IT_PROM_URL", "http://127.0.0.1:9090")
+	// strictURL is the Prometheus without out-of-order window.
+	strictURL = env("TAPYR_IT_PROM_STRICT_URL", "http://127.0.0.1:9091")
 	// listen is where the tapyr under test serves /metrics: on every
 	// interface, at the port Prometheus scrapes (prometheus.yml).
 	listen    = env("TAPYR_IT_LISTEN", "0.0.0.0:19790")
@@ -158,6 +162,23 @@ spec:
   queue: { flushInterval: 1s }
 ---
 apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: strict-rw }
+spec:
+  type: remote_write
+  remoteWrite: { url: %q }
+  queue: { flushInterval: 1s }
+  externalLabels: { tapyr_run: %s }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: strict-otlp }
+spec:
+  type: otlp
+  otlp: { endpoint: %q, resourceAttributes: { tapyr.run: %s, tapyr.protocol: strict-otlp } }
+  queue: { flushInterval: 1s }
+---
+apiVersion: tapyr/v1alpha1
 kind: Settings
 metadata: { name: it }
 spec:
@@ -166,7 +187,8 @@ spec:
   collection: { jitter: 0%% }
   log: { format: text }
 `, simAddr, vmURL+"/api/v1/write", runMarker, otlpHTTP, runMarker, otlpGRPC, runMarker,
-		promURL+"/api/v1/write", runMarker, promURL+"/api/v1/otlp/v1/metrics", runMarker, listen, state)
+		promURL+"/api/v1/write", runMarker, promURL+"/api/v1/otlp/v1/metrics", runMarker,
+		strictURL+"/api/v1/write", runMarker, strictURL+"/api/v1/otlp/v1/metrics", runMarker, listen, state)
 	if withSites {
 		cfg += `---
 apiVersion: tapyr/v1alpha1
@@ -308,6 +330,27 @@ func TestPushOutputs(t *testing.T) {
 		}
 		return true
 	})
+	// The Prometheus without out-of-order window refuses the counter with
+	// the source timestamps of the fixtures, days old, and gets every
+	// sample stamped with the collection time, sent in the same batches.
+	strictPushed := `example_%s{tapyr_run="` + runMarker + `",tapyr_protocol=""}`
+	strictOTLP := `example_%s{tapyr_run="` + runMarker + `",tapyr_protocol="strict-otlp"}`
+	eventually(t, "the devices and sites in the Prometheus without out-of-order window", 60*time.Second, func() bool {
+		for _, q := range []string{strictPushed, strictOTLP} {
+			for _, m := range []string{"device_up", "device_clients", "device_info", "devices", "site_info"} {
+				if series(t, strictURL, fmt.Sprintf(q, m)) == 0 {
+					return false
+				}
+			}
+		}
+		return true
+	})
+	for _, q := range []string{strictPushed, strictOTLP} {
+		if q := fmt.Sprintf(q, "device_received_bytes_total"); series(t, strictURL, q) > 0 {
+			t.Errorf("%s: samples with old source timestamps accepted without out-of-order window", q)
+		}
+	}
+
 	// The scrape of /metrics/self keeps the job label of the Tapyr job.
 	eventually(t, "the self-metrics in Prometheus", 30*time.Second, func() bool {
 		return promSeries(t, `tapyr_job_runs_total{job="devices"}`) > 0
@@ -355,13 +398,23 @@ func TestPushOutputs(t *testing.T) {
 	}
 	self, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	for _, output := range []string{"vm", "otel-http", "otel-grpc", "prom-rw", "prom-otlp"} {
+	for _, output := range []string{"vm", "otel-http", "otel-grpc", "prom-rw", "prom-otlp", "strict-rw", "strict-otlp"} {
 		if !strings.Contains(string(self), fmt.Sprintf(`tapyr_output_samples_sent_total{output=%q}`, output)) {
 			t.Errorf("no samples sent by %s", output)
 		}
 	}
-	if strings.Contains(string(self), "tapyr_output_samples_dropped_total{") {
-		t.Errorf("samples dropped:\n%s", grep(string(self), "tapyr_output_samples_dropped_total"))
+	// Only the samples the Prometheus without out-of-order window refused
+	// are dropped, as out_of_order.
+	for _, line := range strings.Split(grep(string(self), "tapyr_output_samples_dropped_total{"), "\n") {
+		strict := strings.Contains(line, `output="strict-`) && strings.Contains(line, `reason="out_of_order"`)
+		if line != "" && !strict {
+			t.Errorf("samples dropped: %s", line)
+		}
+	}
+	for _, output := range []string{"strict-rw", "strict-otlp"} {
+		if !strings.Contains(string(self), fmt.Sprintf(`tapyr_output_samples_dropped_total{output=%q,reason="out_of_order"}`, output)) {
+			t.Errorf("no out_of_order samples counted for %s", output)
+		}
 	}
 }
 

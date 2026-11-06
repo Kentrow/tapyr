@@ -1,7 +1,9 @@
 # Backends of the integration test (make integration): VictoriaMetrics
 # receives remote write, the OpenTelemetry Collector receives OTLP and
-# writes what it receives to out/metrics.json, and Prometheus scrapes the
-# tapyr under test on the host and receives remote write and OTLP.
+# writes what it receives to out/metrics.json, Prometheus scrapes the
+# tapyr under test on the host and receives remote write and OTLP, and a
+# second Prometheus, without out-of-order window, receives remote write and
+# OTLP too.
 name: tapyr-integration
 services:
   victoriametrics:
@@ -31,6 +33,20 @@ services:
     # The tapyr under test runs on the host.
     extra_hosts: ["host.docker.internal:host-gateway"]
     ports: ["127.0.0.1:9090:9090"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:9090/-/ready"]
+      interval: 2s
+      retries: 30
+  prometheus-strict:
+    image: prom/prometheus:v3.16.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=1d
+      - --web.enable-remote-write-receiver
+      - --web.enable-otlp-receiver
+    volumes:
+      - ./prometheus-strict.yml:/etc/prometheus/prometheus.yml:ro
+    ports: ["127.0.0.1:9091:9090"]
     healthcheck:
       test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:9090/-/ready"]
       interval: 2s
