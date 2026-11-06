@@ -1,7 +1,7 @@
 GO            ?= go
 GOLANGCI_LINT ?= golangci-lint
 # The golangci-lint version of make lint and of the CI (which reads it).
-GOLANGCI_LINT_VERSION := v2.14.0
+GOLANGCI_LINT_VERSION := v2.15.0
 BIN_DIR       ?= bin
 PKG           := github.com/kentrow/tapyr
 
