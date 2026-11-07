@@ -10,8 +10,14 @@ metadata:
   maintainers: [Kentrow]
   tier: official
   validation:
-    status: simulator
-    notes: Built from the official documentation and OpenAPI description v1.75.1; not run against a real Dashboard yet
+    status: real-platform
+    date: 2026-11-07
+    platformVersion: Dashboard API v1
+    notes: >-
+      A DevNet sandbox organization (1 network, 4 devices: appliance, switch,
+      access point, camera), every template; its appliance reports no uplink,
+      so the uplink statuses were checked on the shape of the response only.
+      Built from the OpenAPI description v1.75.1
 spec:
   baseURL: '{{ .params.baseURL | default "https://api.meraki.com/api/v1" | trimSuffix "/" }}'
   params:

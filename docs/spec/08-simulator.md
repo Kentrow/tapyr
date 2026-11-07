@@ -2,7 +2,7 @@
 
 ## Why
 
-Two of the built-in providers (Aruba Central, Meraki) cannot be tested against real platforms by the maintainer. More generally, contributors and users need to develop, test and demo providers without vendor access, and nobody can safely test quota exhaustion against a production API. The simulator makes every provider testable, and its rate-limit enforcement makes the budget engine testable end-to-end.
+Two of the built-in providers cannot be fully tested against real platforms by the maintainer: Aruba Central not at all, Meraki only through a DevNet sandbox organization with a few devices. More generally, contributors and users need to develop, test and demo providers without vendor access, and nobody can safely test quota exhaustion against a production API. The simulator makes every provider testable, and its rate-limit enforcement makes the budget engine testable end-to-end.
 
 ## Principles
 

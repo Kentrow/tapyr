@@ -2,7 +2,7 @@
 
 Cisco Meraki [Dashboard API v1](https://developer.cisco.com/meraki/api-v1/): device availability, appliance uplinks and wireless clients of every organization the API key can read.
 
-**Validation status**: simulator only. The package is built from the official documentation and [OpenAPI description](https://github.com/meraki/openapi) (v1.75.1, November 2026) and tested against a synthetic simulator in CI; it has not been run against a real Dashboard yet. Reports from users of real organizations are welcome.
+**Validation status**: tested against a real Dashboard (a DevNet sandbox organization, November 2026: every template, with 1 network and 4 devices: appliance, switch, access point and camera), and against a synthetic simulator in CI. The package is built from the official documentation and [OpenAPI description](https://github.com/meraki/openapi) (v1.75.1). The appliance of the sandbox reports no uplink, so `meraki-appliance-uplink-statuses` was checked on the shape of the response only: reports from organizations with active uplinks are welcome.
 
 ## Coverage
 
@@ -57,6 +57,15 @@ tapyr sim --provider meraki-dashboard --listen 127.0.0.1:8083
 
 ## Known caveats
 
-- Simulator-validated only (see above).
+- The uplink metrics are validated against the simulator only (see above).
+- Devices without a name have no `name` label on `meraki_device_info`: Tapyr leaves out empty label values, as Prometheus does.
 - `meraki-wireless-client-counts` needs access points; organizations without wireless return no item.
 - Networks bound to configuration templates are reported as returned by the API.
+
+## End-to-end test
+
+```sh
+TAPYR_E2E_MERAKI_API_KEY=... go test -tags e2e -run TestMerakiDashboard ./test/e2e/
+```
+
+It runs every template once against the organizations of the key (a read-only key is enough, for example the one of a DevNet sandbox), checks that the organization, network and device samples have the expected shape and that the device jobs succeed, and spends one request per organization and template, plus one for the organizations. A key generated a minute before can still be refused (`401`): wait a little and run it again.

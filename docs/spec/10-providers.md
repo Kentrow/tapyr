@@ -6,7 +6,7 @@ The built-in provider packages of v0.1.0. Each section was checked against the v
 |---|---|---|---|
 | `teltonika-rms` | Cloud, central | Real platform (maintainer access) + simulator | The whole pipeline against a real platform |
 | `teltonika-rutos` | Local device API, multi-target, session auth | Real devices + simulator | Validates multi-target accounts and `session_login` |
-| `meraki-dashboard` | Cloud, per-org rate limits, Link pagination | Simulator only (docs + public OpenAPI spec) | Validates scoped rate limits and discovery chains |
+| `meraki-dashboard` | Cloud, per-org rate limits, Link pagination | DevNet sandbox (e2e) + simulator (docs + public OpenAPI spec) | Validates scoped rate limits and discovery chains |
 | `aruba-central-classic` | Cloud, daily quota, rotating refresh tokens | Simulator only (docs) | Validates quota windows, header sync, auth plugin |
 
 ---
@@ -64,7 +64,7 @@ Cisco Meraki Dashboard API v1. Checked in November 2026 against the [developer d
   - `meraki-device-availabilities` (`GET /organizations/{organizationId}/devices/availabilities`). It replaces `devices/statuses`, deprecated in October 2024 ([deprecated operations](https://developer.cisco.com/meraki/api-v1/deprecated-operations/));
   - `meraki-appliance-uplink-statuses` (`GET /organizations/{organizationId}/appliance/uplink/statuses`);
   - `meraki-wireless-client-counts` (`GET /organizations/{organizationId}/wireless/clients/overview/byDevice`, an enveloped list under `items`).
-- **Deliverables**: provider package, synthetic simulator (inventory generator sized by config), fixtures derived from the OpenAPI examples, dashboard, contract tests. No e2e test (no access); the README states clearly that the package is simulator-validated only and invites community validation.
+- **Deliverables**: provider package, synthetic simulator (inventory generator sized by config), fixtures derived from the OpenAPI examples, dashboard, contract tests, and an e2e test run against a DevNet sandbox organization (November 2026, every template; the sandbox appliance reports no uplink, so the uplink metrics are validated against the simulator only).
 
 ## aruba-central-classic
 
