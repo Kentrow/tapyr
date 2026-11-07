@@ -4,18 +4,19 @@ Tapyr is a single static binary with the web UI embedded. Releases ship it for L
 
 ## Binary
 
-Download the archive of your platform and `checksums.txt` from the [releases page](https://github.com/kentrow/tapyr/releases), check it, then put `tapyr` in your `PATH`:
+Download the archive of your platform and `checksums.txt` from the [releases page](https://github.com/kentrow/tapyr/releases), check it, then put `tapyr` in your `PATH`. On Linux:
 
 ```sh
 VERSION=0.1.2
-curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/tapyr_${VERSION}_linux_amd64.tar.gz
+ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/tapyr_${VERSION}_linux_${ARCH}.tar.gz
 curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/checksums.txt
 sha256sum --ignore-missing -c checksums.txt
-tar xzf tapyr_${VERSION}_linux_amd64.tar.gz tapyr
+tar xzf tapyr_${VERSION}_linux_${ARCH}.tar.gz tapyr
 ./tapyr version
 ```
 
-On macOS, `sha256sum` is not installed: check the archive with `shasum -a 256 --ignore-missing -c checksums.txt`.
+The archives are `tapyr_<version>_<os>_<arch>`: `linux`, `darwin` or `windows` (a `.zip`), `amd64` or `arm64`. On macOS, `sha256sum` is not installed: check the archive with `shasum -a 256 --ignore-missing -c checksums.txt`.
 
 Each archive has its SBOM next to it (`<archive>.sbom.json`, SPDX), and holds `LICENSE`, `NOTICE` and `THIRD_PARTY_LICENSES`, the licenses and notices of the software the binary includes.
 
@@ -35,7 +36,7 @@ docker run -d --name tapyr \
 - Secrets come from environment variables or files (`{ env: NAME }`, `{ file: /path }`): pass them with `-e` or mount them, never in the configuration files.
 - `docker kill -s HUP tapyr` reloads the configuration.
 
-Tags: `X.Y.Z`, `X.Y` (latest patch of a minor version) and `latest` (latest release).
+Tags: `X.Y.Z`, `X.Y` (latest patch of a minor version) and `latest` (latest release). A release candidate has its tag `X.Y.Z-rc.N` only.
 
 ## systemd
 
@@ -88,7 +89,7 @@ The attestations of the archives are also a release asset, `tapyr_${VERSION}_pro
 
 ## From source
 
-Go 1.27 and Node.js 22 or later:
+Go 1.27 and Node.js 22.12 or later (Vite 8 needs it):
 
 ```sh
 git clone https://github.com/kentrow/tapyr.git

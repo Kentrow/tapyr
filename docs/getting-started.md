@@ -114,6 +114,8 @@ Every job now runs at the interval it asked for, within 89% of the budget.
 
 ## 4. Run it
 
+The log lines below leave out their time stamp (`ts=...`).
+
 ```console
 $ tapyr run --config . --log-format text
 level=INFO msg="collector started" component=run address=127.0.0.1:9790 instances=2 discovered_instances=0 outputs=1 ledger_entries=0
@@ -123,10 +125,11 @@ level=INFO msg="run finished" component=run provider=example-sim account=demo jo
 The first runs are spread over the first 10% of their interval, so that a restart never fires every request at once: the devices come within seconds, the sites within 6 minutes. The instances that discovery finds run first within the same tenth of their interval: the networks of the 3 sites come within 3 minutes after the sites, and the devices of each network within 30 seconds after its network, so everything is there within about 10 minutes (under 5 in a test run). After their first run, the instances of a fan-out run at their own point of the interval, so that a thousand networks never fire at once. The Graph page of the UI shows the instances as they appear. A restart does not wait again: the inventory is cached. Tapyr keeps its state (quota consumption, inventories, run history) in `./data/tapyr.db`, so that a restart remembers what was already spent today.
 
 ```console
-$ curl -s 127.0.0.1:9790/metrics | grep example_device_up
+$ curl -s 127.0.0.1:9790/metrics | grep '^example_device_up'
 example_device_up{environment="lab",serial="SIM-0001",site_id="site-a"} 1
 example_device_up{environment="lab",serial="SIM-0002",site_id="site-a"} 0
 example_device_up{environment="lab",serial="SIM-0003",site_id="site-b"} 1
+example_device_up{environment="lab",serial="SIM-0004",site_id="site-b"} 1
 ```
 
 ## 5. Look around
@@ -153,13 +156,15 @@ Leave Tapyr running. Stop the simulator (`Ctrl-C`) and start it again with its `
 tapyr sim --provider example-sim --scenario quota-tight
 ```
 
-The provider declares its daily quota as `max: auto`: Tapyr takes the real maximum from the quota headers of every response. At the next run of `devices`, it learns that the quota is now 600, and the planner replans at once:
+The provider declares its daily quota as `max: auto`: Tapyr takes the real maximum from the quota headers of every response. At the next run of `devices`, it learns that the quota is now 600, and the planner replans at once, spreading what is left of the quota over what is left of the day until the reset at midnight UTC. Until about 18:00 UTC, there is too much day left for 600 calls, and you see this:
 
 ```text
 level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=demo.example-sim-sites desired=1h0m0s previous=1h0m0s effective=12h0m0s reason="quota example-sim/daily account=demo"
 level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=demo.example-sim-networks desired=30m0s previous=30m0s effective=6h0m0s reason="quota example-sim/daily account=demo"
 level=WARN msg="plan infeasible: critical jobs alone exceed the remaining quota" component=planner limit=example-sim/daily scope="account=demo" budget=523 projected=1056.3525101437106
 ```
+
+Later in the day, what is left of the 600 calls is enough for the few hours before the reset: Tapyr learns the new limit (`tapyr_budget_limit` drops to 600, the Budgets page shows it) and keeps every interval, which is the right decision. The rest of this step needs more than about 6 hours before midnight UTC.
 
 The low-priority discovery jobs are stretched 12 times. `devices` keeps running every 2 minutes, because a critical job is never slowed down: at this pace, it would spend the rest of the quota before the daily reset, and every request after that would be refused until midnight UTC. The Overview page of the UI shows the warning, and the Budgets page the new limit.
 
@@ -169,9 +174,11 @@ Whether polling the devices every 2 minutes is worth the quota is your decision,
 kill -HUP "$(pgrep -f 'tapyr run')"
 ```
 
+(`pgrep` comes with `procps`, missing from minimal systems: `kill -HUP` with the process ID of `tapyr run` does the same.)
+
 ```text
 level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=devices desired=2m0s previous=2m0s effective=4m6s reason="quota example-sim/daily account=demo"
-level=INFO msg="configuration reloaded" component=run instances=5 discovered_instances=3 retired_instances=0 outputs=1
+level=INFO msg="configuration reloaded" component=run instances=10 discovered_instances=8 retired_instances=0 outputs=1
 ```
 
 The plan is feasible again: `devices` now runs every 4 minutes or so, which fits what is left of the quota until the reset. The exact figures depend on the time left before midnight UTC, since the planner replans from the remaining budget and the remaining time. When the quota resets, or when you restart the simulator without the scenario, the intervals come back to the ones you asked for.
