@@ -1,0 +1,17 @@
+# Configuration for lychee link checker (https://github.com/lycheeverse/lychee)
+
+# Limit to external web links
+scheme = ["https", "http"]
+
+# Exclude links that are not meant to resolve
+exclude = [
+  '^https?://127\.0\.0\.1(:[0-9]+)?',
+  '^https?://localhost(:[0-9]+)?',
+  '^https?://.*example\.com',
+  '^https?://.*\.invalid',
+]
+
+# Modest concurrency and retries to avoid rate-limiting vendor documentation
+max_concurrency = 4
+max_retries = 3
+retry_wait_time = 2
