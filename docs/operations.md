@@ -27,7 +27,7 @@ Keep the configuration in Git, and run both commands in the CI of that repositor
 
 - The new configuration is loaded and validated first. When it is invalid, the reload is rejected, the error is logged (`configuration reload rejected`) and the running configuration keeps going; `tapyr_config_last_reload_success` drops to 0.
 - Otherwise the running jobs finish, the consumption of every quota carries over, unchanged instances keep their schedule, and the series of removed jobs go stale.
-- Changes to `server`, `state.path` and `log` need a restart; Tapyr logs a warning when a reload contains one.
+- Changes to `server` (except `server.debug`, applied on reload), `state.path` and `log` need a restart; Tapyr logs a warning when a reload contains one.
 
 ### Secrets
 

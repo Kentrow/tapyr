@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Enabling or changing the live debug (`settings.server.debug`) by a reload logged "settings changed that take effect after a restart", although the reload applies it, as the Live debug page of the UI says.
 - The instances of a fan-out were not spread over their interval when their keys differ only by their last characters (`devices[orgId=1]`, `devices[orgId=2]`): their phases came within a second of each other, and they ran in bursts. Phases now come from a hash that mixes the whole key; they move once when upgrading.
 
 ## [0.1.2] - 2026-11-06
