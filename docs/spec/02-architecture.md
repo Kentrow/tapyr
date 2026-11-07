@@ -70,6 +70,16 @@ Computes effective intervals for all jobs given quotas, priorities and estimated
 - Enforces one run at a time per job instance (no overlap). If a run overruns its interval, the next run is skipped and counted.
 - Orders pending work by priority when the budget engine signals contention.
 
+### Collector (`internal/collector`)
+
+The process of `tapyr run`, wired by `cmd/tapyr`:
+
+- What outlives a configuration reload: the state store, the series registry, the outputs, the token sessions and the HTTP server (`/metrics`, `/metrics/self`, `/healthz`, `/readyz`, the status API and the UI).
+- A generation per compiled graph: its budget engine, executor, discovery and scheduler. A reload builds the next generation, stops the old one once its runs end, moves the ledger to the new engine, keeps the unchanged outputs and the schedule of the instances that stay, and retires the others.
+- The run of a job instance: the executor, the mapping, the inventory update, then the samples to the outputs and the run history.
+- Discovery: the children of every parent instance follow its inventory, start from the cached inventory after a restart, and are removed when it expires.
+- The online plan (every `replanInterval`, on a learned quota, on inventory changes), the flush loop (ledger, series, expiry), the push of the self-metrics, and the adapter of the status API.
+
 ### Collection executor (`internal/collect`)
 
 - Builds requests from job definitions and variables, applies auth, handles pagination.
@@ -154,14 +164,14 @@ The state file path defaults to `./data/tapyr.db`. Writes are batched; the ledge
 
 ## Repository layout
 
-`cmd/tapyr` wires the dependencies and holds the CLI, and also the collector orchestration: the run loop, hot reload, the adapter between the collector and the status API, and the reconciliation of discovery results into job instances. Moving the orchestration to an internal package is planned after v0.1.0.
+`cmd/tapyr` holds the CLI and wires the dependencies: the commands parse their flags, load and compile the configuration, and `tapyr run` hands the state store, the logger, the secrets and the auth plugins to `internal/collector`, which runs the collection.
 
 ```
 tapyr/
 ├── .agents/skills/            # agent skills (Agent Skills format)
 ├── .claude/skills/            # points Claude Code to .agents/skills
 ├── .github/                   # CI and release workflows, issue and pull request templates, Dependabot
-├── cmd/tapyr/                 # main, CLI (cobra), collector orchestration
+├── cmd/tapyr/                 # main, CLI (cobra), wiring
 ├── internal/
 │   ├── api/                   # read-only status API (/api/v1), OpenAPI description
 │   ├── auth/                  # auth interface, declarative types, token sessions
@@ -172,6 +182,7 @@ tapyr/
 │   ├── buildinfo/             # version, revision and Go version (set by ldflags)
 │   ├── clock/                 # Clock interface, real and fake implementations
 │   ├── collect/               # executor, pagination, retry
+│   ├── collector/             # the process of tapyr run: generations, reload, discovery, outputs, status API adapter
 │   ├── config/                # types, loading, defaults, validation
 │   ├── mapping/               # CEL environment, compilation, evaluation
 │   ├── model/                 # internal metric model
