@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"context"
@@ -141,7 +141,7 @@ func TestHealthAndReadiness(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c := &collector{e: &env{clock: clk}, store: store, redact: func(s string) string { return s }}
+	c := &Collector{clock: clk, store: store, redact: func(s string) string { return s }}
 	c.heartbeat.Store(clk.Now().UnixNano())
 
 	get := func(h http.HandlerFunc) (int, map[string]any) {

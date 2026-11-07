@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"context"
@@ -13,6 +13,8 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/kentrow/tapyr/internal/auth"
+	"github.com/kentrow/tapyr/internal/auth/plugins"
 	"github.com/kentrow/tapyr/internal/clock"
 	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/mapping"
@@ -176,7 +178,7 @@ func TestDiscoveryReconcile(t *testing.T) {
 	}
 	fanouts := map[string]int{}
 	for _, e := range h.d.planEntries() {
-		fanouts[scheduler.Group(e.job)] = e.fanout
+		fanouts[scheduler.Group(e.Job)] = e.Fanout
 	}
 	if diff := cmp.Diff(map[string]int{"devices": 2, "fleet.networks": 1, "fleet.orgs": 1}, fanouts); diff != "" {
 		t.Errorf("plan fan-outs (-want +got):\n%s", diff)
@@ -253,7 +255,7 @@ func TestDiscoveryInventoryExpires(t *testing.T) {
 func withAuth(t *testing.T, o runtime.Options) runtime.Options {
 	t.Helper()
 	if o.Auth == nil {
-		m, err := offlineAuth(clock.Real())
+		m, err := auth.NewManager(auth.ManagerOptions{Clock: clock.Real(), Plugins: plugins.Builtin()})
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"context"
@@ -23,12 +23,12 @@ const livenessTimeout = 30 * time.Second
 
 // selfState is the scrape-time view of the running configuration behind the
 // self-metric gauges.
-func (c *collector) selfState() selfobs.State {
+func (c *Collector) selfState() selfobs.State {
 	g := c.current()
 	if g == nil {
 		return selfobs.State{}
 	}
-	now := c.e.clock.Now()
+	now := c.clock.Now()
 	st := selfobs.State{
 		Quotas: quotaGauges(g.engine.Quotas(), now),
 		Plan:   planGauges(g.lastPlan()),
@@ -226,9 +226,9 @@ func (g *generation) lastPlan() *planner.Result {
 
 // serveHealth answers /healthz: unhealthy when the flush loop stopped
 // ticking.
-func (c *collector) serveHealth(w http.ResponseWriter, _ *http.Request) {
+func (c *Collector) serveHealth(w http.ResponseWriter, _ *http.Request) {
 	last := time.Unix(0, c.heartbeat.Load())
-	if since := c.e.clock.Since(last); since > livenessTimeout {
+	if since := c.clock.Since(last); since > livenessTimeout {
 		writeJSON(w, http.StatusServiceUnavailable, map[string]any{
 			"healthy": false, "reason": "the flush loop has not ticked for " + since.Round(time.Second).String(),
 		})
@@ -238,7 +238,7 @@ func (c *collector) serveHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 // serveReady answers /readyz with the reasons the collector is not ready.
-func (c *collector) serveReady(w http.ResponseWriter, r *http.Request) {
+func (c *Collector) serveReady(w http.ResponseWriter, r *http.Request) {
 	reasons := c.notReady(r.Context())
 	status := http.StatusOK
 	if len(reasons) > 0 {
@@ -260,7 +260,7 @@ func (c *collector) serveReady(w http.ResponseWriter, r *http.Request) {
 }
 
 // notReady lists what keeps the collector from being ready.
-func (c *collector) notReady(ctx context.Context) []string {
+func (c *Collector) notReady(ctx context.Context) []string {
 	reasons := []string{}
 	if c.current() == nil {
 		reasons = append(reasons, "configuration not loaded")

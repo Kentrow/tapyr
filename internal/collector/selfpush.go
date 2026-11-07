@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"context"
@@ -20,7 +20,7 @@ const selfInstance = "tapyr_self"
 // selfPushLoop pushes the self-metrics to the outputs of
 // settings.selfMetrics.outputs every selfMetrics.interval until ctx is done.
 // Without outputs it waits for a reload, on no timer.
-func (c *collector) selfPushLoop(ctx context.Context) {
+func (c *Collector) selfPushLoop(ctx context.Context) {
 	for {
 		c.gmu.Lock()
 		names, interval, changed := c.settings.SelfMetrics.Outputs, c.settings.SelfMetrics.Interval.Std(), c.selfChanged
@@ -33,7 +33,7 @@ func (c *collector) selfPushLoop(ctx context.Context) {
 				continue
 			}
 		}
-		timer := c.e.clock.NewTimer(interval)
+		timer := c.clock.NewTimer(interval)
 		select {
 		case <-ctx.Done():
 			timer.Stop()
@@ -48,12 +48,12 @@ func (c *collector) selfPushLoop(ctx context.Context) {
 }
 
 // pushSelf enqueues the current self-metrics in the given outputs.
-func (c *collector) pushSelf(names []config.Name) {
+func (c *Collector) pushSelf(names []config.Name) {
 	families, err := c.metrics.Gather()
 	if err != nil {
 		c.logger.Warn("gathering the self-metrics", "component", "selfobs", "error", err)
 	}
-	now := c.e.clock.Now()
+	now := c.clock.Now()
 	b := model.Batch{Instance: selfInstance, Job: selfInstance, At: now, Samples: selfSamples(families, now)}
 	c.omu.RLock()
 	defer c.omu.RUnlock()

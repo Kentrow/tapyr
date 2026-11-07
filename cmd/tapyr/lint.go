@@ -27,6 +27,7 @@ import (
 	"github.com/kentrow/tapyr/internal/budget"
 	"github.com/kentrow/tapyr/internal/clock"
 	"github.com/kentrow/tapyr/internal/collect"
+	"github.com/kentrow/tapyr/internal/collector"
 	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/model"
 	"github.com/kentrow/tapyr/internal/provider"
@@ -300,14 +301,6 @@ func driveClock(ctx context.Context, clk *clock.Fake, done <-chan struct{}) {
 	}
 }
 
-// tlsClient returns the HTTP client of an account with TLS settings. The
-// executor makes every client refuse to follow redirects by itself.
-func tlsClient(t *runtime.AccountTLS) *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = t.Config
-	return &http.Client{Transport: transport}
-}
-
 // tlsClients returns the HTTP clients of the accounts with TLS settings,
 // and logs, when logger is set, the accounts that disable certificate
 // verification.
@@ -318,7 +311,7 @@ func tlsClients(graph *runtime.Graph, logger *slog.Logger) func(string) *http.Cl
 		if t.Insecure && logger != nil {
 			logger.Warn("TLS certificate verification is disabled (insecureSkipVerify)", "account", account)
 		}
-		clients[account] = tlsClient(t)
+		clients[account] = collector.TLSClient(t)
 	}
 	return func(account string) *http.Client { return clients[account] }
 }

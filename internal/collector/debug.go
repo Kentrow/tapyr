@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"context"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/kentrow/tapyr/internal/api"
 	"github.com/kentrow/tapyr/internal/collect"
+	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/model"
 	"github.com/kentrow/tapyr/internal/runtime"
 )
@@ -143,3 +144,39 @@ func (d *debugCaptures) get(_ context.Context, job, instance string) (api.Debug,
 // debugHeaders are the response headers shown by the live debug endpoint,
 // besides the quota headers of the provider.
 var debugHeaders = []string{"Content-Type", "Link", "X-Next-Cursor", http.CanonicalHeaderKey("Retry-After")}
+
+// KeptHeaders returns the response headers recorded per provider: the
+// quota headers of its limits and the rate-limit header, never others.
+func KeptHeaders(providers []*config.Provider) map[string][]string {
+	out := map[string][]string{}
+	for _, p := range providers {
+		set := map[string]bool{"Retry-After": true}
+		if e := p.Spec.Errors; e != nil && e.RateLimited != nil && e.RateLimited.RetryAfterHeader != "" {
+			set[http.CanonicalHeaderKey(e.RateLimited.RetryAfterHeader)] = true
+		}
+		for _, l := range p.Spec.Limits {
+			if s := l.Sync; s != nil {
+				for _, h := range []string{s.LimitHeader, s.RemainingHeader, s.ResetHeader} {
+					if h != "" {
+						set[http.CanonicalHeaderKey(h)] = true
+					}
+				}
+			}
+		}
+		names := make([]string, 0, len(set))
+		for h := range set {
+			names = append(names, h)
+		}
+		slices.Sort(names)
+		out[string(p.Metadata.Name)] = names
+	}
+	return out
+}
+
+// TLSClient returns the HTTP client of an account with TLS settings. The
+// executor makes every client refuse to follow redirects by itself.
+func TLSClient(t *runtime.AccountTLS) *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.TLSClientConfig = t.Config
+	return &http.Client{Transport: transport}
+}

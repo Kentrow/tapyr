@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"context"
@@ -155,21 +155,21 @@ func (d *discovery) expire(ctx context.Context, now time.Time) {
 
 // planEntries returns the planner inputs: the configured instances, and the
 // fan-out models with at least one instance.
-func (d *discovery) planEntries() []planEntry {
+func (d *discovery) planEntries() []PlanEntry {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	counts := map[string]int{}
 	for _, j := range d.active {
 		counts[scheduler.Group(j)]++
 	}
-	entries := make([]planEntry, 0, len(d.static))
+	entries := make([]PlanEntry, 0, len(d.static))
 	for _, j := range d.static {
-		entries = append(entries, planEntry{job: j, fanout: 1})
+		entries = append(entries, PlanEntry{Job: j, Fanout: 1})
 	}
 	for _, parent := range slices.Sorted(maps.Keys(d.models)) {
 		for _, m := range d.models[parent] {
 			if n := counts[scheduler.Group(m)]; n > 0 {
-				entries = append(entries, planEntry{job: m, fanout: n})
+				entries = append(entries, PlanEntry{Job: m, Fanout: n})
 			}
 		}
 	}
