@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `meraki-dashboard` is validated against a real Dashboard: every template ran against a DevNet sandbox organization, and an e2e test (`TAPYR_E2E_MERAKI_API_KEY`) joins those of the Teltonika packages. The uplink metrics stay validated against the simulator only: the sandbox appliance reports no uplink.
 - A newly discovered fan-out instance runs first within the jitter of its interval (10% by default), then at its point of the interval: the first data of a discovery chain no longer waits up to one interval per level (the network devices of the getting started guide could take about 40 minutes, they now come within about 10). Instances loaded from the cached inventory keep their schedule.
 
 ### Fixed
