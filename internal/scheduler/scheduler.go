@@ -4,7 +4,9 @@
 // [0, jitter x interval) for configured instances, a phase spread over the
 // interval for the instances of a fan-out. A run still in flight when the
 // next one is due makes the scheduler skip that next run. Instances can be
-// added and removed while the scheduler runs (discovery).
+// added and removed while the scheduler runs (discovery): a fan-out
+// instance added then is new, it runs first within the jitter and then
+// joins its spread phase.
 package scheduler
 
 import (
@@ -81,7 +83,10 @@ type Scheduler struct {
 }
 
 type instance struct {
-	job      *runtime.Job
+	job *runtime.Job
+	// fresh is set for an instance added while the scheduler runs: it was
+	// just discovered, not loaded from the cached inventory.
+	fresh    bool
 	cancel   context.CancelFunc
 	inFlight atomic.Bool
 	// next is when the next run is due, in Unix nanoseconds (0 until the
@@ -127,7 +132,8 @@ func New(jobs []*runtime.Job, opts Options) *Scheduler {
 }
 
 // Add schedules a job instance; an instance with the same key is kept.
-// Instances added while the scheduler runs start at once (with their phase).
+// Instances added while the scheduler runs start at once: a fan-out
+// instance among them runs first within the jitter, then at its phase.
 func (s *Scheduler) Add(j *runtime.Job) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -138,7 +144,7 @@ func (s *Scheduler) Add(j *runtime.Job) {
 	if _, ok := s.groups[g]; !ok {
 		s.groups[g] = &group{interval: j.Interval, changed: make(chan struct{})}
 	}
-	inst := &instance{job: j}
+	inst := &instance{job: j, fresh: s.ctx != nil}
 	s.instances[j.Instance] = inst
 	if s.ctx == nil {
 		s.pending = append(s.pending, j.Instance)
@@ -191,7 +197,11 @@ func (s *Scheduler) start(inst *instance) {
 	ctx, cancel := context.WithCancel(s.ctx)
 	inst.cancel = cancel
 	phase := s.phase(inst.job)
-	s.loops.Go(func() { s.loop(ctx, inst, phase) })
+	first := time.Duration(-1)
+	if inst.fresh && len(inst.job.DiscoveryVars) > 0 {
+		first = time.Duration(s.opts.Rand.Float64() * s.opts.Jitter * float64(s.groups[Group(inst.job)].interval))
+	}
+	s.loops.Go(func() { s.loop(ctx, inst, phase, first) })
 }
 
 // phase spreads the instances of a fan-out over the interval (stable per
@@ -288,14 +298,23 @@ func (s *Scheduler) intervalOf(group string) (time.Duration, <-chan struct{}) {
 	return g.interval, g.changed
 }
 
-func (s *Scheduler) loop(ctx context.Context, inst *instance, phase time.Duration) {
+// loop runs an instance at phase + k x interval. A new fan-out instance
+// (first >= 0) runs first at first instead, then joins that grid at the
+// first slot at least half an interval later: one more run at most, and the
+// instances discovered together stay spread over the interval.
+func (s *Scheduler) loop(ctx context.Context, inst *instance, phase, first time.Duration) {
 	clk := s.opts.Clock
 	job := inst.job
 	g := Group(job)
 	next := clk.Now().Add(phase)
 	last := time.Time{}
+	grid := time.Time{} // the first slot of a new instance, until it joins it
+	if first >= 0 {
+		grid, next = next, clk.Now().Add(first)
+	}
 	if s.opts.Resume != nil {
 		if due, ok := s.opts.Resume(job.Instance); ok {
+			grid = time.Time{}
 			interval, _ := s.intervalOf(g)
 			now := clk.Now()
 			switch next = due; {
@@ -341,7 +360,12 @@ func (s *Scheduler) loop(ctx context.Context, inst *instance, phase time.Duratio
 				s.execute(run, interval)
 			})
 		}
-		next = next.Add(interval)
+		if grid.IsZero() {
+			next = next.Add(interval)
+		} else {
+			next = joinGrid(grid, last.Add(interval/2), interval)
+			grid = time.Time{}
+		}
 		// Catch up after a pause (for example a suspended host) without a
 		// burst: the missed slots are skipped.
 		if now := clk.Now(); next.Before(now) {
@@ -352,6 +376,16 @@ func (s *Scheduler) loop(ctx context.Context, inst *instance, phase time.Duratio
 			}
 		}
 	}
+}
+
+// joinGrid returns the first slot of grid + k x interval not before
+// earliest.
+func joinGrid(grid, earliest time.Time, interval time.Duration) time.Time {
+	if grid.Before(earliest) {
+		k := (earliest.Sub(grid) + interval - 1) / interval
+		grid = grid.Add(k * interval)
+	}
+	return grid
 }
 
 func (s *Scheduler) skip(job *runtime.Job, at time.Time, reason string) {

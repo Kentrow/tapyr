@@ -34,7 +34,7 @@ configuration is invalid: 1 error
 ## No data yet
 
 - **First runs are spread.** Jobs start at a random point within the first 10% of their interval (`settings.collection.jitter`), so that a restart does not fire every request at once: a job polled every hour may wait up to 6 minutes for its first run.
-- **Discovery comes first.** A fan-out job waits for the first run of its parents (organizations, then networks...). Each instance of a fan-out runs at its own point of its interval, so that a thousand networks never fire at once: with a parent polled every 30 minutes, the first data of its children can take that long. After that, the inventory is cached and restarts no longer wait. The Graph page of the UI shows the chain.
+- **Discovery comes first.** A fan-out job waits for the first run of its parents (organizations, then networks...). A newly discovered instance runs first within the jitter of its interval, then at its own point of the interval, so that a thousand networks never fire at once: with the default jitter, each level of the chain adds at most a tenth of its interval. After that, the inventory is cached and restarts no longer wait. The Graph page of the UI shows the chain.
 - **No output.** `/metrics` serves the samples only with a `prometheus` output; push outputs deliver to their backend (see [their troubleshooting](#samples-do-not-reach-the-backend)).
 - **The job fails.** Open it in the UI, or `GET /api/v1/jobs/<name>/runs`: every run has its result and its error.
 
