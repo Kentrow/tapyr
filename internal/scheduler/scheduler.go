@@ -9,8 +9,9 @@ package scheduler
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
-	"hash/fnv"
 	"log/slog"
 	"math/rand/v2"
 	"sync"
@@ -195,11 +196,12 @@ func (s *Scheduler) start(inst *instance) {
 
 // phase spreads the instances of a fan-out over the interval (stable per
 // instance key); configured instances get a random phase within the jitter.
+// The hash mixes every byte of the key: instance keys often differ only by
+// their last characters (devices[orgId=1], devices[orgId=2]).
 func (s *Scheduler) phase(j *runtime.Job) time.Duration {
 	if len(j.DiscoveryVars) > 0 {
-		h := fnv.New64a()
-		_, _ = h.Write([]byte(j.Instance))
-		return time.Duration(float64(h.Sum64()) / float64(^uint64(0)) * float64(j.Interval))
+		sum := sha256.Sum256([]byte(j.Instance))
+		return time.Duration(float64(binary.BigEndian.Uint64(sum[:8])) / float64(^uint64(0)) * float64(j.Interval))
 	}
 	return time.Duration(s.opts.Rand.Float64() * s.opts.Jitter * float64(j.Interval))
 }

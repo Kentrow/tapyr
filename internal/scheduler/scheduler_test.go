@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/rand/v2"
 	"slices"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -121,6 +122,29 @@ func TestZeroJitterRunsImmediately(t *testing.T) {
 	got := map[string]bool{rec.next(t).Job.Name: true, rec.next(t).Job.Name: true}
 	if !got["a"] || !got["b"] {
 		t.Fatalf("runs = %v", got)
+	}
+}
+
+// TestFanOutPhasesSpread is a regression test: with FNV-1a, keys that
+// differ only by their last characters got phases within a second of each
+// other, and 100 instances fell in 4 tenths of the interval.
+func TestFanOutPhasesSpread(t *testing.T) {
+	s := New(nil, Options{})
+	var tenths [10]int
+	for i := range 100 {
+		org := strconv.Itoa(i)
+		j := &runtime.Job{Name: "devices", Instance: "devices[orgId=" + org + "]", Interval: time.Hour, DiscoveryVars: map[string]string{"orgId": org}}
+		p := s.phase(j)
+		if p < 0 || p >= time.Hour {
+			t.Fatalf("phase %v outside the interval", p)
+		}
+		tenths[p*10/time.Hour]++
+	}
+	for i, n := range tenths {
+		if n == 0 || n > 25 {
+			t.Errorf("100 instances per tenth of the interval: %v (tenth %d)", tenths, i)
+			break
+		}
 	}
 }
 
