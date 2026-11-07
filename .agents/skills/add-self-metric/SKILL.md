@@ -19,13 +19,13 @@ Add a row to the right table of [`07-self-observability.md`](../../../docs/spec/
 ## 2. Implement it
 
 - **Event metrics**: a field and its registration in `NewMetrics` (`internal/selfobs/metrics.go`), and a method called by the component through the observer interface it already receives (budget, collect, output...). Components never import Prometheus types.
-- **State gauges**: a `prometheus.Desc` in `internal/selfobs/state.go`, emitted in `stateCollector.Collect` from the `State` returned by `collector.selfState()` (`cmd/tapyr/selfmetrics.go`); add the field to `State` if needed.
+- **State gauges**: a `prometheus.Desc` in `internal/selfobs/state.go`, emitted in `stateCollector.Collect` from the `State` returned by `(*Collector).selfState` (`internal/collector/selfmetrics.go`); add the field to `State` if needed.
 - Time comes from the injected clock; labels from the configuration and the descriptor, never from a response body.
 
 ## 3. Test it
 
 - `internal/selfobs/metrics_test.go`: `TestMetricsEvents` (events) or `TestStateGauges` (gauges) asserts the exposition with its labels.
-- When the value depends on a real run, an end-to-end check in `cmd/tapyr` (`selfmetrics_test.go`, `selfmetrics_acceptance_test.go`) against the simulator.
+- The conversion of the state into gauges: `internal/collector/selfmetrics_test.go`. When the value depends on a real run, an end-to-end check in `cmd/tapyr/selfmetrics_acceptance_test.go` against the simulator.
 - Redaction: if a label value could come from user input, prove it cannot hold a secret.
 
 ## 4. Dashboard and alerts
@@ -37,7 +37,7 @@ Add a row to the right table of [`07-self-observability.md`](../../../docs/spec/
 ## 5. Check
 
 ```sh
-go test ./internal/selfobs/ ./cmd/tapyr -run 'Metrics|Gauges|SelfMetrics|OverviewDashboard|ExampleAlerts'
+go test ./internal/selfobs/ ./internal/collector/ ./cmd/tapyr -run 'Metrics|Gauges|SelfMetrics|OverviewDashboard|ExampleAlerts'
 make alerts-check    # promtool (Docker)
 ```
 

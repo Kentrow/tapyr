@@ -21,6 +21,7 @@ import (
 	"github.com/kentrow/tapyr/internal/auth/plugins"
 	"github.com/kentrow/tapyr/internal/budget"
 	"github.com/kentrow/tapyr/internal/collect"
+	"github.com/kentrow/tapyr/internal/collector"
 	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/runtime"
 	"github.com/kentrow/tapyr/internal/selfobs"
@@ -110,7 +111,7 @@ func newRecordCmd(e *env, flags *globalFlags) *cobra.Command {
 			tokens.SetSender(exec)
 			return record(cmd, e, recording{
 				exec: exec, tokens: tokens, anon: anon, jobs: selected,
-				headers: keptHeaders(cfg.Providers), out: out, redact: redactor.Redact,
+				headers: collector.KeptHeaders(cfg.Providers), out: out, redact: redactor.Redact,
 			})
 		},
 	}
@@ -270,32 +271,4 @@ func selectJobs(jobs []*runtime.Job, names []string) ([]*runtime.Job, error) {
 		}
 	}
 	return out, nil
-}
-
-// keptHeaders returns the response headers recorded per provider: the
-// quota headers of its limits and the rate-limit header, never others.
-func keptHeaders(providers []*config.Provider) map[string][]string {
-	out := map[string][]string{}
-	for _, p := range providers {
-		set := map[string]bool{"Retry-After": true}
-		if e := p.Spec.Errors; e != nil && e.RateLimited != nil && e.RateLimited.RetryAfterHeader != "" {
-			set[http.CanonicalHeaderKey(e.RateLimited.RetryAfterHeader)] = true
-		}
-		for _, l := range p.Spec.Limits {
-			if s := l.Sync; s != nil {
-				for _, h := range []string{s.LimitHeader, s.RemainingHeader, s.ResetHeader} {
-					if h != "" {
-						set[http.CanonicalHeaderKey(h)] = true
-					}
-				}
-			}
-		}
-		names := make([]string, 0, len(set))
-		for h := range set {
-			names = append(names, h)
-		}
-		slices.Sort(names)
-		out[string(p.Metadata.Name)] = names
-	}
-	return out
 }

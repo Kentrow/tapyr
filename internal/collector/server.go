@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"context"
@@ -14,14 +14,9 @@ import (
 // shutdownTimeout bounds the graceful shutdown of HTTP servers.
 const shutdownTimeout = 10 * time.Second
 
-// serve serves h on ln until ctx is done, then shuts the server down
-// gracefully.
-func serve(ctx context.Context, ln net.Listener, h http.Handler) error {
-	return serveTLS(ctx, ln, h, "", "")
-}
-
-// serveTLS is serve with HTTPS when certFile and keyFile are set.
-func serveTLS(ctx context.Context, ln net.Listener, h http.Handler, certFile, keyFile string) error {
+// Serve serves h on ln until ctx is done, then shuts the server down
+// gracefully; with HTTPS when certFile and keyFile are set.
+func Serve(ctx context.Context, ln net.Listener, h http.Handler, certFile, keyFile string) error {
 	srv := &http.Server{Handler: h, ReadHeaderTimeout: 10 * time.Second}
 	errc := make(chan error, 1)
 	go func() {

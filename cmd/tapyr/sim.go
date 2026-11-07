@@ -14,6 +14,7 @@ import (
 
 	"github.com/kentrow/tapyr/internal/auth/plugins"
 	"github.com/kentrow/tapyr/internal/clock"
+	"github.com/kentrow/tapyr/internal/collector"
 	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/provider"
 	"github.com/kentrow/tapyr/internal/sim"
@@ -212,7 +213,7 @@ func serveSims(ctx context.Context, e *env, targets []simTarget, clk clock.Clock
 		e.logger.Info("simulator listening", "component", "sim", "provider", string(s.target.pkg.Provider.Metadata.Name),
 			"address", s.ln.Addr().String(), "scenario", sc, "time_scale", timeScale)
 		wg.Go(func() {
-			if err := serve(ctx, s.ln, s.s.Handler()); err != nil {
+			if err := collector.Serve(ctx, s.ln, s.s.Handler(), "", ""); err != nil {
 				errs <- err
 				cancel()
 			}

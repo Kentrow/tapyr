@@ -7,7 +7,6 @@ v0.1.0 (milestones M0 to M7) is complete. v0.1.1 added the documentation site do
 Candidates, not committed. Each one starts with an issue and an agreement on its design (an ADR when it changes the architecture); the items listed as out of scope in [`01-vision-and-scope.md`](spec/01-vision-and-scope.md) need that agreement before any code.
 
 - Validation of `aruba-central-classic` against a real account, and of the uplink metrics of `meraki-dashboard` against an organization with active uplinks (reports welcome).
-- Move the collector orchestration out of `cmd/tapyr` into an internal package (see [`02-architecture.md`](spec/02-architecture.md#repository-layout)).
 - Provider catalog ([ADR 0011](adr/0011-provider-ecosystem.md)): catalog metadata on provider packages (tier, validation, maintainers, categories, structured sources of limits) checked by `tapyr provider lint --catalog`, then `tapyr provider list --output json` for a static catalog on tapyr.eu.
 - New provider packages, network and beyond ([provider ideas](provider-ideas.md)).
 - Engine features for APIs beyond networks ([engine gaps](provider-ideas.md#engine-gaps)): request cost, quota windows aligned on any duration, quota sync from expressions, windows starting at the first request, rate limiting signaled other than by a status.

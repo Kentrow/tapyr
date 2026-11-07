@@ -1,4 +1,4 @@
-package main
+package collector
 
 import (
 	"cmp"
@@ -21,7 +21,7 @@ import (
 )
 
 // statusSource implements api.Source for the running collector.
-type statusSource struct{ c *collector }
+type statusSource struct{ c *Collector }
 
 var _ api.Source = statusSource{}
 
@@ -41,10 +41,10 @@ func configHash(cfg *config.Config) string {
 }
 
 // recordLoad records a configuration load or reload attempt.
-func (c *collector) recordLoad(cfg *config.Config, err error) {
+func (c *Collector) recordLoad(cfg *config.Config, err error) {
 	c.smu.Lock()
 	defer c.smu.Unlock()
-	c.lastReload = api.Reload{At: c.e.clock.Now().UTC(), Success: err == nil}
+	c.lastReload = api.Reload{At: c.clock.Now().UTC(), Success: err == nil}
 	if err != nil {
 		c.lastReload.Error = c.redact(err.Error())
 		return
@@ -55,7 +55,7 @@ func (c *collector) recordLoad(cfg *config.Config, err error) {
 func (s statusSource) Status(ctx context.Context) api.Status {
 	c := s.c
 	info := buildinfo.Get()
-	now := c.e.clock.Now()
+	now := c.clock.Now()
 	c.smu.Lock()
 	st := api.Status{
 		Version: info.Version, Revision: info.Revision, GoVersion: info.GoVersion, StartedAt: c.started.UTC(),
@@ -85,7 +85,7 @@ func (s statusSource) snapshot() (*snapshot, bool) {
 	if g == nil {
 		return nil, false
 	}
-	snap := &snapshot{g: g, next: g.sched.Next(), now: s.c.e.clock.Now()}
+	snap := &snapshot{g: g, next: g.sched.Next(), now: s.c.clock.Now()}
 	g.disc.do(func(active map[string]*runtime.Job) {
 		for _, key := range slices.Sorted(maps.Keys(active)) {
 			snap.instances = append(snap.instances, active[key])
@@ -418,7 +418,7 @@ func (s statusSource) Budgets(context.Context) []api.Budget {
 	if g == nil {
 		return nil
 	}
-	now := s.c.e.clock.Now()
+	now := s.c.clock.Now()
 	var out []api.Budget
 	for _, q := range g.engine.Quotas() {
 		b := api.Budget{
