@@ -389,7 +389,7 @@ func (c *Collector) reload(ctx context.Context) error {
 // warnRestartSettings logs the settings changes that only a restart applies.
 func (c *Collector) warnRestartSettings(next *config.SettingsSpec) {
 	for name, changed := range map[string]bool{
-		"server":     !reflect.DeepEqual(c.settings.Server, next.Server),
+		"server":     !reflect.DeepEqual(restartServer(c.settings.Server), restartServer(next.Server)),
 		"state.path": c.settings.State.Path != next.State.Path,
 		"log":        c.settings.Log != next.Log,
 	} {
@@ -397,6 +397,13 @@ func (c *Collector) warnRestartSettings(next *config.SettingsSpec) {
 			c.logger.Warn("settings changed that take effect after a restart", "component", "run", "settings", name)
 		}
 	}
+}
+
+// restartServer returns the server settings that only a restart applies:
+// all of them but the live debug, which a reload applies.
+func restartServer(s config.ServerSettings) config.ServerSettings {
+	s.Debug = config.DebugSettings{}
+	return s
 }
 
 // flushLoop persists the ledger and the series, and expires stale
