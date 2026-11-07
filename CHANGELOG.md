@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tapyr provider list --output json`: every package with its catalog metadata, its templates (request path, default interval, metrics) and its limits (value, scope, source), and the catalog categories, versioned by a `schemaVersion` ([provider catalog output](docs/spec/09-cli-api-ui.md#provider-catalog-output)).
 - Documentation: the strategy of the provider ecosystem ([ADR 0011](docs/adr/0011-provider-ecosystem.md)), and a page of [provider ideas](docs/provider-ideas.md) beyond networks, with their rate-limit patterns and the engine features some of them still need.
 
+### Changed
+
+- A newly discovered fan-out instance runs first within the jitter of its interval (10% by default), then at its point of the interval: the first data of a discovery chain no longer waits up to one interval per level (the network devices of the getting started guide could take about 40 minutes, they now come within about 10). Instances loaded from the cached inventory keep their schedule.
+
+### Fixed
+
+- The instances of a fan-out were not spread over their interval when their keys differ only by their last characters (`devices[orgId=1]`, `devices[orgId=2]`): their phases came within a second of each other, and they ran in bursts. Phases now come from a hash that mixes the whole key; they move once when upgrading.
+
 ## [0.1.2] - 2026-11-06
 
 ### Fixed

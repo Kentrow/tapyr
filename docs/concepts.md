@@ -70,7 +70,7 @@ Many APIs are hierarchical: organizations contain networks, networks contain dev
 organizations (inventory) -> networks (inventory, one instance per organization) -> devices (one instance per network)
 ```
 
-These per-item runs are **instances** of the job. You only declare the job you want: parents that no job of the account instantiates run implicitly, named `<account>.<template>`, at priority `low`. The inventory is cached in the state store, so a restart does not wait for discovery; the instances of a fan-out are spread over their interval instead of firing together, and `forEach.maxInstances` (default 10000) protects against a runaway discovery.
+These per-item runs are **instances** of the job. You only declare the job you want: parents that no job of the account instantiates run implicitly, named `<account>.<template>`, at priority `low`. The inventory is cached in the state store, so a restart does not wait for discovery; the instances of a fan-out are spread over their interval instead of firing together (a newly discovered one runs first within the jitter, then at its point of the interval), and `forEach.maxInstances` (default 10000) protects against a runaway discovery.
 
 ## Mapping
 

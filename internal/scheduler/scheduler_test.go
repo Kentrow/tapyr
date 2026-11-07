@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math/rand/v2"
 	"slices"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -121,6 +122,29 @@ func TestZeroJitterRunsImmediately(t *testing.T) {
 	got := map[string]bool{rec.next(t).Job.Name: true, rec.next(t).Job.Name: true}
 	if !got["a"] || !got["b"] {
 		t.Fatalf("runs = %v", got)
+	}
+}
+
+// TestFanOutPhasesSpread is a regression test: with FNV-1a, keys that
+// differ only by their last characters got phases within a second of each
+// other, and 100 instances fell in 4 tenths of the interval.
+func TestFanOutPhasesSpread(t *testing.T) {
+	s := New(nil, Options{})
+	var tenths [10]int
+	for i := range 100 {
+		org := strconv.Itoa(i)
+		j := &runtime.Job{Name: "devices", Instance: "devices[orgId=" + org + "]", Interval: time.Hour, DiscoveryVars: map[string]string{"orgId": org}}
+		p := s.phase(j)
+		if p < 0 || p >= time.Hour {
+			t.Fatalf("phase %v outside the interval", p)
+		}
+		tenths[p*10/time.Hour]++
+	}
+	for i, n := range tenths {
+		if n == 0 || n > 25 {
+			t.Errorf("100 instances per tenth of the interval: %v (tenth %d)", tenths, i)
+			break
+		}
 	}
 }
 
@@ -340,21 +364,19 @@ func TestDynamicInstances(t *testing.T) {
 	clk := clock.NewFake(epoch)
 	rec := newRecorder()
 	s := New(nil, Options{Clock: clk, Runner: rec.runner})
-	stop := start(t, s)
-	defer stop()
 
-	// Fan-out instances spread over the interval, in a stable way.
+	// Fan-out instances added before the scheduler runs (from the cached
+	// inventory) spread over the interval, in a stable way.
 	children := map[string]time.Time{}
 	for _, org := range []string{"1", "2", "3"} {
-		s.Add(&runtime.Job{
-			Name: "devices", Instance: "devices[orgId=" + org + "]", Interval: time.Hour,
-			DiscoveryVars: map[string]string{"orgId": org},
-		})
+		s.Add(fanOut(org, time.Hour))
 	}
 	s.Add(&runtime.Job{Name: "devices", Instance: "devices[orgId=1]", Interval: time.Hour}) // duplicate: kept once
 	if got := s.Instances()["devices"]; got != 3 {
 		t.Fatalf("instances = %d", got)
 	}
+	stop := start(t, s)
+	defer stop()
 	for range 3 {
 		settle(t, clk, 1)
 		clk.Advance(time.Minute)
@@ -465,6 +487,101 @@ func TestResume(t *testing.T) {
 		}
 	}
 	t.Fatal("a did not keep its schedule")
+}
+
+func fanOut(org string, interval time.Duration) *runtime.Job {
+	return &runtime.Job{
+		Name: "devices", Instance: "devices[orgId=" + org + "]", Interval: interval,
+		DiscoveryVars: map[string]string{"orgId": org},
+	}
+}
+
+func TestNewFanOutInstances(t *testing.T) {
+	clk := clock.NewFake(epoch)
+	rec := newRecorder()
+	var active atomic.Int64
+	resumed := epoch.Add(40 * time.Minute)
+	s := New(nil, Options{
+		Clock: clk, Rand: rand.New(rand.NewPCG(1, 2)), Jitter: 0.1, Runner: rec.runner,
+		OnRun: func(d int) { active.Add(int64(d)) },
+		// An instance kept across a reload keeps its schedule, new or not.
+		Resume: func(key string) (time.Time, bool) { return resumed, key == "devices[orgId=resumed]" },
+	})
+	stop := start(t, s)
+	defer stop()
+	waitFor(t, func() bool { s.mu.Lock(); defer s.mu.Unlock(); return s.ctx != nil })
+
+	// Instances discovered while the scheduler runs (clock at epoch).
+	orgs := []string{"1", "2", "3", "4", "5", "resumed"}
+	for _, org := range orgs {
+		s.Add(fanOut(org, time.Hour))
+	}
+	got := map[string][]time.Time{}
+	drain := func() {
+		for {
+			select {
+			case run := <-rec.ch:
+				got[run.Job.Instance] = append(got[run.Job.Instance], run.Scheduled)
+			default:
+				return
+			}
+		}
+	}
+	for range 3 * 60 {
+		settle(t, clk, len(orgs))
+		clk.Advance(time.Minute)
+		waitFor(t, func() bool { return active.Load() == 0 })
+		drain()
+	}
+	settle(t, clk, len(orgs))
+	waitFor(t, func() bool { return active.Load() == 0 })
+	drain()
+
+	if r := got["devices[orgId=resumed]"]; len(r) == 0 || !r[0].Equal(resumed) {
+		t.Errorf("resumed instance runs %v, want first at %v", r, resumed)
+	}
+	seconds := map[time.Time]bool{}
+	for _, org := range orgs[:5] {
+		key := "devices[orgId=" + org + "]"
+		r := got[key]
+		if len(r) < 3 {
+			t.Fatalf("%s ran %d times in 3 hours: %v", key, len(r), r)
+		}
+		// The first run comes within the jitter, not at the phase.
+		if r[0].Before(epoch) || !r[0].Before(epoch.Add(6*time.Minute)) {
+			t.Errorf("%s: first run at %v, want within 6m of the discovery", key, r[0].Sub(epoch))
+		}
+		// Then the instance joins its spread phase, half an interval later
+		// at least, and keeps it.
+		slot := epoch.Add(s.phase(fanOut(org, time.Hour)))
+		if gap := r[1].Sub(r[0]); gap < 30*time.Minute || r[1].Sub(slot)%time.Hour != 0 {
+			t.Errorf("%s: second run at %v (gap %v), want a slot of its phase %v", key, r[1].Sub(epoch), gap, slot.Sub(epoch))
+		}
+		if !r[2].Equal(r[1].Add(time.Hour)) {
+			t.Errorf("%s: third run at %v, want one interval after the second", key, r[2].Sub(epoch))
+		}
+		seconds[r[1]] = true
+	}
+	if len(seconds) < 3 {
+		t.Errorf("new instances not spread after their first run: %v", got)
+	}
+}
+
+func TestJoinGrid(t *testing.T) {
+	h := time.Hour
+	tests := []struct {
+		grid, earliest, want time.Duration
+	}{
+		{grid: 40 * time.Minute, earliest: 30 * time.Minute, want: 40 * time.Minute},
+		{grid: 30 * time.Minute, earliest: 30 * time.Minute, want: 30 * time.Minute},
+		{grid: 10 * time.Minute, earliest: 30 * time.Minute, want: 70 * time.Minute},
+		{grid: 10 * time.Minute, earliest: 3 * h, want: 3*h + 10*time.Minute},
+	}
+	for _, tt := range tests {
+		if got := joinGrid(epoch.Add(tt.grid), epoch.Add(tt.earliest), h); !got.Equal(epoch.Add(tt.want)) {
+			t.Errorf("joinGrid(%v, %v) = %v, want %v", tt.grid, tt.earliest, got.Sub(epoch), tt.want)
+		}
+	}
 }
 
 // running reports whether a run of the instance is in flight.

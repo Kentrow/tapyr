@@ -67,11 +67,11 @@ spec:
 		onInstances: func(n int) { instances.Store(int64(n)) },
 	}, "run", "--config", dir)
 
-	// Idle: no run in flight and only the idle timers pending, one per
-	// scheduled instance plus the ledger flush and replan tickers.
+	// Idle: every run in flight waits on the clock (see clockBound), so
+	// only advancing it makes progress.
 	quiet := func() {
 		deadline := time.Now().Add(10 * time.Second)
-		for (inFlight.Load() != 0 || int64(clk.Waiters()) != instances.Load()+2) && time.Now().Before(deadline) {
+		for !clockBound(clk, inFlight.Load(), instances.Load()) && time.Now().Before(deadline) {
 			time.Sleep(100 * time.Microsecond)
 		}
 		if time.Now().After(deadline) {
@@ -161,4 +161,16 @@ func labelValues(exposition, metric, label string) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// clockBound reports whether the collector can only make progress when the
+// fake clock advances. Every scheduled instance waits on a timer, as do the
+// ledger flush and replan tickers; a run in flight adds its deadline timer,
+// and a second one while it waits on the clock (rate tokens of the budget
+// engine, a backoff, simulated latency). New fan-out instances start
+// together, so their runs can wait on a rate limit. A run in an HTTP
+// request, or an instance between two timers, lowers the count: the
+// equality never holds early.
+func clockBound(clk *clock.Fake, inFlight, instances int64) bool {
+	return int64(clk.Waiters()) == instances+2+2*inFlight
 }

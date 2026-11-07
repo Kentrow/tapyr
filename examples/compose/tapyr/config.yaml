@@ -53,8 +53,9 @@ spec:
   server: { listen: "0.0.0.0:9790", debug: { enabled: true } }
   state: { path: /home/nonroot/data/tapyr.db }
   # The first runs spread over 1% of their interval instead of 10%, so that
-  # the hourly inventory jobs start within a minute. The instances of a
-  # fan-out are spread over their own interval, whatever the jitter.
+  # the hourly inventory jobs start within a minute, and the instances they
+  # discover within seconds. The instances of a fan-out then run at their
+  # own point of their interval, whatever the jitter.
   collection: { jitter: 1% }
 ---
 apiVersion: tapyr/v1alpha1
