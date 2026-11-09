@@ -78,6 +78,8 @@ spec:
 	// the counter exposed after each, as value@call.
 	collect := func(n int) []string {
 		t.Helper()
+		// Before the start: the first run may call the API at once.
+		seen := calls.Load()
 		var inFlight, instances atomic.Int64
 		addr, stop := backgroundHooks(t, nil, &env{
 			clock:       clk,
@@ -85,10 +87,9 @@ spec:
 			onInstances: func(n int) { instances.Store(int64(n)) },
 		}, "run", "--config", dir)
 		var got []string
-		seen := calls.Load()
 		for len(got) < n {
 			deadline := time.Now().Add(10 * time.Second)
-			for (inFlight.Load() != 0 || int64(clk.Waiters()) != instances.Load()+2) && time.Now().Before(deadline) {
+			for !collectorIdle(clk, &inFlight, &instances) && time.Now().Before(deadline) {
 				time.Sleep(100 * time.Microsecond)
 			}
 			if c := calls.Load(); c > seen {

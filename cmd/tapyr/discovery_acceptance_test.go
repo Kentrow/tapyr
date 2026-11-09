@@ -71,7 +71,7 @@ spec:
 	// only advancing it makes progress.
 	quiet := func() {
 		deadline := time.Now().Add(10 * time.Second)
-		for !clockBound(clk, inFlight.Load(), instances.Load()) && time.Now().Before(deadline) {
+		for !clockBound(clk, &inFlight, &instances) && time.Now().Before(deadline) {
 			time.Sleep(100 * time.Microsecond)
 		}
 		if time.Now().After(deadline) {
@@ -163,6 +163,17 @@ func labelValues(exposition, metric, label string) []string {
 	return out
 }
 
+// collectorIdle reports whether every run has finished and only the idle
+// timers are pending: one per scheduled instance, the ledger flush and the
+// replan tickers. The timers are read first, then the runs: the scheduler
+// counts a run as in flight before it re-arms the timer of its instance, so
+// a count of timers that includes that timer always sees the run. In the
+// other order, a run starting between the two reads looks idle.
+func collectorIdle(clk *clock.Fake, inFlight, instances *atomic.Int64) bool {
+	timers := int64(clk.Waiters())
+	return timers == instances.Load()+2 && inFlight.Load() == 0
+}
+
 // clockBound reports whether the collector can only make progress when the
 // fake clock advances. Every scheduled instance waits on a timer, as do the
 // ledger flush and replan tickers; a run in flight adds its deadline timer,
@@ -170,7 +181,8 @@ func labelValues(exposition, metric, label string) []string {
 // engine, a backoff, simulated latency). New fan-out instances start
 // together, so their runs can wait on a rate limit. A run in an HTTP
 // request, or an instance between two timers, lowers the count: the
-// equality never holds early.
-func clockBound(clk *clock.Fake, inFlight, instances int64) bool {
-	return int64(clk.Waiters()) == instances+2+2*inFlight
+// equality never holds early. The timers are read first, see collectorIdle.
+func clockBound(clk *clock.Fake, inFlight, instances *atomic.Int64) bool {
+	timers := int64(clk.Waiters())
+	return timers == instances.Load()+2+2*inFlight.Load()
 }

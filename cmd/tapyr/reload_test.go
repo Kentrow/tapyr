@@ -91,7 +91,7 @@ spec: { account: fleet, template: example-sim-devices, interval: 3m, labels: { c
 
 	quiet := func() {
 		deadline := time.Now().Add(10 * time.Second)
-		for !clockBound(clk, inFlight.Load(), instances.Load()) && time.Now().Before(deadline) {
+		for !clockBound(clk, &inFlight, &instances) && time.Now().Before(deadline) {
 			time.Sleep(100 * time.Microsecond)
 		}
 		if time.Now().After(deadline) {
