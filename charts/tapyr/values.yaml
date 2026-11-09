@@ -1,0 +1,94 @@
+# Values of the Tapyr chart, see README.md.
+
+image:
+  repository: ghcr.io/kentrow/tapyr
+  # Defaults to the version of the chart.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# The name of an existing Secret: its keys become environment variables, for
+# the { env: NAME } references of the configuration and TAPYR_STATE_KEY. The
+# chart never holds a secret: values end up in Git and in the Helm history.
+existingSecret: ""
+
+# Merged into the spec of the Settings document, which the chart writes:
+# server.listen and state.path are set by the chart. Do not put a Settings
+# document in config.
+settings: {}
+
+# Your Account, Job and Output documents, as YAML separated by ---.
+config: ""
+
+persistence:
+  # Without it, a restart forgets what was already spent of the daily and
+  # monthly quotas, and the rotated tokens.
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  # Use this PersistentVolumeClaim instead of creating one.
+  existingClaim: ""
+
+service:
+  type: ClusterIP
+  port: 9790
+  annotations: {}
+
+# The web UI and the status API have no authentication unless
+# settings.server.basicAuth is set or the Ingress controller adds one.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  # The UI is served at the root of this host.
+  host: ""
+  tls: []
+  # Only what the UI needs: /metrics and /metrics/self stay inside the
+  # cluster.
+  paths:
+    - { path: /, pathType: Exact }
+    - { path: /ui, pathType: Prefix }
+    - { path: /api, pathType: Prefix }
+
+# A ServiceMonitor of the Prometheus Operator, for the collected samples and
+# the self-metrics.
+serviceMonitor:
+  enabled: false
+  labels: {}
+  interval: ""
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: [ALL]
+
+# Shutdown flushes the state store and the outputs.
+terminationGracePeriodSeconds: 30
+
+extraEnv: []
+# For secret files ({ file: /path }) and provider packages of your own
+# (settings.providerPaths).
+extraVolumes: []
+extraVolumeMounts: []
+
+podLabels: {}
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
