@@ -106,6 +106,15 @@ jobs:
           args: release --clean --release-notes=${{ runner.temp }}/notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A deploy key of Kentrow/homebrew-tap, for the cask.
+          HOMEBREW_TAP_SSH_KEY: ${{ secrets.HOMEBREW_TAP_SSH_KEY }}
+      # A release candidate does not write to the tap: its cask is kept here,
+      # to install and check it by hand.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: homebrew-cask
+          path: dist/homebrew/Casks/tapyr.rb
+          retention-days: 7
       # SLSA build provenance (GitHub artifact attestations): one attestation
       # for every archive of checksums.txt, one for the image, attached to
       # its digest in the registry. The bundle of the archives is also a

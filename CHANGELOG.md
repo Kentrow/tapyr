@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A Helm chart (`charts/tapyr`), published with every release as the signed OCI artifact `oci://ghcr.io/kentrow/charts/tapyr`: one replica, the hardening of the Kustomize example, the state store on a volume, secrets from an existing Secret, an optional Ingress for the web UI and the status API, and an optional ServiceMonitor.
+- A Homebrew cask for macOS: `brew install kentrow/tap/tapyr`.
 - deb and rpm packages for amd64 and arm64, attached to every release: the binary, the hardened systemd unit and an example configuration. The service starts once configured; an upgrade restarts it; a removal keeps the configuration and the state store.
 
 ## [0.2.0] - 2026-11-09
