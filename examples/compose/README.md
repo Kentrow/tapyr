@@ -29,6 +29,14 @@ SIM_SCENARIO=bad-day docker compose up -d sim
 docker compose up -d sim           # back to the default behavior
 ```
 
+A scenario is a timeline that starts with the simulators. `quota-tight` acts at once. `bad-day` waits an hour before its first fault, then goes through added latency, errors on the main routes and a short outage, at times of their own in every package (`sim/scenarios/bad-day.yaml`): the outage of RutOS after 1 hour, the errors after 2 hours, the outages of Meraki and RMS after 4 hours. To see it sooner, run the simulators faster than real time:
+
+```sh
+SIM_SCENARIO=bad-day SIM_TIME_SCALE=10 docker compose up -d sim
+```
+
+The scenarios then play ten times faster: the outage of RutOS after 6 minutes, the errors after 12, the other outages after 24. The faults get shorter as well, and the quota windows of the simulators run faster too: well above 10, most faults end before the jobs of the demo run again, and Tapyr hardly sees them. Retries absorb most of the errors: look for them on the `Retries per minute, by reason` panel of the `Tapyr / Overview` dashboard rather than in the logs.
+
 ## With your own build
 
 The compose uses the image of the release. To try a local build:
