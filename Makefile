@@ -100,6 +100,14 @@ run: ## Run tapyr against ./examples/config (start make sim first)
 smoke: build-go ## Smoke test the built binary (tapyr sim + tapyr run)
 	./scripts/smoke.sh $(BIN_DIR)/tapyr
 
+.PHONY: helm-check
+helm-check: ## Lint the Helm chart, validate its manifests and what its templates guarantee
+	./scripts/helm-check.sh
+
+.PHONY: helm-e2e
+helm-e2e: ## Install the Helm chart on a kind cluster against a simulator (Docker, helm, kubectl)
+	./scripts/helm-e2e.sh
+
 .PHONY: sim
 sim: ## Run the simulator for a provider (PROVIDER=name)
 	$(GO) run ./cmd/tapyr sim --provider $(PROVIDER)

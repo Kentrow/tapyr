@@ -8,6 +8,7 @@ sources:
   - docs
   - examples
   - providers
+  - charts
 
 nav:
   - docs/getting-started.md
@@ -22,6 +23,7 @@ nav:
       - examples/compose/README.md
       - examples/config/README.md
       - examples/systemd/README.md
+      - charts/tapyr/README.md
       - examples/kubernetes/README.md
   - Providers:
       - docs/providers.md

@@ -70,6 +70,7 @@ Your training data does not know this project, and may be out of date about its 
 | `make sim PROVIDER=name` | Run the simulator of a provider |
 | `make smoke` | The built binary against the simulator |
 | `make integration` | The outputs against VictoriaMetrics, the OpenTelemetry Collector and Prometheus (Docker) |
+| `make helm-check` / `make helm-e2e` | Lint and check the Helm chart / install it on a kind cluster against a simulator (Docker, helm, kubectl) |
 | `make alerts-check` | promtool checks and unit tests of the example alert rules (Docker) |
 | `make e2e` | Opt-in tests against real platforms (credentials in environment variables) |
 | `make docker` | The image `tapyr:dev` from source |

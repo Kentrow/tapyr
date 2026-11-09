@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A Helm chart (`charts/tapyr`), published with every release as the signed OCI artifact `oci://ghcr.io/kentrow/charts/tapyr`: one replica, the hardening of the Kustomize example, the state store on a volume, secrets from an existing Secret, an optional Ingress for the web UI and the status API, and an optional ServiceMonitor.
+
 ## [0.2.0] - 2026-11-09
 
 ### Added

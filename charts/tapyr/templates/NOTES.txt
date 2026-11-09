@@ -1,0 +1,17 @@
+Tapyr {{ .Chart.AppVersion }} is installed as {{ include "tapyr.fullname" . }}.
+{{- if not .Values.config }}
+
+WARNING: the value config is empty: Tapyr runs and collects nothing. Set your
+Account, Job and Output documents in it.
+{{- end }}
+{{- if and .Values.ingress.enabled (not (dig "server" "basicAuth" "" .Values.settings)) }}
+
+WARNING: the Ingress is enabled without settings.server.basicAuth. Unless the
+Ingress controller authenticates its clients, anyone reaching it can read the
+accounts, the jobs, the quotas and the errors of this Tapyr.
+{{- end }}
+
+Open the web UI:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "tapyr.fullname" . }} 9790:{{ .Values.service.port }}
+  http://127.0.0.1:9790/ui/

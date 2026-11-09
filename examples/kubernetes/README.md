@@ -1,6 +1,6 @@
 # Kubernetes
 
-Plain manifests, applied with Kustomize (`kubectl apply -k`): a Deployment of one replica, its Service, a volume for the state store and the configuration as a ConfigMap.
+With Helm, use the [chart](../../charts/tapyr/README.md). Otherwise, plain manifests, applied with Kustomize (`kubectl apply -k`): a Deployment of one replica, its Service, a volume for the state store and the configuration as a ConfigMap.
 
 | File | What it is |
 |---|---|
