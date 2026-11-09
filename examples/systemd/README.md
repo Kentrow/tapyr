@@ -4,7 +4,9 @@
 
 ## Install
 
-With the binary in `/usr/local/bin/tapyr` (see [`docs/install.md`](../../docs/install.md)):
+The [deb and rpm packages](../../docs/install.md#deb-and-rpm-packages) install this unit: write the configuration and the secrets as below, then `sudo systemctl enable --now tapyr`.
+
+With the binary installed by hand, in `/usr/local/bin/tapyr` (see [`docs/install.md`](../../docs/install.md)):
 
 ```sh
 sudo install -d -m 0755 /etc/tapyr

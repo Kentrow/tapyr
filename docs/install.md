@@ -20,6 +20,23 @@ The archives are `tapyr_<version>_<os>_<arch>`: `linux`, `darwin` or `windows` (
 
 Each archive has its SBOM next to it (`<archive>.sbom.json`, SPDX), and holds `LICENSE`, `NOTICE` and `THIRD_PARTY_LICENSES`, the licenses and notices of the software the binary includes.
 
+## deb and rpm packages
+
+From v0.2.1, every release has `.deb` and `.rpm` packages for amd64 and arm64: the binary in `/usr/bin`, the [hardened systemd unit](../examples/systemd/README.md) and an example in `/etc/tapyr`. They are static, without dependencies, and covered by the checksums, their signature and the provenance below.
+
+```sh
+VERSION=0.2.1
+ARCH=$(dpkg --print-architecture)    # or: uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/'
+curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/tapyr_${VERSION}_linux_${ARCH}.deb    # or .rpm
+curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/checksums.txt
+sha256sum --ignore-missing -c checksums.txt
+sudo dpkg -i tapyr_${VERSION}_linux_${ARCH}.deb                                                             # or: sudo rpm -i ...
+```
+
+The service does not start by itself: without a configuration, it would collect nothing. Write `/etc/tapyr/config.yaml` from `config.yaml.example`, the secrets in `/etc/tapyr/tapyr.env` (mode `0600`), then `sudo systemctl enable --now tapyr`. [The systemd guide](../examples/systemd/README.md) covers how to run it.
+
+An upgrade restarts the service if it runs, and keeps the state store. A removal, even a `purge`, keeps `/etc/tapyr` and the state store in `/var/lib/private/tapyr`: it remembers the quotas already spent and the rotated tokens. Delete them by hand if you really mean to.
+
 ## Container image
 
 ```sh
@@ -40,7 +57,7 @@ Tags: `X.Y.Z`, `X.Y` (latest patch of a minor version) and `latest` (latest rele
 
 ## systemd
 
-[`examples/systemd`](../examples/systemd/README.md) has a hardened unit: a dynamic user, the configuration in `/etc/tapyr`, the secrets in an environment file read by systemd, the state store in `/var/lib/tapyr`, and `systemctl reload tapyr` for a reload.
+The [deb and rpm packages](#deb-and-rpm-packages) install it. For a binary installed by hand, [`examples/systemd`](../examples/systemd/README.md) has a hardened unit: a dynamic user, the configuration in `/etc/tapyr`, the secrets in an environment file read by systemd, the state store in `/var/lib/tapyr`, and `systemctl reload tapyr` for a reload.
 
 ## Kubernetes
 

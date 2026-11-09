@@ -1,0 +1,25 @@
+# An example of configuration: copy it to /etc/tapyr/config.yaml and replace
+# the account, the job and the output with yours (the README of each provider
+# package has an example). Tapyr only reads the *.yaml and *.yml files of
+# /etc/tapyr.
+#
+# Secrets go in /etc/tapyr/tapyr.env, as NAME=value lines, mode 0600. Then:
+#
+#   sudo tapyr validate --config /etc/tapyr
+#   sudo systemctl enable --now tapyr
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: campus }
+spec:
+  provider: meraki-dashboard
+  secrets: { apiKey: { env: TAPYR_MERAKI_API_KEY } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: device-availabilities }
+spec: { account: campus, template: meraki-device-availabilities }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: prom }
+spec: { type: prometheus }
