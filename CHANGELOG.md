@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-09
+
 ### Added
 
 - Catalog metadata on provider packages ([ADR 0011](docs/adr/0011-provider-ecosystem.md)): `displayName`, `categories`, `maintainers`, `tier` (`official` or `community`) and `validation` (`simulator` or `real-platform`, with a date and the platform version), and a structured `source` on every limit (`vendor-docs`, `measured` or `assumed`). They are optional; `tapyr provider lint --catalog` requires them, and every built-in package has them.
@@ -70,7 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kentrow/tapyr/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kentrow/tapyr/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kentrow/tapyr/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/kentrow/tapyr/releases/tag/v0.1.0
