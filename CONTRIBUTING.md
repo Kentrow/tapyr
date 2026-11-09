@@ -19,7 +19,7 @@ If you work with a coding agent, point it to [`AGENTS.md`](AGENTS.md): it holds 
 
 ## Development setup
 
-You need Go 1.27, Node.js 22 or later (for the web UI), [golangci-lint](https://golangci-lint.run) v2, and optionally Docker (integration tests, alert rules, image).
+You need Go 1.27, Node.js 22.12 or later (for the web UI), [golangci-lint](https://golangci-lint.run) v2, and optionally Docker (integration tests, alert rules, image).
 
 ```sh
 git clone https://github.com/kentrow/tapyr.git

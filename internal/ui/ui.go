@@ -68,7 +68,7 @@ const notBuilt = `<!doctype html>
 code{background:#e8f2f7;padding:.1rem .3rem;border-radius:4px}@media(prefers-color-scheme:dark){body{color:#e4f1f7;background:#0b1824}code{background:#142c42}}</style>
 </head><body>
 <h1>Tapyr</h1>
-<p>This binary was built without the web UI. Build it with <code>make ui</code> (Node.js 22 or later), then <code>make build</code>.</p>
+<p>This binary was built without the web UI. Build it with <code>make ui</code> (Node.js 22.12 or later), then <code>make build</code>.</p>
 <p>The status API answers at <a href="/api/v1/status">/api/v1/status</a>, the metrics at <a href="/metrics">/metrics</a> and <a href="/metrics/self">/metrics/self</a>.</p>
 </body></html>
 `

@@ -6,7 +6,7 @@
   "description": "Read-only web UI of Tapyr, embedded in the binary",
   "license": "Apache-2.0",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "scripts": {
     "postinstall": "node scripts/go-ignore.mjs",

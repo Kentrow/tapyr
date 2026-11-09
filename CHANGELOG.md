@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Catalog metadata on provider packages ([ADR 0011](docs/adr/0011-provider-ecosystem.md)): `displayName`, `categories`, `maintainers`, `tier` (`official` or `community`) and `validation` (`simulator` or `real-platform`, with a date and the platform version), and a structured `source` on every limit (`vendor-docs`, `measured` or `assumed`). They are optional; `tapyr provider lint --catalog` requires them, and every built-in package has them.
 - `tapyr provider list --output json`: every package with its catalog metadata, its templates (request path, default interval, metrics) and its limits (value, scope, source), and the catalog categories, versioned by a `schemaVersion` ([provider catalog output](docs/spec/09-cli-api-ui.md#provider-catalog-output)).
 - Documentation: the strategy of the provider ecosystem ([ADR 0011](docs/adr/0011-provider-ecosystem.md)), and a page of [provider ideas](docs/provider-ideas.md) beyond networks, with their rate-limit patterns and the engine features some of them still need.
+- Demo compose: `SIM_TIME_SCALE` runs the simulators faster than real time, to watch the `bad-day` scenario in minutes instead of hours.
 
 ### Changed
 
@@ -20,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The web UI declared Node.js 22 as its minimum to build from source; Vite 8 needs 22.12 or later.
 - Enabling or changing the live debug (`settings.server.debug`) by a reload logged "settings changed that take effect after a restart", although the reload applies it, as the Live debug page of the UI says.
 - The instances of a fan-out were not spread over their interval when their keys differ only by their last characters (`devices[orgId=1]`, `devices[orgId=2]`): their phases came within a second of each other, and they ran in bursts. Phases now come from a hash that mixes the whole key; they move once when upgrading.
 

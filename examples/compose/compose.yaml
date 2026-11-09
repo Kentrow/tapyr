@@ -18,8 +18,9 @@ services:
     # package: aruba-central-classic 8081, example-sim 8082,
     # meraki-dashboard 8083, teltonika-rms 8084, teltonika-rutos 8085.
     # SIM_SCENARIO=quota-tight or bad-day overlays the fault scenario of the
-    # packages that have it.
-    command: ["sim", "--all", "--listen-base", "0.0.0.0:8081", "--scenario", "${SIM_SCENARIO:-default}"]
+    # packages that have it; SIM_TIME_SCALE=10 plays the scenarios (and the
+    # quota windows of the simulators) ten times faster.
+    command: ["sim", "--all", "--listen-base", "0.0.0.0:8081", "--scenario", "${SIM_SCENARIO:-default}", "--time-scale", "${SIM_TIME_SCALE:-1}"]
     restart: unless-stopped
 
   tapyr:

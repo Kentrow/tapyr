@@ -135,7 +135,7 @@ licenses: ## Write THIRD_PARTY_LICENSES (Go modules, Go, UI packages; run make u
 	$(GO) run ./internal/tools/licenses -ui ui/dist/licenses.txt -out THIRD_PARTY_LICENSES
 
 .PHONY: ui
-ui: ## Build the web UI into ui/dist/app (Node.js 22 or later), embedded by the next Go build
+ui: ## Build the web UI into ui/dist/app (Node.js 22.12 or later), embedded by the next Go build
 	cd ui && npm ci --no-audit --no-fund && npm run build
 
 .PHONY: ui-check
