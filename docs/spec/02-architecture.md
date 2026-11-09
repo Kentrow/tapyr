@@ -203,6 +203,7 @@ tapyr/
 │   ├── tools/schemagen/       # JSON Schema generator (make schema)
 │   └── ui/                    # HTTP handler of the web UI (assets embedded by ui/embed.go)
 ├── charts/tapyr/              # Helm chart, published as an OCI artifact by the release
+├── packaging/                 # what the deb and rpm packages add: scripts, example configuration
 ├── providers/                 # built-in provider packages
 │   ├── embed.go               # embeds the packages in the binary
 │   ├── aruba-central-classic/

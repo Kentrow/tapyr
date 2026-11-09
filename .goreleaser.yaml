@@ -1,6 +1,7 @@
 # GoReleaser configuration of the releases: static binaries for Linux,
 # macOS and Windows (amd64, arm64) with the web UI embedded, archives with
-# their SBOM, checksums, and the multi-arch image ghcr.io/kentrow/tapyr.
+# their SBOM, deb and rpm packages, checksums, and the multi-arch image
+# ghcr.io/kentrow/tapyr.
 # The checksums and the image are signed with cosign in keyless mode (the
 # OIDC identity of the release workflow). See .github/workflows/release.yml.
 version: 2
@@ -46,6 +47,41 @@ archives:
       - THIRD_PARTY_LICENSES
       - README.md
       - CHANGELOG.md
+
+# deb and rpm packages of the Linux binaries, covered by the checksums, their
+# signature and the provenance. The service is the unit of examples/systemd.
+nfpms:
+  - id: tapyr
+    ids: [tapyr]
+    package_name: tapyr
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: Tapyr
+    homepage: https://tapyr.eu
+    maintainer: Tapyr maintainers <conduct@tapyr.eu>
+    description: Declarative API-to-metrics gateway that plans and spends API quota deliberately
+    license: Apache-2.0
+    formats: [deb, rpm]
+    bindir: /usr/bin
+    section: net
+    contents:
+      - src: examples/systemd/tapyr.service
+        dst: /usr/lib/systemd/system/tapyr.service
+      - dst: /etc/tapyr
+        type: dir
+        file_info:
+          mode: 0755
+      - src: packaging/config.yaml.example
+        dst: /etc/tapyr/config.yaml.example
+      - src: LICENSE
+        dst: /usr/share/doc/tapyr/LICENSE
+      - src: NOTICE
+        dst: /usr/share/doc/tapyr/NOTICE
+      - src: THIRD_PARTY_LICENSES
+        dst: /usr/share/doc/tapyr/THIRD_PARTY_LICENSES
+    scripts:
+      postinstall: packaging/postinstall.sh
+      preremove: packaging/preremove.sh
+      postremove: packaging/postremove.sh
 
 checksum:
   name_template: checksums.txt

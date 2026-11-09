@@ -15,7 +15,8 @@ After=network-online.target
 
 [Service]
 Type=exec
-ExecStart=/usr/local/bin/tapyr run --config /etc/tapyr
+# Found in the search path of systemd: /usr/local/bin or /usr/bin (packages).
+ExecStart=tapyr run --config /etc/tapyr
 ExecReload=kill -HUP $MAINPID
 # Read by systemd as root: the file can stay 0600 root:root.
 EnvironmentFile=-/etc/tapyr/tapyr.env

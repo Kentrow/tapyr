@@ -108,6 +108,10 @@ helm-check: ## Lint the Helm chart, validate its manifests and what its template
 helm-e2e: ## Install the Helm chart on a kind cluster against a simulator (Docker, helm, kubectl)
 	./scripts/helm-e2e.sh
 
+.PHONY: packages-e2e
+packages-e2e: ## Install the deb and rpm packages of dist/ (goreleaser release --snapshot) in Debian and Fedora containers with systemd (Docker)
+	./scripts/packages-e2e.sh dist
+
 .PHONY: sim
 sim: ## Run the simulator for a provider (PROVIDER=name)
 	$(GO) run ./cmd/tapyr sim --provider $(PROVIDER)
