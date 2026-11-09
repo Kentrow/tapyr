@@ -3,8 +3,8 @@ name: tapyr
 description: Declarative API-to-metrics gateway that plans and spends API quotas deliberately
 type: application
 # The release workflow sets both versions from its tag.
-version: 0.2.0
-appVersion: "0.2.0"
+version: 0.2.1
+appVersion: "0.2.1"
 home: https://tapyr.eu
 sources:
   - https://github.com/Kentrow/tapyr
