@@ -20,6 +20,17 @@ The archives are `tapyr_<version>_<os>_<arch>`: `linux`, `darwin` or `windows` (
 
 Each archive has its SBOM next to it (`<archive>.sbom.json`, SPDX), and holds `LICENSE`, `NOTICE` and `THIRD_PARTY_LICENSES`, the licenses and notices of the software the binary includes.
 
+## Homebrew
+
+From v0.2.1, on macOS:
+
+```sh
+brew install kentrow/tap/tapyr
+brew trust kentrow/tap            # once, so that a plain `brew upgrade` includes it
+```
+
+The binary is not notarized by Apple: the cask removes its quarantine attribute at install, otherwise macOS would refuse to run it. To check what you run, [verify the signatures](#verify-the-signatures) of the release first.
+
 ## deb and rpm packages
 
 From v0.2.1, every release has `.deb` and `.rpm` packages for amd64 and arm64: the binary in `/usr/bin`, the [hardened systemd unit](../examples/systemd/README.md) and an example in `/etc/tapyr`. They are static, without dependencies, and covered by the checksums, their signature and the provenance below.

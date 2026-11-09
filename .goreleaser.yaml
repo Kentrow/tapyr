@@ -1,7 +1,7 @@
 # GoReleaser configuration of the releases: static binaries for Linux,
 # macOS and Windows (amd64, arm64) with the web UI embedded, archives with
-# their SBOM, deb and rpm packages, checksums, and the multi-arch image
-# ghcr.io/kentrow/tapyr.
+# their SBOM, deb and rpm packages, a Homebrew cask, checksums, and the
+# multi-arch image ghcr.io/kentrow/tapyr.
 # The checksums and the image are signed with cosign in keyless mode (the
 # OIDC identity of the release workflow). See .github/workflows/release.yml.
 version: 2
@@ -82,6 +82,36 @@ nfpms:
       postinstall: packaging/postinstall.sh
       preremove: packaging/preremove.sh
       postremove: packaging/postremove.sh
+
+# The Homebrew cask, written to Kentrow/homebrew-tap with a deploy key of that
+# repository. A release candidate only generates it in dist/homebrew.
+homebrew_casks:
+  - name: tapyr
+    ids: [tapyr]
+    binaries: [tapyr]
+    directory: Casks
+    homepage: https://tapyr.eu
+    description: Declarative API-to-metrics gateway that plans and spends API quota deliberately
+    license: Apache-2.0
+    skip_upload: auto
+    commit_author:
+      name: Tapyr release workflow
+      email: conduct@tapyr.eu
+    repository:
+      owner: Kentrow
+      name: homebrew-tap
+      branch: main
+      git:
+        url: git@github.com:Kentrow/homebrew-tap.git
+        private_key: '{{ index .Env "HOMEBREW_TAP_SSH_KEY" }}'
+    hooks:
+      post:
+        # The binary is not notarized by Apple: without this, macOS refuses
+        # to run it.
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/tapyr"]
+          end
 
 checksum:
   name_template: checksums.txt

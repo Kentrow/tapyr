@@ -169,6 +169,8 @@ jobs:
           for bin in $bins; do
             go version -m "$bin" | grep -q 'CGO_ENABLED=0' || { echo "::error::$bin is not static"; exit 1; }
           done
+      - name: The Homebrew cask is generated
+        run: test -s dist/homebrew/Casks/tapyr.rb && ruby -c dist/homebrew/Casks/tapyr.rb
       - name: The deb and rpm packages install and run under systemd
         run: make packages-e2e
       - name: Image built from source
