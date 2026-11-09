@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-09
+
 ### Added
 
 - A Helm chart (`charts/tapyr`), published with every release as the signed OCI artifact `oci://ghcr.io/kentrow/charts/tapyr`: one replica, the hardening of the Kustomize example, the state store on a volume, secrets from an existing Secret, an optional Ingress for the web UI and the status API, and an optional ServiceMonitor.
@@ -78,7 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/kentrow/tapyr/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kentrow/tapyr/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kentrow/tapyr/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kentrow/tapyr/compare/v0.1.0...v0.1.1
