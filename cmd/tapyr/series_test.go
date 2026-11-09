@@ -84,7 +84,7 @@ spec:
 	advanceTo := func(at time.Time) {
 		for {
 			deadline := time.Now().Add(10 * time.Second)
-			for (inFlight.Load() != 0 || int64(clk.Waiters()) != instances.Load()+2) && time.Now().Before(deadline) {
+			for !collectorIdle(clk, &inFlight, &instances) && time.Now().Before(deadline) {
 				time.Sleep(100 * time.Microsecond)
 			}
 			if time.Now().After(deadline) {
