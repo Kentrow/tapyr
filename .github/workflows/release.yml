@@ -4,8 +4,10 @@ name: Release
 # binaries (UI embedded), the archives with their SBOM, the checksums and
 # the multi-arch image ghcr.io/kentrow/tapyr; cosign signs the checksums and
 # the image in keyless mode with the OIDC identity of this workflow, and
-# GitHub artifact attestations record their SLSA build provenance. The
-# release notes are the section of the version in CHANGELOG.md.
+# GitHub artifact attestations record their SLSA build provenance. The Helm
+# chart is published as the OCI artifact ghcr.io/kentrow/charts/tapyr, signed
+# and attested the same way. The release notes are the section of the version
+# in CHANGELOG.md.
 #
 # Safety: the tagged commit must be on main and pass the tests; the UI is
 # built in a job without any write permission (npm scripts never see a
@@ -138,3 +140,31 @@ jobs:
           asset="$RUNNER_TEMP/tapyr_${TAG#v}_provenance.intoto.jsonl"
           jq -c . "$BUNDLE" > "$asset"
           gh release upload "$TAG" "$asset" --repo "$GITHUB_REPOSITORY" --clobber
+      # The Helm chart, as an OCI artifact of the version of the tag.
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: "v4.3.1"
+      - name: Publish the Helm chart
+        id: chart
+        env:
+          TAG: ${{ github.ref_name }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${TAG#v}"
+          echo "$GH_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          helm package charts/tapyr --version "$version" --app-version "$version" --destination "$RUNNER_TEMP"
+          helm push "$RUNNER_TEMP/tapyr-$version.tgz" oci://ghcr.io/kentrow/charts 2>&1 | tee "$RUNNER_TEMP/push.log"
+          digest=$(sed -n 's/^Digest: //p' "$RUNNER_TEMP/push.log")
+          case "$digest" in sha256:*) ;; *) echo "no digest for the chart" >&2; exit 1 ;; esac
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - name: Sign the Helm chart
+        env:
+          DIGEST: ${{ steps.chart.outputs.digest }}
+        run: cosign sign --yes "ghcr.io/kentrow/charts/tapyr@$DIGEST"
+      - name: Provenance of the Helm chart
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ghcr.io/kentrow/charts/tapyr
+          subject-digest: ${{ steps.chart.outputs.digest }}
+          push-to-registry: true
+          create-storage-record: false # organization repositories only

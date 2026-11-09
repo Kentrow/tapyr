@@ -44,7 +44,15 @@ Tags: `X.Y.Z`, `X.Y` (latest patch of a minor version) and `latest` (latest rele
 
 ## Kubernetes
 
-[`examples/kubernetes`](../examples/kubernetes/README.md) has Kustomize manifests: a Deployment of one replica (non-root, read-only root file system, probes on `/readyz` and `/healthz`), its Service, a volume for the state store, and the configuration as a ConfigMap whose changes roll the Deployment out. Run a single replica: a second one would spend the same quotas without coordinating.
+The [Helm chart](../charts/tapyr/README.md) is published with every release, signed:
+
+```sh
+kubectl create namespace tapyr
+kubectl -n tapyr create secret generic tapyr --from-env-file=tapyr.env
+helm install tapyr oci://ghcr.io/kentrow/charts/tapyr --namespace tapyr --values my-values.yaml
+```
+
+Without Helm, [`examples/kubernetes`](../examples/kubernetes/README.md) has Kustomize manifests: a Deployment of one replica (non-root, read-only root file system, probes on `/readyz` and `/healthz`), its Service, a volume for the state store, and the configuration as a ConfigMap whose changes roll the Deployment out. Run a single replica: a second one would spend the same quotas without coordinating.
 
 ## Verify the signatures
 
@@ -59,6 +67,14 @@ cosign verify-blob checksums.txt \
 
 # The image.
 cosign verify ghcr.io/kentrow/tapyr:$VERSION \
+  --certificate-identity "https://github.com/Kentrow/tapyr/.github/workflows/release.yml@refs/tags/v$VERSION" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+The Helm chart, from v0.2.1:
+
+```sh
+cosign verify ghcr.io/kentrow/charts/tapyr:$VERSION \
   --certificate-identity "https://github.com/Kentrow/tapyr/.github/workflows/release.yml@refs/tags/v$VERSION" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 ```
@@ -81,6 +97,11 @@ gh attestation verify "tapyr_${VERSION}_linux_amd64.tar.gz" --repo Kentrow/tapyr
 
 # The image.
 gh attestation verify "oci://ghcr.io/kentrow/tapyr:$VERSION" --repo Kentrow/tapyr \
+  --signer-workflow Kentrow/tapyr/.github/workflows/release.yml \
+  --source-ref "refs/tags/v$VERSION" --deny-self-hosted-runners
+
+# The Helm chart, from v0.2.1.
+gh attestation verify "oci://ghcr.io/kentrow/charts/tapyr:$VERSION" --repo Kentrow/tapyr \
   --signer-workflow Kentrow/tapyr/.github/workflows/release.yml \
   --source-ref "refs/tags/v$VERSION" --deny-self-hosted-runners
 ```

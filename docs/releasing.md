@@ -13,7 +13,7 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
 - **Workflow permissions**: Settings > Actions > General, "Read repository contents and packages permissions" as the default token permissions (every workflow asks for what it needs), GitHub Actions not allowed to create or approve pull requests, and approval required to run the workflows of first-time contributors.
 - **Labels**: `scripts/sync-labels.sh` creates the labels of [`.github/labels.yml`](../.github/labels.yml).
 - **OpenSSF**: the Scorecard workflow publishes its results once the repository is public (badge in the README). The project is registered on [bestpractices.dev](https://www.bestpractices.dev/projects/16342) (passing level, badge in the README): keep its answers true when the project changes (security policy, tests, CI, release signing).
-- **Image visibility**: after the first release, the package `ghcr.io/kentrow/tapyr` is private by default: Packages > tapyr > Package settings > Change visibility to public, and link it to the repository.
+- **Image visibility**: after the first release, the package `ghcr.io/kentrow/tapyr` is private by default: Packages > tapyr > Package settings > Change visibility to public, and link it to the repository. The same for `ghcr.io/kentrow/charts/tapyr`, after the first release with the chart.
 
 ## A release
 
@@ -26,7 +26,7 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
    [X.Y.Z]: https://github.com/kentrow/tapyr/compare/vPREVIOUS...vX.Y.Z
    ```
 
-   (for the first release: `[0.1.0]: https://github.com/kentrow/tapyr/releases/tag/v0.1.0`). In the same commit, update the version the docs and examples pin (`git grep -n "tapyr:PREVIOUS\|VERSION=PREVIOUS\|newTag"`: the README, `docs/install.md`, `docs/operations.md`, the demo compose and the Kustomize example). Commit it as `chore(release): vX.Y.Z` through a pull request.
+   (for the first release: `[0.1.0]: https://github.com/kentrow/tapyr/releases/tag/v0.1.0`). In the same commit, update the version the docs and examples pin (`git grep -n "tapyr:PREVIOUS\|VERSION=PREVIOUS\|newTag"`: the README, `docs/install.md`, `docs/operations.md`, the demo compose and the Kustomize example), and `version` and `appVersion` in `charts/tapyr/Chart.yaml`. Commit it as `chore(release): vX.Y.Z` through a pull request.
 4. Tag the merge commit on `main` and push the tag:
 
    ```sh
@@ -51,6 +51,8 @@ Dependabot updates the Go modules, the actions, the images and the npm packages.
 | GoReleaser | `version:` of the GoReleaser steps in [`ci.yml`](../.github/workflows/ci.yml) and [`release.yml`](../.github/workflows/release.yml) | The same version in both; the release snapshot job of the CI checks it before a tag does. |
 | govulncheck | `golang.org/x/vuln/cmd/govulncheck@vX.Y.Z` in [`ci.yml`](../.github/workflows/ci.yml) | The latest release. |
 | Node.js major | `node-version` in the workflows, the `ui` stage of the [`Dockerfile`](../Dockerfile), `@types/node` in [`ui/package.json`](../ui/package.json) | The active LTS line, all together; Dependabot updates the minor versions only. |
+| Helm | `version:` of the `azure/setup-helm` steps in [`ci.yml`](../.github/workflows/ci.yml) and [`release.yml`](../.github/workflows/release.yml) | The latest release; the same in both. |
+| kubeconform, kind | `KUBECONFORM_VERSION` in [`scripts/helm-check.sh`](../scripts/helm-check.sh), `KIND_VERSION` in [`scripts/helm-e2e.sh`](../scripts/helm-e2e.sh) | The latest releases. |
 | TypeScript major | `typescript` in [`ui/package.json`](../ui/package.json) | Held back until typescript-eslint supports the new major. |
 
 A separate `tools/go.mod` module, with `tool` directives updated by Dependabot, was considered and set aside: the three Go tools pull about 500 modules into it (a `go.sum` of 1600 lines), whose advisories would raise Dependabot alerts on the repository for code that never enters the binary, and golangci-lint recommends its prebuilt binaries over `go tool`.
