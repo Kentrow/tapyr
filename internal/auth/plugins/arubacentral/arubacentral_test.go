@@ -253,6 +253,98 @@ func TestRotation(t *testing.T) {
 	}
 }
 
+// TestReadOnly is a regression test: tapyr record started from the
+// bootstrap pair, which tapyr run had already rotated, and tried to refresh
+// it. Read-only, the plugin uses the stored pair and never refreshes: a
+// refresh would spend the refresh token of tapyr run.
+func TestReadOnly(t *testing.T) {
+	clk := clock.NewFake(time.Date(2026, time.November, 3, 9, 0, 0, 0, time.UTC))
+	c := newCentral(t, clk)
+	store := &memStore{tokens: map[string][]byte{}}
+	var tokens []string
+	block := &config.Auth{Type: config.AuthPlugin, Plugin: &config.PluginAuth{Name: Name, Config: pluginConfig}}
+	run, err := manager(t, clk, store, &tokens).For(block, session(c.srv.URL, "boot-refresh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := call(t, run, c.srv.URL); err != nil {
+		t.Fatal(err)
+	}
+	clk.Advance(2 * time.Minute)
+	if status, err := call(t, run, c.srv.URL); err != nil || status != http.StatusOK || c.sim.Issued() != 1 {
+		t.Fatalf("tapyr run: %d %v, %d issued", status, err, c.sim.Issued())
+	}
+	stored := store.stored(t)
+
+	rec, err := readOnlyManager(t, clk, store).For(block, session(c.srv.URL, "boot-refresh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := call(t, rec, c.srv.URL); err != nil || status != http.StatusOK {
+		t.Fatalf("with the stored pair: %d %v", status, err)
+	}
+	// The access token is used until its expiry, not refreshBefore it.
+	clk.Advance(115 * time.Minute)
+	if status, err := call(t, rec, c.srv.URL); err != nil || status != http.StatusOK {
+		t.Fatalf("before the expiry: %d %v", status, err)
+	}
+	clk.Advance(5 * time.Minute)
+	if _, err := call(t, rec, c.srv.URL); !errors.Is(err, auth.ErrRenewalNotAllowed) {
+		t.Fatalf("at the expiry: %v", err)
+	}
+	if c.sim.Issued() != 1 || store.stored(t) != stored {
+		t.Fatalf("the read-only plugin refreshed or wrote: %d issued, %+v", c.sim.Issued(), store.stored(t))
+	}
+	// tapyr run still holds a valid refresh token.
+	if status, err := call(t, run, c.srv.URL); err != nil || status != http.StatusOK || c.sim.Issued() != 2 {
+		t.Fatalf("tapyr run after the recording: %d %v, %d issued", status, err, c.sim.Issued())
+	}
+
+	// A rejected access token is not refreshed either.
+	rec, _ = readOnlyManager(t, clk, store).For(block, session(c.srv.URL, "boot-refresh"))
+	c.sim.ExpireBefore(clk.Now())
+	if status, err := call(t, rec, c.srv.URL); err != nil || status != http.StatusUnauthorized {
+		t.Fatalf("rejected token: %d %v", status, err)
+	}
+	if _, err := call(t, rec, c.srv.URL); !errors.Is(err, auth.ErrRenewalNotAllowed) || c.sim.Issued() != 2 {
+		t.Fatalf("after a rejection: %v, %d issued", err, c.sim.Issued())
+	}
+}
+
+// TestReadOnlyBootstrap checks that without a stored pair, a read-only
+// plugin uses the bootstrap access token and never spends the bootstrap
+// refresh token.
+func TestReadOnlyBootstrap(t *testing.T) {
+	clk := clock.NewFake(time.Date(2026, time.November, 3, 9, 0, 0, 0, time.UTC))
+	c := newCentral(t, clk)
+	store := &memStore{tokens: map[string][]byte{}}
+	block := &config.Auth{Type: config.AuthPlugin, Plugin: &config.PluginAuth{Name: Name, Config: pluginConfig}}
+	rec, err := readOnlyManager(t, clk, store).For(block, session(c.srv.URL, "boot-refresh"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status, err := call(t, rec, c.srv.URL); err != nil || status != http.StatusOK {
+		t.Fatalf("with the bootstrap access token: %d %v", status, err)
+	}
+	clk.Advance(11 * time.Minute)
+	if _, err := call(t, rec, c.srv.URL); !errors.Is(err, auth.ErrRenewalNotAllowed) {
+		t.Fatalf("past its assumed lifetime: %v", err)
+	}
+	if c.sim.Issued() != 0 || len(store.tokens) != 0 {
+		t.Errorf("%d tokens issued, %d stored", c.sim.Issued(), len(store.tokens))
+	}
+}
+
+func readOnlyManager(t *testing.T, clk clock.Clock, store auth.TokenStore) *auth.Manager {
+	t.Helper()
+	m, err := auth.NewManager(auth.ManagerOptions{Clock: clk, Store: store, Plugins: auth.NewPlugins(New()), ReadOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.SetSender(sender{})
+	return m
+}
+
 func TestReauthRequired(t *testing.T) {
 	clk := clock.NewFake(time.Date(2026, time.November, 3, 9, 0, 0, 0, time.UTC))
 	c := newCentral(t, clk)

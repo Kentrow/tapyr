@@ -62,6 +62,12 @@ type PluginEnv struct {
 	Observe func(result string)
 	// OnToken registers a token for log redaction.
 	OnToken func(token string)
+	// ReadOnly is set for commands that run next to tapyr run (tapyr
+	// record): Store does not persist, and the plugin must not renew
+	// credentials whose renewal invalidates the previous ones (a rotating
+	// refresh token), or tapyr run would be left with spent ones. It returns
+	// ErrRenewalNotAllowed instead.
+	ReadOnly bool
 }
 
 // PluginStore persists the state of a plugin for an account.
@@ -139,6 +145,11 @@ func (m *Manager) ValidatePlugin(a *config.PluginAuth) ([]string, error) {
 // be renewed: the account needs a manual re-bootstrap.
 var ErrReauthRequired = errors.New("the credentials can no longer be renewed: a manual re-bootstrap is required")
 
+// ErrRenewalNotAllowed is returned by plugins in read-only mode when the
+// credentials need a renewal that would invalidate those of tapyr run.
+var ErrRenewalNotAllowed = errors.New("the access token must be renewed, which would spend the refresh token that tapyr run uses: " +
+	"retry while tapyr run holds a valid access token, or with a token pair of its own")
+
 // pluginSession is a plugin authenticator shared by the jobs of an
 // account.
 type pluginSession struct {
@@ -184,9 +195,10 @@ func (m *Manager) plugin(a *config.PluginAuth, s Session) (Authenticator, error)
 		Send: func(ctx context.Context, endpoint string, req *http.Request) (*http.Response, error) {
 			return m.send(ctx, scope, endpoint, req)
 		},
-		Store:   &pluginStore{m: m, key: storeKey},
-		Observe: func(result string) { m.obs.TokenRequest(scope.Provider, scope.Account, result) },
-		OnToken: m.onTok,
+		Store:    &pluginStore{m: m, key: storeKey},
+		Observe:  func(result string) { m.obs.TokenRequest(scope.Provider, scope.Account, result) },
+		OnToken:  m.onTok,
+		ReadOnly: m.readOnly,
 	}
 	pa, err := p.New(env, a.Config)
 	if err != nil {
@@ -214,7 +226,7 @@ func (s *pluginStore) Load(ctx context.Context) (string, bool) {
 func (s *pluginStore) Save(ctx context.Context, value string, expiry time.Time) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.m.store == nil {
+	if s.m.store == nil || s.m.readOnly {
 		return nil
 	}
 	sealed, err := s.m.seal(s.key, value)

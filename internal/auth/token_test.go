@@ -1,10 +1,12 @@
 package auth
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -218,6 +220,44 @@ func TestOAuth2ClientCredentials(t *testing.T) {
 	a4, _ := m4.For(oauth2Auth(ts.URL+"/oauth/token", ""), session)
 	if got := authorization(t, a4); got != "Bearer tok-6" {
 		t.Errorf("plain token reused with a key: %q", got)
+	}
+}
+
+// TestReadOnlyManager checks that a read-only Manager (tapyr record next to
+// tapyr run) never writes or deletes stored tokens, and does not use them:
+// their sessions belong to tapyr run, which a logout would end.
+func TestReadOnlyManager(t *testing.T) {
+	ts := newTokenServer(t, `, "expires_in": 600`)
+	clk := clock.NewFake(start)
+	store := newMemStore()
+	session := Session{Scope: Scope{Provider: "p", Account: "acme", Credential: "c1"}, Secrets: secretsOf(map[string]string{"id": "client id", "secret": "s3cr3t"})}
+	m, _ := newManager(t, clk, store, "state-key")
+	a, _ := m.For(oauth2Auth(ts.URL+"/oauth/token", ""), session)
+	authorization(t, a)
+	snapshot := maps.Clone(store.tokens)
+
+	ro, err := NewManager(ManagerOptions{Clock: clk, Store: store, StateKey: "state-key", ReadOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ro.SetSender(&directSender{})
+	b, err := ro.For(oauth2Auth(ts.URL+"/oauth/token", ""), session)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := authorization(t, b); got != "Bearer tok-2" {
+		t.Fatalf("read-only token: %q", got)
+	}
+	// A renewed token is kept in memory, a rejected one is not deleted.
+	clk.Advance(10 * time.Minute)
+	if got := authorization(t, b); got != "Bearer tok-3" {
+		t.Errorf("after expiry: %q", got)
+	}
+	if _, err := b.OnAuthFailure(context.Background(), &http.Response{StatusCode: http.StatusUnauthorized}); err != nil {
+		t.Fatal(err)
+	}
+	if !maps.EqualFunc(store.tokens, snapshot, bytes.Equal) {
+		t.Error("the read-only manager changed the store")
 	}
 }
 

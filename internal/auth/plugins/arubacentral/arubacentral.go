@@ -204,7 +204,14 @@ func (a *authenticator) Decorate(ctx context.Context, req *http.Request) error {
 	if a.st.Reauth {
 		return auth.ErrReauthRequired
 	}
-	if a.st.Access == "" || !a.env.Clock.Now().Before(a.st.Expiry.Add(-a.settings.refreshBefore)) {
+	switch {
+	case a.env.ReadOnly:
+		// A refresh would spend the refresh token of tapyr run: the access
+		// token is used until its expiry, and never renewed.
+		if a.st.Access == "" || !a.env.Clock.Now().Before(a.st.Expiry) {
+			return auth.ErrRenewalNotAllowed
+		}
+	case a.st.Access == "" || !a.env.Clock.Now().Before(a.st.Expiry.Add(-a.settings.refreshBefore)):
 		if err := a.refreshLocked(ctx); err != nil {
 			return err
 		}
@@ -214,7 +221,7 @@ func (a *authenticator) Decorate(ctx context.Context, req *http.Request) error {
 }
 
 // OnAuthFailure implements auth.Authenticator: the access token is dropped
-// and the request retried once after a refresh.
+// and the request retried once after a refresh (not in read-only mode).
 func (a *authenticator) OnAuthFailure(context.Context, *http.Response) (bool, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -222,6 +229,10 @@ func (a *authenticator) OnAuthFailure(context.Context, *http.Response) (bool, er
 		return false, nil
 	}
 	a.st.Access = ""
+	if a.env.ReadOnly {
+		a.env.Logger.Warn("the access token was rejected; it is not renewed in read-only mode", "error", auth.ErrRenewalNotAllowed)
+		return false, nil
+	}
 	return true, nil
 }
 

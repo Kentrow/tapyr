@@ -31,6 +31,8 @@ If the refresh token is rejected (400 or 401: expired after 15 days without use,
 
 **Do not share a token pair between Tapyr and another tool**: the first one to refresh invalidates the refresh token of the other. A crash between a refresh answer and its storage loses the pair (the refresh is the only request in flight for the account): the account then needs a new pair.
 
+`tapyr record` can run next to `tapyr run`: with the same configuration and `TAPYR_STATE_KEY`, it reads the current pair from the state store and never refreshes it. It uses the stored access token until its expiry; past it, it stops and asks to retry once `tapyr run` has renewed the token.
+
 ## Limits
 
 | Limit | Value | Source |

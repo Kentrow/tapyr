@@ -127,6 +127,7 @@ tapyr record --config ./config --job devices --out ./recording [--anonymize ./an
 
 - `report.txt` lists every replaced path and rule, never a value. **Review the recording before committing anything**: free-text fields can still hold identifying data.
 - Only the quota headers of the provider and `Retry-After` are recorded; request credentials never are.
+- Run it with the configuration and `TAPYR_STATE_KEY` of `tapyr run`: it reads the token pair an auth plugin stored (`aruba-central-classic`), read-only, and never renews a rotating refresh token, which would leave `tapyr run` with a spent one.
 
 The `teltonika-rms` fixtures follow the shape of such a recording.
 
