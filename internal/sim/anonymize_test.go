@@ -137,7 +137,7 @@ func TestAnonymizer(t *testing.T) {
 func TestAnonymizerSiteAndZipcode(t *testing.T) {
 	doc, err := mapping.DecodeJSON([]byte(`{
 	  "aps": [{"serial": "CN0000001", "site": "North campus", "status": "Up"}],
-	  "sites": [{"site_id": 7, "site_name": "North campus", "zipcode": "75001", "state": "Ile-de-France"}]
+	  "sites": [{"site_id": 7, "site_name": "North campus", "zipcode": "99999", "state": "online"}]
 	}`))
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func TestAnonymizerSiteAndZipcode(t *testing.T) {
 	out := a.Document(doc).(map[string]any)
 	ap := out["aps"].([]any)[0].(map[string]any)
 	site := out["sites"].([]any)[0].(map[string]any)
-	if ap["site"] == "North campus" || site["zipcode"] == "75001" {
+	if ap["site"] == "North campus" || site["zipcode"] == "99999" {
 		t.Fatalf("site or zipcode kept: %v %v", ap, site)
 	}
 	// The site of a device keeps pointing at its site.
@@ -157,7 +157,7 @@ func TestAnonymizerSiteAndZipcode(t *testing.T) {
 		t.Errorf("site = %v, site_name = %v", ap["site"], site["site_name"])
 	}
 	// state is often a status (online, Up): it is left to the review.
-	if ap["status"] != "Up" || site["state"] != "Ile-de-France" {
+	if ap["status"] != "Up" || site["state"] != "online" {
 		t.Errorf("status or state changed: %v %v", ap, site)
 	}
 }
