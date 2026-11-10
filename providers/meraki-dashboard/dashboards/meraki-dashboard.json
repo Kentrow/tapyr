@@ -9,7 +9,7 @@
   "editable": true,
   "graphTooltip": 1,
   "schemaVersion": 39,
-  "version": 1,
+  "version": 3,
   "refresh": "1m",
   "time": {
     "from": "now-6h",
@@ -121,12 +121,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"})",
+          "expr": "count(last_over_time(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -162,7 +176,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"} == 0) or vector(0)",
+          "expr": "count(last_over_time(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]) == 0) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -183,7 +197,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -220,7 +235,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(meraki_device_alerting{organization_id=~\"$organization\", network_id=~\"$network\"})",
+          "expr": "sum(last_over_time(meraki_device_alerting{organization_id=~\"$organization\", network_id=~\"$network\"}[15m])) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -241,7 +256,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -278,12 +294,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(meraki_wireless_device_clients{organization_id=~\"$organization\", network_id=~\"$network\"})",
+          "expr": "sum(last_over_time(meraki_wireless_device_clients{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -319,12 +349,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (product_type) (meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"})",
+          "expr": "sum by (product_type) (last_over_time(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]))",
           "legendFormat": "{{product_type}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -360,12 +393,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count by (network_id) (meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"} == 0) * on (network_id) group_left (name) meraki_network_info",
+          "expr": "count by (network_id) (last_over_time(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]) == 0) * on (network_id) group_left (name) max by (network_id, name) (last_over_time(meraki_network_info[2h]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none",
+          "noValue": "None"
+        },
         "overrides": []
       },
       "options": {
@@ -401,14 +438,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"} == 0) * on (serial) group_left (name, model) meraki_device_info",
+          "expr": "(last_over_time(meraki_device_up{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]) == 0) * on (serial) group_left (name, model) max by (serial, name, model) (last_over_time(meraki_device_info[2h]))",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "None"
+        },
         "overrides": []
       },
       "options": {},
@@ -418,8 +457,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -440,7 +479,7 @@
     },
     {
       "id": 10,
-      "type": "timeseries",
+      "type": "state-timeline",
       "title": "Active uplinks",
       "datasource": {
         "type": "prometheus",
@@ -459,28 +498,68 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (network_id, interface) (meraki_appliance_uplink_active{organization_id=~\"$organization\", network_id=~\"$network\"}) * on (network_id) group_left (name) meraki_network_info",
+          "expr": "max by (network_id, interface) (last_over_time(meraki_appliance_uplink_active{organization_id=~\"$organization\", network_id=~\"$network\"}[15m])) * on (network_id) group_left (name) max by (network_id, name) (last_over_time(meraki_network_info[2h]))",
           "legendFormat": "{{name}} {{interface}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "min": 0,
-          "max": 1
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              },
+              {
+                "color": "blue",
+                "value": 1
+              }
+            ]
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Active",
+                  "color": "blue",
+                  "index": 0
+                },
+                "0": {
+                  "text": "Standby",
+                  "color": "text",
+                  "index": 1
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
       "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
-      }
+      },
+      "description": "Which uplink of each appliance carries the traffic."
     },
     {
       "id": 11,
@@ -503,7 +582,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count((max by (organization_id, network_id) (meraki_appliance_uplink_active{organization_id=~\"$organization\", network_id=~\"$network\", interface!=\"wan1\"}) == 1) unless on (organization_id, network_id) (max by (organization_id, network_id) (meraki_appliance_uplink_active{organization_id=~\"$organization\", network_id=~\"$network\", interface=\"wan1\"}) == 1)) or vector(0)",
+          "expr": "count((max by (organization_id, network_id) (last_over_time(meraki_appliance_uplink_active{organization_id=~\"$organization\", network_id=~\"$network\", interface!=\"wan1\"}[15m])) == 1) unless on (organization_id, network_id) (max by (organization_id, network_id) (last_over_time(meraki_appliance_uplink_active{organization_id=~\"$organization\", network_id=~\"$network\", interface=\"wan1\"}[15m])) == 1)) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -524,7 +603,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -562,7 +642,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(meraki_appliance_uplink_up{organization_id=~\"$organization\", network_id=~\"$network\"} == 0) or vector(0)",
+          "expr": "count(last_over_time(meraki_appliance_uplink_up{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]) == 0) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -583,7 +663,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -633,12 +714,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (network_id) (meraki_wireless_device_clients{organization_id=~\"$organization\", network_id=~\"$network\"}) * on (network_id) group_left (name) meraki_network_info",
+          "expr": "sum by (network_id) (last_over_time(meraki_wireless_device_clients{organization_id=~\"$organization\", network_id=~\"$network\"}[15m])) * on (network_id) group_left (name) max by (network_id, name) (last_over_time(meraki_network_info[2h]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -655,7 +739,7 @@
     },
     {
       "id": 15,
-      "type": "timeseries",
+      "type": "bargauge",
       "title": "Busiest access points",
       "datasource": {
         "type": "prometheus",
@@ -674,25 +758,49 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(10, meraki_wireless_device_clients{organization_id=~\"$organization\", network_id=~\"$network\"} * on (serial) group_left (name) meraki_device_info)",
-          "legendFormat": "{{name}}"
+          "expr": "topk(10, last_over_time(meraki_wireless_device_clients{organization_id=~\"$organization\", network_id=~\"$network\"}[15m]) * on (serial) group_left (name) max by (serial, name) (last_over_time(meraki_device_info[2h])))",
+          "legendFormat": "{{name}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
-      }
+      },
+      "description": "The 10 access points with the most clients now."
     },
     {
       "id": 16,
@@ -734,7 +842,8 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps"
+          "unit": "reqps",
+          "min": 0
         },
         "overrides": []
       },
@@ -778,7 +887,12 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "reqps"
+          "unit": "reqps",
+          "min": 0,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "orange"
+          }
         },
         "overrides": []
       },

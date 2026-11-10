@@ -9,7 +9,7 @@
   "editable": true,
   "graphTooltip": 1,
   "schemaVersion": 39,
-  "version": 1,
+  "version": 3,
   "refresh": "1m",
   "time": {
     "from": "now-6h",
@@ -100,12 +100,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(example_device_up{site_id=~\"$site\"})",
+          "expr": "sum(last_over_time(example_device_up{site_id=~\"$site\"}[15m]))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -141,7 +155,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(example_device_up{site_id=~\"$site\"} == 0) or vector(0)",
+          "expr": "count(last_over_time(example_device_up{site_id=~\"$site\"}[15m]) == 0) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -162,7 +176,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -199,12 +214,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(example_devices)",
+          "expr": "sum(last_over_time(example_devices[15m]))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -240,12 +269,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(example_device_clients)",
+          "expr": "sum(last_over_time(example_device_clients[15m]))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -294,12 +337,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (site_id) (example_device_up{site_id=~\"$site\"})",
+          "expr": "sum by (site_id) (last_over_time(example_device_up{site_id=~\"$site\"}[15m]))",
           "legendFormat": "{{site_id}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -335,13 +381,14 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(example_device_received_bytes_total[$__rate_interval]) * on (serial) group_left (name) example_device_info",
+          "expr": "rate(example_device_received_bytes_total[$__rate_interval]) * on (serial) group_left (name) max by (serial, name) (last_over_time(example_device_info[15m]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "Bps",
+          "min": 0
         },
         "overrides": []
       },
@@ -378,14 +425,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "example_device_info",
+          "expr": "last_over_time(example_device_info[15m])",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "No device"
+        },
         "overrides": []
       },
       "options": {},
@@ -395,8 +444,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -436,12 +485,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "example_site_devices * on (site_id) group_left (name) example_site_info",
+          "expr": "last_over_time(example_site_devices[2h]) * on (site_id) group_left (name) max by (site_id, name) (last_over_time(example_site_info[2h]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -477,12 +529,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (network_id) (example_network_device_up) * on (network_id) group_left (name) example_network_info",
+          "expr": "sum by (network_id) (last_over_time(example_network_device_up[15m])) * on (network_id) group_left (name) max by (network_id, name) (last_over_time(example_network_info[1h]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -520,7 +575,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 18,
         "x": 0,
         "y": 32
       },
@@ -554,8 +609,74 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^limit$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^used by Tapyr$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^used by others$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -572,16 +693,16 @@
     },
     {
       "id": 15,
-      "type": "timeseries",
-      "title": "Remaining calls today",
+      "type": "stat",
+      "title": "Daily quota left",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 6,
+        "x": 18,
         "y": 32
       },
       "targets": [
@@ -591,25 +712,53 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "max(tapyr_budget_remaining{provider=\"example-sim\", limit=\"daily\"})",
-          "legendFormat": "remaining"
+          "expr": "min(tapyr_budget_remaining{provider=\"example-sim\", limit=\"daily\"} / tapyr_budget_limit{provider=\"example-sim\", limit=\"daily\"})",
+          "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.1
+              },
+              {
+                "color": "green",
+                "value": 0.25
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
-      }
+      },
+      "description": "Share of the daily quota still available to Tapyr (its share of the quota, less what it and other clients spent)."
     }
   ]
 }

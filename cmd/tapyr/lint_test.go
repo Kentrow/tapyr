@@ -54,9 +54,18 @@ func TestProviderLint(t *testing.T) {
 		{
 			name: "unknown metric in a dashboard",
 			change: func(t *testing.T, dir string) {
-				edit(t, filepath.Join(dir, "dashboards", "example-sim.json"), `sum(example_devices)`, `sum(example_devices_missing)`)
+				edit(t, filepath.Join(dir, "dashboards", "example-sim.json"), `last_over_time(example_devices[15m])`, `last_over_time(example_devices_missing[15m])`)
 			},
 			want: []string{"dashboards/example-sim.json: example_devices_missing is not a metric of the package"},
+		},
+		{
+			name: "stat without thresholds",
+			change: func(t *testing.T, dir string) {
+				edit(t, filepath.Join(dir, "dashboards", "example-sim.json"), `"type": "timeseries",
+      "title": "Devices online per site",`, `"type": "stat",
+      "title": "Devices online per site",`)
+			},
+			want: []string{`dashboards/example-sim.json: panel "Devices online per site" has no thresholds (Grafana colors it red from 80)`},
 		},
 		{
 			name: "no datasource variable",

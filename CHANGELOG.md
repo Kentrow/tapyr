@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `format` on the `header` auth type, for APIs that expect a scheme name before the key (`format: "Token {value}"` sends `Authorization: Token <key>`). The formatted value is redacted like the secret.
 
+### Fixed
+
+- The Grafana dashboards of `Tapyr / Overview` and of the provider packages work with push outputs: the series of slow jobs (inventories, `_info` metrics) are read with `last_over_time`, where they used to vanish between two runs and leave tables and joins empty.
+- The dashboards follow one set of conventions (documented in the provider guide): colors with a meaning instead of Grafana's default thresholds (counts turned red from 80), the same quota thresholds and colors everywhere, state timelines for up/down states, mobile signal thresholds from the Teltonika recommendations, rankings as bars, and a message when there is nothing to show. The interval table of `Tapyr / Overview` shows the effective intervals and instances again.
+
 ## [0.2.1] - 2026-11-09
 
 ### Added

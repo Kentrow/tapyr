@@ -26,7 +26,7 @@ Looking for an API to package? [Provider ideas](provider-ideas.md) lists candida
 2. Write the job templates (`templates/*.yaml`) with `estimate.pagesPerRun`. Metric names follow `<prefix>_<object>_<measure>_<unit>` in base units, descriptive attributes go to `_info` metrics, and no high-cardinality label (client MAC addresses, IPs) is used.
 3. Build the simulator (`sim/sim.yaml`): a synthetic inventory with template fixtures (see [`08-simulator.md`](spec/08-simulator.md#synthetic-inventory-and-templated-fixtures)), or static fixtures from a recording. Ship the `default`, `quota-tight` and `bad-day` scenarios.
 4. Write the contract test (`tests/contract.yaml`, `tests/contract.env`) and generate `tests/expected.prom` with `tapyr provider lint --update <dir>`. Review the samples: they are the contract of the package.
-5. Add a Grafana dashboard (`dashboards/*.json`, with a `datasource` variable, an `API quota` row when the API has a quota, and a link to `Tapyr / Overview`), examples (`examples/*.yaml`) and the README. Every package README follows the same skeleton, as in [`example-sim`](../providers/example-sim/README.md):
+5. Add a Grafana dashboard (`dashboards/*.json`, with a `datasource` variable, an `API quota` row when the API has a quota, and a link to `Tapyr / Overview`, following the [dashboard conventions](#dashboard-conventions)), examples (`examples/*.yaml`) and the README. Every package README follows the same skeleton, as in [`example-sim`](../providers/example-sim/README.md):
    - an introduction (the API, what is collected) with the **Validation status** (real platform or simulator, versions, dates);
    - `Requirements`, when there are (firmware versions, permissions, network access);
    - `Coverage`: a table `Template | Endpoint | Default interval | Requests | Metrics` (requests per run), then the labels, joins and conversions;
@@ -35,6 +35,22 @@ Looking for an API to package? [Provider ideas](provider-ideas.md) lists candida
    - `Simulator`: the command, with the port the simulator gets under `tapyr sim --all --listen-base 127.0.0.1:8081` (8081 plus its `portOffset`), the credentials it accepts and a `Scenario | Effect` table;
    - `Dashboard`, `Known caveats`, and `End-to-end test` when there is one.
 6. `tapyr provider lint --catalog <dir>` must pass.
+
+## Dashboard conventions
+
+The dashboards of the packages and `Tapyr / Overview` read the same way, whatever the API:
+
+- **Colors carry a meaning.** Grafana's named colors (`green`, `orange`, `red`, `blue`, `text`), so that the dashboards follow the theme of each Grafana:
+  - a count of problems (devices down, failed runs) is green at 0, then `red` from 1 when it needs action, or `orange` when it is a warning (alerting devices, a backup uplink, a device not seen for an hour);
+  - a count or a measure with no good or bad value (devices, clients, uptime) is `text`, never the default thresholds of Grafana (red from 80);
+  - the share of a quota left is red under 10%, orange under 25%, green above;
+  - quota charts draw the limit in dashed red, Tapyr in blue and other clients in orange;
+  - status codes: 2xx green, 429 orange, other errors red.
+- **States are state timelines.** A 0/1 metric (an interface up, an uplink active) is a state timeline with value mappings (`Up`/`Down`), not a line between 0 and 1.
+- **Thresholds come from a source.** Mobile signal (RSRP, RSRQ, SINR, RSSI) uses the categories of the [Teltonika recommendations](https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations) as dashed lines; resource use (memory, flash) is orange from 80% and red from 90%. A measure without a sound threshold (temperatures, load) has none.
+- **Rankings are bars.** "The 10 busiest access points" is a bar gauge of the current values, not ten lines that change members over time.
+- **Empty is an answer.** A panel that can have nothing to show (no device down, no exhaustion projected) says so with `noValue` (`None`, `0`).
+- **Queries survive push outputs.** With `remote_write` or `otlp`, a series receives a sample only when its job runs, and queries look back 5 minutes for the last one ([outputs](outputs.md#series-of-slow-jobs)). Gauges are read with `last_over_time(metric[window])`, the window two to three times the default interval of the job that produces them (`15m` for a 5-minute job, `2h` for an hourly one), and the `_info` metrics of joins with `max by (<id>, <labels>) (last_over_time(..._info[window]))`. Rates of counters need no window of their own.
 
 ## CEL mapping recipes
 

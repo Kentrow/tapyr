@@ -10,7 +10,7 @@
   "editable": true,
   "graphTooltip": 1,
   "schemaVersion": 39,
-  "version": 1,
+  "version": 3,
   "refresh": "1m",
   "time": {
     "from": "now-6h",
@@ -101,12 +101,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(rms_device_info{model=~\"$model\"})",
+          "expr": "count(last_over_time(rms_device_info{model=~\"$model\"}[15m]))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -143,7 +157,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rms_device_up * on (device_id) group_left (model) rms_device_info{model=~\"$model\"})",
+          "expr": "sum(last_over_time(rms_device_up[15m]) * on (device_id) group_left (model) max by (device_id, model) (last_over_time(rms_device_info{model=~\"$model\"}[15m])))",
           "legendFormat": ""
         }
       ],
@@ -153,13 +167,14 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
+                "color": "text",
                 "value": null
               }
             ]
           },
           "color": {
-            "mode": "thresholds"
+            "mode": "fixed",
+            "fixedColor": "text"
           }
         },
         "overrides": []
@@ -197,7 +212,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count((rms_device_up == 0) * on (device_id) group_left (model) rms_device_info{model=~\"$model\"}) or vector(0)",
+          "expr": "count((last_over_time(rms_device_up[15m]) == 0) * on (device_id) group_left (model) max by (device_id, model) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -218,7 +233,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -255,7 +271,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count((time() - rms_device_last_connection_timestamp_seconds > 3600) * on (device_id) group_left (model) rms_device_info{model=~\"$model\"}) or vector(0)",
+          "expr": "count((time() - last_over_time(rms_device_last_connection_timestamp_seconds[15m]) > 3600) * on (device_id) group_left (model) max by (device_id, model) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -276,7 +292,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -313,12 +330,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rms_device_mobile_roaming * on (device_id) group_left (model) rms_device_info{model=~\"$model\"}) or vector(0)",
+          "expr": "sum(last_over_time(rms_device_mobile_roaming[15m]) * on (device_id) group_left (model) max by (device_id, model) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))) or vector(0)",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -336,7 +367,7 @@
     {
       "id": 7,
       "type": "stat",
-      "title": "RMS quota left this month",
+      "title": "Monthly quota left",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -354,26 +385,53 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "max(tapyr_budget_remaining{provider=\"teltonika-rms\", limit=\"monthly\"})",
+          "expr": "min(tapyr_budget_remaining{provider=\"teltonika-rms\", limit=\"monthly\"} / tapyr_budget_limit{provider=\"teltonika-rms\", limit=\"monthly\"})",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.1
+              },
+              {
+                "color": "green",
+                "value": 0.25
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
           ],
           "fields": "",
           "values": false
-        },
-        "colorMode": "value",
-        "graphMode": "area"
+        }
       },
-      "description": "Requests left in the monthly window of the token (Tapyr self-metrics)."
+      "description": "Share of the monthly RMS quota still available to Tapyr (its share of the quota, less what it and other clients spent)."
     },
     {
       "id": 8,
@@ -396,12 +454,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (model) (rms_device_up * on (device_id) group_left (model) rms_device_info{model=~\"$model\"})",
+          "expr": "sum by (model) (last_over_time(rms_device_up[15m]) * on (device_id) group_left (model) max by (device_id, model) (last_over_time(rms_device_info{model=~\"$model\"}[15m])))",
           "legendFormat": "{{model}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -437,7 +498,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rms_device_temperature_celsius * on (device_id) group_left (name) rms_device_info{model=~\"$model\"}",
+          "expr": "last_over_time(rms_device_temperature_celsius[15m]) * on (device_id) group_left (name) max by (device_id, name) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))",
           "legendFormat": "{{name}}"
         }
       ],
@@ -480,14 +541,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rms_device_info{model=~\"$model\"}",
+          "expr": "last_over_time(rms_device_info{model=~\"$model\"}[15m])",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "No device"
+        },
         "overrides": []
       },
       "options": {},
@@ -497,8 +560,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -538,7 +601,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rms_device_mobile_rsrp_dbm * on (device_id) group_left (name) rms_device_info{model=~\"$model\"}",
+          "expr": "last_over_time(rms_device_mobile_rsrp_dbm[15m]) * on (device_id) group_left (name) max by (device_id, name) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))",
           "legendFormat": "{{name}}"
         }
       ],
@@ -554,16 +617,21 @@
               },
               {
                 "color": "orange",
-                "value": -110
+                "value": -100
               },
               {
                 "color": "green",
-                "value": -100
+                "value": -90
               }
             ]
           },
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
           }
         },
         "overrides": []
@@ -578,7 +646,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Reference signal received power. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 13,
@@ -601,13 +670,38 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rms_device_mobile_sinr_db * on (device_id) group_left (name) rms_device_info{model=~\"$model\"}",
+          "expr": "last_over_time(rms_device_mobile_sinr_db[15m]) * on (device_id) group_left (name) max by (device_id, name) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "dB"
+          "unit": "dB",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 13
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -621,7 +715,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Signal to interference and noise ratio. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 14,
@@ -644,13 +739,38 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rms_device_mobile_rssi_dbm * on (device_id) group_left (name) rms_device_info{model=~\"$model\"}",
+          "expr": "last_over_time(rms_device_mobile_rssi_dbm[15m]) * on (device_id) group_left (name) max by (device_id, name) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "dBm"
+          "unit": "dBm",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -85
+              },
+              {
+                "color": "green",
+                "value": -75
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -664,7 +784,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Received signal strength indicator, unreliable alone in 4G. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 15,
@@ -687,13 +808,38 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rms_device_mobile_rsrq_db * on (device_id) group_left (name) rms_device_info{model=~\"$model\"}",
+          "expr": "last_over_time(rms_device_mobile_rsrq_db[15m]) * on (device_id) group_left (name) max by (device_id, name) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))",
           "legendFormat": "{{name}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "dB"
+          "unit": "dB",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -20
+              },
+              {
+                "color": "green",
+                "value": -15
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -707,7 +853,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Reference signal received quality. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 16,
@@ -730,14 +877,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rms_device_mobile_info * on (device_id) group_left (name, model) rms_device_info{model=~\"$model\"}",
+          "expr": "last_over_time(rms_device_mobile_info[15m]) * on (device_id) group_left (name, model) max by (device_id, name, model) (last_over_time(rms_device_info{model=~\"$model\"}[15m]))",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "No mobile connection"
+        },
         "overrides": []
       },
       "options": {},
@@ -747,8 +896,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -769,7 +918,7 @@
     },
     {
       "id": 18,
-      "type": "timeseries",
+      "type": "bargauge",
       "title": "Received today",
       "datasource": {
         "type": "prometheus",
@@ -788,31 +937,53 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (device_id) (rms_device_mobile_received_bytes_today) * on (device_id) group_left (name) rms_device_info",
-          "legendFormat": "{{name}}"
+          "expr": "sum by (device_id) (last_over_time(rms_device_mobile_received_bytes_today[12h])) * on (device_id) group_left (name) max by (device_id, name) (last_over_time(rms_device_info[12h]))",
+          "legendFormat": "{{name}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "unit": "bytes",
+          "min": 0,
+          "noValue": "No report in the last 12 hours",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
-      }
+      },
+      "description": "Mobile data of the current day, as of the last run of the rms-device-data-usage job (every 6 hours by default)."
     },
     {
       "id": 19,
-      "type": "timeseries",
+      "type": "bargauge",
       "title": "Transmitted today",
       "datasource": {
         "type": "prometheus",
@@ -831,27 +1002,49 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (device_id) (rms_device_mobile_transmitted_bytes_today) * on (device_id) group_left (name) rms_device_info",
-          "legendFormat": "{{name}}"
+          "expr": "sum by (device_id) (last_over_time(rms_device_mobile_transmitted_bytes_today[12h])) * on (device_id) group_left (name) max by (device_id, name) (last_over_time(rms_device_info[12h]))",
+          "legendFormat": "{{name}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "bytes"
+          "unit": "bytes",
+          "min": 0,
+          "noValue": "No report in the last 12 hours",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
-      }
+      },
+      "description": "Mobile data of the current day, as of the last run of the rms-device-data-usage job (every 6 hours by default)."
     },
     {
       "id": 20,
@@ -876,7 +1069,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 24,
         "x": 0,
         "y": 56
       },
@@ -910,8 +1103,74 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^limit$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^used by Tapyr$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^used by others$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -925,47 +1184,6 @@
         }
       },
       "description": "The monthly requests of the token, synced from the X-RateLimit-* headers (Tapyr self-metrics)."
-    },
-    {
-      "id": 22,
-      "type": "timeseries",
-      "title": "Remaining requests this month",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 56
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "max(tapyr_budget_remaining{provider=\"teltonika-rms\", limit=\"monthly\"})",
-          "legendFormat": "remaining"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      }
     }
   ]
 }
