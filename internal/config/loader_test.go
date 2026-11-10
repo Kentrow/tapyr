@@ -408,3 +408,59 @@ func write(t *testing.T, path, content string) {
 		t.Fatal(err)
 	}
 }
+
+// TestProcessingWarnings checks the warning of a keep or drop on __name__
+// that matches no metric of the jobs sent to the output.
+func TestProcessingWarnings(t *testing.T) {
+	doc := `apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: p, version: 0.1.0 }
+spec: { baseURL: https://api.example.invalid }
+---
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata: { name: devices }
+spec:
+  provider: p
+  defaultInterval: 5m
+  request: { path: /devices }
+  extract:
+    items: response.body
+    metrics: [{ name: p_device_up, value: "1", labels: { id: item.id } }]
+---
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: a }
+spec: { provider: p }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: devices }
+spec: { account: a, template: devices }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: hosted }
+spec:
+  type: remote_write
+  remoteWrite: { url: https://metrics.example.invalid/api/v1/write }
+  processing:
+    - { action: drop, sourceLabels: [__name__], regex: "p_device_.*" }
+    - { action: drop, sourceLabels: [__name__], regex: "p_uplink_.*" }
+    - { action: keep, sourceLabels: [__name__, id], regex: "nothing" }
+`
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := newTestLoader(t).Load([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Only the second rule: the first matches, the third is not on
+	// __name__ alone.
+	if got := cfg.Warnings.Error(); len(cfg.Warnings) != 1 ||
+		!strings.Contains(got, `spec.processing[1].regex: drop matches no metric of the jobs sent to output "hosted"`) {
+		t.Errorf("warnings = %q", got)
+	}
+}

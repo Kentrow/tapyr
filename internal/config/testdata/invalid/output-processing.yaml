@@ -1,0 +1,21 @@
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: hosted }
+spec:
+  type: remote_write
+  remoteWrite: { url: https://metrics.example.invalid/api/v1/write }
+  processing:
+    - action: drop
+      regex: "x.*"
+    - action: labeldrop
+    - action: labeldrop
+      regex: "__.*"
+    - action: labelkeep
+      regex: "site|serial"
+    - action: labelkeep
+      regex: "__name__|site"
+      sourceLabels: [site]
+      separator: ","
+    - action: keep
+      sourceLabels: [__name__]
+      regex: "(unclosed"

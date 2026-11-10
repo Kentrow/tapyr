@@ -94,6 +94,42 @@ spec:
 - Partial success responses count the rejected points; `429`, `502`, `503`, `504` (HTTP) and `UNAVAILABLE` or `RESOURCE_EXHAUSTED` with `RetryInfo` (gRPC) are retried, honoring the delay asked by the receiver.
 - `https://` endpoints use TLS with the system roots.
 
+## Sending less to an output
+
+`spec.processing` filters what an output receives, for that output only: a hosted backend billed by series can get less than a local one, without changing the provider packages. The rules are those of Prometheus `metric_relabel_configs`, so rules written for Prometheus carry over:
+
+```yaml
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: hosted }
+spec:
+  type: remote_write
+  remoteWrite: { url: https://metrics.example.com/api/v1/write }
+  processing:
+    # No uplink metrics for this backend.
+    - action: drop
+      sourceLabels: [__name__]
+      regex: "meraki_uplink_.*"
+    # No access point metrics for the lab site.
+    - action: drop
+      sourceLabels: [__name__, site]
+      regex: "aruba_ap_.*;lab"
+    # No firmware label.
+    - action: labeldrop
+      regex: firmware
+```
+
+| Action | Keeps or drops |
+|---|---|
+| `keep`, `drop` | the samples whose `sourceLabels` values, joined by `separator` (`;`), match `regex` (`__name__` is the metric name) |
+| `labelkeep`, `labeldrop` | the labels whose name matches `regex` (never `__name__`) |
+
+- The regex matches the whole value (it is anchored), in the RE2 syntax.
+- Samples removed by `keep` and `drop` are counted in `tapyr_output_samples_filtered_total`, not as dropped samples: filtering is what you asked for.
+- A `labeldrop` can make two series identical; the duplicates are dropped and counted in `tapyr_output_samples_dropped_total{reason="duplicate"}`, which the `TapyrOutputDropping` alert reports: remove a label only when the others still tell the series apart.
+- A changed rule applies from the next run of each job instance; the series it removes or renames get a stale marker then.
+- Tapyr's self-metrics are never filtered.
+
 ## Sizing the queue
 
 The queue holds `capacity` samples per output. While a backend is down, the batch at the head of the queue is retried and new samples queue behind it; once full, the oldest samples are dropped and counted. Size `capacity` for the outage you want to ride out: samples per minute across your jobs, times the minutes. The batch being sent is never dropped while its request is in flight.
@@ -104,7 +140,8 @@ The queue holds `capacity` samples per output. While a backend is down, the batc
 |---|---|
 | `tapyr_output_queue_samples` | Samples waiting; grows while a backend is slow or down |
 | `tapyr_output_samples_sent_total` | Samples accepted by the backend |
-| `tapyr_output_samples_dropped_total{reason}` | `queue_full`, `rejected` or `out_of_order` |
+| `tapyr_output_samples_dropped_total{reason}` | `queue_full`, `rejected`, `out_of_order` or `duplicate` (made identical by processing rules) |
+| `tapyr_output_samples_filtered_total` | Samples removed by the `keep` and `drop` processing rules |
 | `tapyr_output_send_failures_total{class}` | Failed requests: `transient`, `throttled`, `rejected`, `out_of_order` |
 | `tapyr_output_last_success_timestamp_seconds` | Last successful send |
 

@@ -18,6 +18,7 @@ const maxDiscoveryDepth = 4
 type checker struct {
 	cfg       *Config
 	diags     Diagnostics
+	warnings  Diagnostics
 	providers map[string]*Provider
 	templates map[string]*JobTemplate
 	accounts  map[string]*Account
@@ -53,11 +54,19 @@ func (c *checker) errorf(a at, format string, args ...any) {
 	})
 }
 
+func (c *checker) warnf(a at, format string, args ...any) {
+	c.warnings = append(c.warnings, Diagnostic{
+		Pos:     a.src.positions.position(a.tokens, false),
+		Path:    a.src.positions.path(a.tokens),
+		Message: fmt.Sprintf(format, args...),
+	})
+}
+
 func (c *checker) posOf(a at) Position { return a.src.positions.position(a.tokens, false) }
 
 // validateSemantics checks the rules that span documents or that JSON
-// Schema cannot express.
-func validateSemantics(cfg *Config) Diagnostics {
+// Schema cannot express, and returns the errors and the warnings.
+func validateSemantics(cfg *Config) (errs, warnings Diagnostics) {
 	c := &checker{cfg: cfg, metricTypes: map[string]metricDecl{}}
 	c.providers = index(c, cfg.Providers)
 	c.templates = index(c, cfg.JobTemplates)
@@ -82,7 +91,7 @@ func validateSemantics(cfg *Config) Diagnostics {
 		c.checkSettings(cfg.Settings)
 	}
 	c.checkDiscovery()
-	return c.diags
+	return c.diags, c.warnings
 }
 
 // index maps documents by name and reports duplicates.
@@ -624,6 +633,7 @@ func (c *checker) checkOutputs() {
 				c.errorf(base.child(block), "%s is not allowed with output type %s", block, o.Spec.Type)
 			}
 		}
+		c.checkProcessing(o)
 		if o.Spec.Type != OutputPrometheus {
 			continue
 		}
@@ -637,6 +647,96 @@ func (c *checker) checkOutputs() {
 		}
 		prometheus = o
 	}
+}
+
+// checkProcessing checks the processing rules of an output (ADR 0012).
+func (c *checker) checkProcessing(o *Output) {
+	var metrics []string
+	for i, r := range o.Spec.Processing {
+		a := loc(o.Source, "spec", "processing", strconv.Itoa(i))
+		switch r.Action {
+		case ProcessingKeep, ProcessingDrop:
+			if len(r.SourceLabels) == 0 {
+				c.errorf(a, "%s requires sourceLabels", r.Action)
+			}
+		case ProcessingLabelKeep, ProcessingLabelDrop:
+			if len(r.SourceLabels) > 0 {
+				c.errorf(a.child("sourceLabels"), "sourceLabels is not allowed with %s", r.Action)
+			}
+			if r.Separator != nil {
+				c.errorf(a.child("separator"), "separator is not allowed with %s", r.Action)
+			}
+			if r.Regex == "" {
+				c.errorf(a, "%s requires regex", r.Action)
+				continue
+			}
+		}
+		re, err := CompileProcessingRegex(r.Regex)
+		if err != nil {
+			c.errorf(a.child("regex"), "invalid regular expression: %v", err)
+			continue
+		}
+		switch {
+		case r.Action == ProcessingLabelKeep && !re.MatchString("__name__"):
+			c.errorf(a.child("regex"), "labelkeep must keep __name__ (the metric name): the regex does not match it")
+		case r.Action == ProcessingLabelDrop && re.MatchString("__name__"):
+			c.errorf(a.child("regex"), "labeldrop must not remove __name__ (the metric name): the regex matches it")
+		case (r.Action == ProcessingKeep || r.Action == ProcessingDrop) && slices.Equal(r.SourceLabels, []string{"__name__"}):
+			if metrics == nil {
+				metrics = c.outputMetrics(string(o.Metadata.Name))
+			}
+			if len(metrics) > 0 && !slices.ContainsFunc(metrics, re.MatchString) {
+				c.warnf(a.child("regex"), "%s matches no metric of the jobs sent to output %q", r.Action, o.Metadata.Name)
+			}
+		}
+	}
+}
+
+// outputMetrics returns the metric names that the jobs sent to an output
+// may produce, sorted: the metrics of every template of the providers of
+// those jobs (their implicit parents included) and of their inline
+// definitions.
+func (c *checker) outputMetrics(output string) []string {
+	names := map[string]bool{}
+	add := func(e *Extract) {
+		if e == nil {
+			return
+		}
+		for _, m := range e.Metrics {
+			names[m.Name] = true
+		}
+		for _, m := range e.Info {
+			names[m.Name] = true
+		}
+		for _, m := range e.Post {
+			names[m.Name] = true
+		}
+	}
+	for _, j := range c.cfg.Jobs {
+		if len(j.Spec.Outputs) > 0 && !slices.ContainsFunc(j.Spec.Outputs, func(o Name) bool { return string(o) == output }) {
+			continue
+		}
+		add(j.Spec.Extract)
+		acc, ok := c.accounts[string(j.Spec.Account)]
+		if !ok {
+			continue
+		}
+		for _, t := range c.cfg.JobTemplates {
+			if t.Spec.Provider == acc.Spec.Provider {
+				add(t.Spec.Extract)
+			}
+		}
+	}
+	return sortedKeys(names)
+}
+
+// CompileProcessingRegex compiles the regex of a processing rule, fully
+// anchored; an empty regex is (.*).
+func CompileProcessingRegex(re string) (*regexp.Regexp, error) {
+	if re == "" {
+		re = "(.*)"
+	}
+	return regexp.Compile("^(?:" + re + ")$")
 }
 
 func (c *checker) checkSettings(s *Settings) {

@@ -38,6 +38,7 @@ func TestMetricsEvents(t *testing.T) {
 	m.RunFinished(Run{Provider: "meraki", Account: "acme", Job: "devices", Result: "failed", Duration: time.Second, Pages: 9})
 	m.OutputSent("vm", 10)
 	m.OutputDropped("vm", "queue_full", 3)
+	m.OutputFiltered("vm", 7)
 	m.OutputSendFailed("vm", "transient")
 	m.OutputSendDuration("vm", 50*time.Millisecond)
 	m.ConfigLoaded(at, false)
@@ -96,6 +97,9 @@ tapyr_output_samples_dropped_total{output="vm",reason="queue_full"} 3
 # HELP tapyr_output_samples_sent_total Samples accepted by the output backend.
 # TYPE tapyr_output_samples_sent_total counter
 tapyr_output_samples_sent_total{output="vm"} 10
+# HELP tapyr_output_samples_filtered_total Samples removed by the keep and drop processing rules of an output.
+# TYPE tapyr_output_samples_filtered_total counter
+tapyr_output_samples_filtered_total{output="vm"} 7
 # HELP tapyr_output_send_failures_total Failed send requests of an output, by class.
 # TYPE tapyr_output_send_failures_total counter
 tapyr_output_send_failures_total{class="transient",output="vm"} 1
@@ -115,7 +119,8 @@ tapyr_state_flush_failures_total 1
 		"tapyr_budget_unexpected_429_total", "tapyr_build_info", "tapyr_config_last_reload_success",
 		"tapyr_config_last_reload_timestamp_seconds", "tapyr_http_in_flight", "tapyr_http_requests_total",
 		"tapyr_http_retries_total", "tapyr_job_partial_runs_total", "tapyr_job_runs_total", "tapyr_mapping_errors_total",
-		"tapyr_output_samples_dropped_total", "tapyr_output_samples_sent_total", "tapyr_output_send_failures_total",
+		"tapyr_output_samples_dropped_total", "tapyr_output_samples_filtered_total", "tapyr_output_samples_sent_total",
+		"tapyr_output_send_failures_total",
 		"tapyr_plan_recomputations_total", "tapyr_samples_deduplicated_total", "tapyr_state_flush_failures_total",
 	}
 	if err := testutil.GatherAndCompare(m.reg, strings.NewReader(want), names...); err != nil {

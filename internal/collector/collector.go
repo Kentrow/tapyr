@@ -27,7 +27,6 @@ import (
 	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/clock"
 	"github.com/kentrow/tapyr/internal/config"
-	"github.com/kentrow/tapyr/internal/model"
 	"github.com/kentrow/tapyr/internal/output/prometheus"
 	"github.com/kentrow/tapyr/internal/runtime"
 	"github.com/kentrow/tapyr/internal/secret"
@@ -470,7 +469,7 @@ func (c *Collector) expireSeries(g *generation, now time.Time) {
 			}
 			stale := c.series.Expire(instance)
 			c.logger.Warn("series withdrawn: no successful run within staleAfter", "component", "series", "provider", j.Provider,
-				"account", j.Account, "job", j.Name, "instance", instance, "series", len(stale),
+				"account", j.Account, "job", j.Name, "instance", instance, "series", len(stale.Series),
 				"stale_after", g.disc.staleAfter(j).String())
 			c.retire(instance, stale)
 		}
@@ -479,12 +478,12 @@ func (c *Collector) expireSeries(g *generation, now time.Time) {
 
 // retire withdraws the series of an instance from every output; its
 // reconstructed counters start again.
-func (c *Collector) retire(instance string, stale []model.Series) {
+func (c *Collector) retire(instance string, stale series.Withdrawal) {
 	c.accum.Remove(instance)
 	c.debug.remove(instance)
 	c.omu.RLock()
 	defer c.omu.RUnlock()
-	for _, ro := range c.outputs {
-		ro.out.Retire(instance, stale)
+	for name, ro := range c.outputs {
+		ro.out.Retire(instance, stale.For(name, ro.proc))
 	}
 }

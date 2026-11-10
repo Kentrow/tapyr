@@ -30,6 +30,7 @@ OutputSpec is the specification of an Output.
 |---|---|---|---|
 | `externalLabels` | map of string to string |  | `externalLabels` added to every sample sent through this output. Keys match `^[a-zA-Z_][a-zA-Z0-9_]*$`. |
 | `otlp` | [OTLPOutput](#otlpoutput) |  | `otlp` pushes OTLP metrics (type otlp). |
+| `processing` | list of [ProcessingRule](#processingrule) |  | Processing is an ordered list of rules applied to the samples of the jobs sent to this output only, with the semantics of Prometheus metric\_relabel\_configs (ADR 0012). Self-metrics are never processed. |
 | `prometheus` | [PrometheusOutput](#prometheusoutput) |  | Prometheus pull exposition on /metrics (type prometheus, at most one). |
 | `queue` | [Queue](#queue) |  | Queue of a push output (not allowed for prometheus). |
 | `remoteWrite` | [RemoteWriteOutput](#remotewriteoutput) |  | `remoteWrite` pushes with Prometheus remote write 1.0 (type remote\_write). |
@@ -53,6 +54,17 @@ OTLPOutput configures OTLP metrics export.
 | `protocol` | string |  | Protocol: http/protobuf or grpc. Default `http/protobuf`. One of `http/protobuf`, `grpc`. |
 | `resourceAttributes` | map of string to string |  | `resourceAttributes` added to the OTLP resource. |
 | `timeout` | [Duration](#duration) |  | Timeout of a send request. Default `10s`. |
+
+## ProcessingRule
+
+ProcessingRule keeps or drops samples, or labels, of an output.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | Action: keep or drop the samples whose joined sourceLabels match regex; labelkeep or labeldrop the labels whose name matches regex. One of `keep`, `drop`, `labelkeep`, `labeldrop`. |
+| `regex` | string |  | Regex is an RE2 regular expression, fully anchored. keep and drop default to (.\*); labelkeep and labeldrop require it. |
+| `separator` | string |  | Separator joins the values of sourceLabels (keep and drop). Default `;`. |
+| `sourceLabels` | list of string |  | `sourceLabels` are the labels whose values are joined and matched (keep and drop, required); \_\_name\_\_ is the metric name, a missing label the empty string. Each item: pattern `^[a-zA-Z_][a-zA-Z0-9_]*$`. |
 
 ## PrometheusOutput
 

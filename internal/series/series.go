@@ -1,7 +1,8 @@
 // Package series is the series registry (see
 // docs/spec/06-mapping-and-outputs.md, "Series registry"): per job instance,
-// the series of the last successful run and the last source timestamp sent
-// per series and output. It drives staleness and deduplication.
+// the series of the last successful run, the processed series last sent to
+// every output with processing rules, and the last source timestamp sent per
+// series and output. It drives staleness and deduplication.
 package series
 
 import (
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kentrow/tapyr/internal/model"
+	"github.com/kentrow/tapyr/internal/processing"
 	"github.com/kentrow/tapyr/internal/state"
 )
 
@@ -21,6 +23,8 @@ type Output struct {
 	// sent (push outputs). The pull output exposes the latest value and
 	// receives every sample.
 	Dedup bool
+	// Processor applies the processing rules of the output (nil without).
+	Processor *processing.Processor
 }
 
 // Delivery is what an output receives for a successful run.
@@ -30,6 +34,31 @@ type Delivery struct {
 	Stale []model.Series
 	// Deduplicated counts the samples dropped by deduplication.
 	Deduplicated int
+	// Filtered counts the samples removed by the keep and drop rules, and
+	// Duplicates those dropped because the rules made them collide.
+	Filtered, Duplicates int
+}
+
+// Withdrawal is what a withdrawn instance leaves: the series to mark stale.
+type Withdrawal struct {
+	// Series are the series of its last successful run.
+	Series []model.Series
+	// Outputs are the processed series last sent to the outputs with
+	// processing rules.
+	Outputs map[string][]model.Series
+}
+
+// For returns the series withdrawn from an output: the processed series
+// last sent to it, or, when the registry does not know them (after a
+// restart), the series of the last run processed with p.
+func (w Withdrawal) For(output string, p *processing.Processor) []model.Series {
+	if s, ok := w.Outputs[output]; ok {
+		return s
+	}
+	if p == nil {
+		return w.Series
+	}
+	return sortedSeries(p.Series(w.Series))
 }
 
 // Registry tracks the series of every job instance. It is safe for
@@ -46,7 +75,11 @@ type Registry struct {
 type instance struct {
 	lastSuccess time.Time
 	series      map[string]model.Series
-	sent        map[string]map[string]time.Time // output -> series key -> source timestamp
+	// processed are the processed series last sent to the outputs with
+	// processing rules, by key; not persisted, derived from series after a
+	// restart.
+	processed map[string]map[string]model.Series // output -> series key -> series
+	sent      map[string]map[string]time.Time    // output -> series key -> source timestamp
 }
 
 // New returns an empty registry.
@@ -74,18 +107,47 @@ func (r *Registry) Success(name string, samples []model.Sample, outputs []Output
 		}
 	}
 	out := make(map[string]Delivery, len(outputs))
+	// alive are the series an output now receives, when they differ from
+	// the series of the run (outputs with processing rules).
+	alive := map[string]map[string]model.Series{}
 	for _, o := range outputs {
 		d := Delivery{Samples: samples, Stale: stale}
+		prev, known := inst.processed[o.Name]
+		if o.Processor != nil || known {
+			var now map[string]model.Series
+			d.Samples, d.Filtered, d.Duplicates = o.Processor.Samples(samples)
+			if o.Processor != nil {
+				now = seriesOf(d.Samples)
+				inst.processed[o.Name] = now
+			} else {
+				now = current // the rules were removed: back to the raw series
+				delete(inst.processed, o.Name)
+			}
+			if !known {
+				prev = o.Processor.Series(slices.Collect(maps.Values(inst.series)))
+			}
+			d.Stale = nil
+			for _, key := range slices.Sorted(maps.Keys(prev)) {
+				if _, ok := now[key]; !ok {
+					d.Stale = append(d.Stale, prev[key])
+				}
+			}
+			alive[o.Name] = now
+		}
 		if o.Dedup {
-			d.Samples, d.Deduplicated = inst.dedup(o.Name, samples)
+			d.Samples, d.Deduplicated = inst.dedup(o.Name, d.Samples)
 		}
 		out[o.Name] = d
 	}
 	// The timestamps of stale series are forgotten, which bounds the
 	// registry to the series alive.
-	for _, sent := range inst.sent {
+	for output, sent := range inst.sent {
+		live, ok := alive[output]
+		if !ok {
+			live = current
+		}
 		for key := range sent {
-			if _, ok := current[key]; !ok {
+			if _, ok := live[key]; !ok {
 				delete(sent, key)
 			}
 		}
@@ -147,32 +209,45 @@ func (r *Registry) Expired(now time.Time, staleAfter func(instance string) (time
 
 // Expire withdraws the series of an instance whose runs keep failing and
 // returns them. The timestamps sent are kept for when the runs recover.
-func (r *Registry) Expire(name string) []model.Series {
+func (r *Registry) Expire(name string) Withdrawal {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	inst, ok := r.instances[name]
 	if !ok {
-		return nil
+		return Withdrawal{}
 	}
-	stale := sortedSeries(inst.series)
+	w := inst.withdrawal()
 	inst.series = map[string]model.Series{}
+	clear(inst.processed)
 	r.dirty[name] = true
-	return stale
+	return w
 }
 
 // Remove forgets an instance (removed by discovery or the configuration)
 // and returns its series, now stale.
-func (r *Registry) Remove(name string) []model.Series {
+func (r *Registry) Remove(name string) Withdrawal {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	inst, ok := r.instances[name]
 	if !ok {
-		return nil
+		return Withdrawal{}
 	}
 	delete(r.instances, name)
 	delete(r.dirty, name)
 	r.removed[name] = true
-	return sortedSeries(inst.series)
+	return inst.withdrawal()
+}
+
+// withdrawal returns the series of the instance and of its outputs.
+func (inst *instance) withdrawal() Withdrawal {
+	w := Withdrawal{Series: sortedSeries(inst.series)}
+	for output, series := range inst.processed {
+		if w.Outputs == nil {
+			w.Outputs = map[string][]model.Series{}
+		}
+		w.Outputs[output] = sortedSeries(series)
+	}
+	return w
 }
 
 // Snapshot returns the state of the instances changed since the last
@@ -246,11 +321,26 @@ func (r *Registry) LastSuccess(name string) (at time.Time, ok bool) {
 func (r *Registry) instance(name string) *instance {
 	inst, ok := r.instances[name]
 	if !ok {
-		inst = &instance{series: map[string]model.Series{}, sent: map[string]map[string]time.Time{}}
+		inst = &instance{
+			series: map[string]model.Series{}, processed: map[string]map[string]model.Series{},
+			sent: map[string]map[string]time.Time{},
+		}
 		r.instances[name] = inst
 		delete(r.removed, name)
 	}
 	return inst
+}
+
+// seriesOf returns the series of samples, by key.
+func seriesOf(samples []model.Sample) map[string]model.Series {
+	out := make(map[string]model.Series, len(samples))
+	for i := range samples {
+		s := samples[i].Series()
+		if key := s.Key(); !hasKey(out, key) {
+			out[key] = s
+		}
+	}
+	return out
 }
 
 func hasKey(m map[string]model.Series, key string) bool {

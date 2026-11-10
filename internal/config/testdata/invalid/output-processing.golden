@@ -1,0 +1,7 @@
+testdata/invalid/output-processing.yaml:8:7: spec.processing[0]: drop requires sourceLabels
+testdata/invalid/output-processing.yaml:10:7: spec.processing[1]: labeldrop requires regex
+testdata/invalid/output-processing.yaml:12:14: spec.processing[2].regex: labeldrop must not remove __name__ (the metric name): the regex matches it
+testdata/invalid/output-processing.yaml:14:14: spec.processing[3].regex: labelkeep must keep __name__ (the metric name): the regex does not match it
+testdata/invalid/output-processing.yaml:17:7: spec.processing[4].sourceLabels: sourceLabels is not allowed with labelkeep
+testdata/invalid/output-processing.yaml:18:18: spec.processing[4].separator: separator is not allowed with labelkeep
+testdata/invalid/output-processing.yaml:21:14: spec.processing[5].regex: invalid regular expression: error parsing regexp: missing closing ): `^(?:(unclosed)$`

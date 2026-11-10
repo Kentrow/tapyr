@@ -81,7 +81,8 @@ Self-metrics can also be pushed: setting `selfMetrics.outputs: [name]` in `Setti
 | Metric | Type | Labels | Notes |
 |---|---|---|---|
 | `tapyr_output_samples_sent_total` | counter | output | |
-| `tapyr_output_samples_dropped_total` | counter | output, reason | queue_full, rejected, out_of_order |
+| `tapyr_output_samples_dropped_total` | counter | output, reason | queue_full, rejected, out_of_order, duplicate (samples that processing rules made identical) |
+| `tapyr_output_samples_filtered_total` | counter | output | removed by the keep and drop processing rules of the output (intended, not a loss) |
 | `tapyr_output_send_failures_total` | counter | output, class | |
 | `tapyr_output_queue_samples` | gauge | output | |
 | `tapyr_output_send_duration_seconds` | histogram | output | |
