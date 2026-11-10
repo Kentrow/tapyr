@@ -2,9 +2,11 @@
 {{- $gw := items "gateways" -}}
 {"count": {{ len $gw }}, "total": {{ len $gw }}, "gateways": [
 {{- range $i, $g := $gw }}{{ if $i }},{{ end }}
-  {"serial": {{ json (serial $g "XX99999999") }}, "name": "GW-{{ add $g.parent.index 1 }}", "macaddr": {{ json (mac $g) }},
-   "model": "A9004", "firmware_version": "10.5.1.0_89234", "ip_address": {{ json (ipv4 $g) }},
-   "group_name": "Branch", "site": "Site {{ add $g.parent.index 1 }}", "role": "BGW",
-   "status": "{{ flap $g "status" "1h" "Up:0.99" "Down:0.01" }}", "ap_count": 8, "labels": [], "usage": {{ counter $g "usage" 200000 }}}
+  {"serial": {{ json (serial $g "XX99999999") }}, "name": "GW-{{ add $g.parent.index 1 }}", "macaddr": {{ json (mac $g) }}, "mac_range": "",
+   "model": "A9004", "firmware_version": "10.5.1.0_89234", "firmware_backup_version": "10.5.1.0_89234", "ip_address": {{ json (ipv4 $g) }},
+   "group_name": "Branch", "site": "Site {{ add $g.parent.index 1 }}", "role": "BGW", "mode": "gateway", "device_type": "GW",
+   "status": "{{ flap $g "status" "1h" "Up:0.99" "Down:0.01" }}", "labels": [], "reboot_reason": "Power cycle",
+   "uptime": {{ mod (unix $.now) 1209600 }}, "cpu_utilization": {{ printf "%.0f" (walk $g "cpu" 2 60 "5m") }},
+   "mem_total": 4194304, "mem_free": {{ printf "%.0f" (walk $g "memfree" 1048576 3145728 "15m") }}}
 {{- end }}
 ]}

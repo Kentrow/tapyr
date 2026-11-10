@@ -75,8 +75,10 @@
       ],
       "tier": "official",
       "validation": {
-        "status": "simulator",
-        "notes": "Built from the Aruba developer hub and the pycentral SDK; not run against a real Central account yet"
+        "status": "real-platform",
+        "date": "2026-11-10",
+        "platformVersion": "Central classic API Gateway",
+        "notes": "A production Central account, strictly read-only: every template, the refresh of the rotating token pair, a restart resuming from the stored pair, and the daily quota headers. Built from the Aruba developer hub and the pycentral SDK"
       },
       "origin": "builtin",
       "status": "active",
@@ -92,7 +94,6 @@
             "aruba_ap_clients",
             "aruba_ap_info",
             "aruba_ap_up",
-            "aruba_ap_uptime_seconds",
             "aruba_aps"
           ]
         },
@@ -101,7 +102,6 @@
           "path": "/monitoring/v1/gateways",
           "defaultInterval": "15m",
           "metrics": [
-            "aruba_gateway_aps",
             "aruba_gateway_info",
             "aruba_gateway_up"
           ]

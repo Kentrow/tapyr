@@ -6,8 +6,9 @@ spec:
   # tapyr sim --all serves this simulator at --listen-base plus this offset.
   portOffset: 0
   # A synthetic Central account: 3 sites, each with 8 access points, 2
-  # switches and a gateway. Fields follow the API reference of the Aruba
-  # developer hub. The refresh endpoint rotates the refresh tokens.
+  # switches and a gateway. Fields follow the shape of a recording of a
+  # real Central account (November 2026), with synthetic values. The refresh
+  # endpoint rotates the refresh tokens.
   inventory:
     seed: 42
     sets:

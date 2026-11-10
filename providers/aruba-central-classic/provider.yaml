@@ -10,8 +10,14 @@ metadata:
   maintainers: [Kentrow]
   tier: official
   validation:
-    status: simulator
-    notes: Built from the Aruba developer hub and the pycentral SDK; not run against a real Central account yet
+    status: real-platform
+    date: 2026-11-10
+    platformVersion: Central classic API Gateway
+    notes: >-
+      A production Central account, strictly read-only: every template, the
+      refresh of the rotating token pair, a restart resuming from the stored
+      pair, and the daily quota headers. Built from the Aruba developer hub
+      and the pycentral SDK
 spec:
   baseURL: '{{ .params.baseURL | trimSuffix "/" }}'
   params:

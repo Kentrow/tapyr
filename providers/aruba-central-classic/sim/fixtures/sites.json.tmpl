@@ -2,6 +2,11 @@
 {{- $sites := items "sites" -}}
 {"count": {{ len $sites }}, "total": {{ len $sites }}, "sites": [
 {{- range $i, $s := $sites }}{{ if $i }},{{ end }}
-  {"site_id": {{ add 9 $s.index }}, "site_name": "Site {{ add $s.index 1 }}"}
+{{- $n := add $s.index 1 }}
+  {"site_id": {{ add 9 $s.index }}, "site_name": "Site {{ $n }}", "associated_device_count": 11, "tags": null,
+   "address": "{{ $n }} Example Road", "city": "Example City", "state": "Example State", "country": "Exampleland", "zipcode": "0000{{ $n }}",
+   "latitude": "1.{{ $n }}", "longitude": "2.{{ $n }}",
+   "site_details": {"name": "Site {{ $n }}", "address": "{{ $n }} Example Road", "city": "Example City", "state": "Example State",
+                    "country": "Exampleland", "zipcode": "0000{{ $n }}", "latitude": "1.{{ $n }}", "longitude": "2.{{ $n }}"}}
 {{- end }}
 ]}

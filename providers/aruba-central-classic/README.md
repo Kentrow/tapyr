@@ -2,15 +2,15 @@
 
 HPE Aruba Networking Central, **classic platform**, REST API: access points, switches, gateways and sites of a Central account. The newer GreenLake-based Central uses another API and will be a separate package.
 
-**Validation status**: simulator only. The package is built from the [Aruba developer hub](https://developer.arubanetworks.com/aruba-central/) and the official `pycentral` SDK (November 2026) and tested against a simulator in CI that rotates refresh tokens and enforces the limits below; it has not been run against a real Central account yet. Reports are welcome.
+**Validation status**: tested against a real Central account (November 2026, strictly read-only): every template, the refresh of the rotating token pair, a restart resuming from the stored pair, and the daily quota headers, which matched the documented formula. The package is built from the [Aruba developer hub](https://developer.arubanetworks.com/aruba-central/) and the official `pycentral` SDK, and tested in CI against a simulator that follows the shape of the real responses, rotates refresh tokens and enforces the limits below.
 
 ## Coverage
 
 | Template | Endpoint | Default interval | Requests | Metrics |
 |---|---|---|---|---|
-| `aruba-aps` | `GET /monitoring/v2/aps?calculate_client_count=true` | 5m | 1 per 1000 APs (288 a day) | `aruba_ap_up`, `aruba_ap_clients`, `aruba_ap_uptime_seconds`, `aruba_ap_info` (name, model, firmware, group, site), `aruba_aps` |
+| `aruba-aps` | `GET /monitoring/v2/aps?calculate_client_count=true` | 5m | 1 per 1000 APs (288 a day) | `aruba_ap_up`, `aruba_ap_clients`, `aruba_ap_info` (name, model, firmware, group, site), `aruba_aps` |
 | `aruba-switches` | `GET /monitoring/v1/switches` | 15m | 1 per 1000 switches (96 a day) | `aruba_switch_up`, `aruba_switch_info` (name, model, firmware, group, site, switch type) |
-| `aruba-gateways` | `GET /monitoring/v1/gateways` | 15m | 1 per 1000 gateways (96 a day) | `aruba_gateway_up`, `aruba_gateway_aps`, `aruba_gateway_info` (name, model, firmware, group, site, role) |
+| `aruba-gateways` | `GET /monitoring/v1/gateways` | 15m | 1 per 1000 gateways (96 a day) | `aruba_gateway_up`, `aruba_gateway_info` (name, model, firmware, group, site, role) |
 | `aruba-sites` | `GET /central/v2/sites` | 1h | 1 per 1000 sites (24 a day) | `aruba_site_info` |
 
 - Lists are read 1000 items per page (the maximum), with `calculate_total=true` for the pagination.
@@ -50,7 +50,7 @@ If other integrations use the same account, give Tapyr a share of the quota (`bu
 tapyr sim --provider aruba-central-classic --listen 127.0.0.1:8081
 ```
 
-8081 is the port of the simulator under `tapyr sim --all --listen-base 127.0.0.1:8081` (`portOffset: 0`). A synthetic account of 3 sites with 8 access points, 2 switches and a gateway each. The simulator serves the refresh endpoint of the plugin (client `sim-client` / `sim-client-secret`, bootstrap refresh token `sim-refresh-token`, valid once, then rotated like Central; bootstrap access token `sim-access-token`), issues 2-hour access tokens, enforces 7 calls per second and the daily quota, and sends the `X-RateLimit-*-day` headers.
+8081 is the port of the simulator under `tapyr sim --all --listen-base 127.0.0.1:8081` (`portOffset: 0`). A synthetic account of 3 sites with 8 access points, 2 switches and a gateway each, in the shape of the responses of a real account. The simulator serves the refresh endpoint of the plugin (client `sim-client` / `sim-client-secret`, bootstrap refresh token `sim-refresh-token`, valid once, then rotated like Central; bootstrap access token `sim-access-token`), issues 2-hour access tokens, enforces 7 calls per second and the daily quota, and sends the `X-RateLimit-*-day` headers.
 
 | Scenario | Effect |
 |---|---|
@@ -64,6 +64,7 @@ tapyr sim --provider aruba-central-classic --listen 127.0.0.1:8081
 
 ## Known caveats
 
-- Simulator-validated only (see above).
+- The access point list carries no uptime, and the gateway list no access point count: the package has no metric for them.
+- The `role` of a gateway can be empty.
 - Whether a refresh token stays valid for a while after a refresh is not documented: the plugin treats it as spent at once.
-- Radio channel utilization (in the access point list) is not collected yet.
+- The CPU, memory and uptime of switches and gateways (in their lists) are not collected yet.
