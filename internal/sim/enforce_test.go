@@ -165,6 +165,54 @@ func TestScenarioStepEnds(t *testing.T) {
 	}
 }
 
+// TestExternalConsumptionStepEnd is a regression test: the consumption of an
+// externalConsumption step was charged only while the step was active at a
+// request, so a step ending between two requests lost what it consumed since
+// the last one.
+func TestExternalConsumptionStepEnd(t *testing.T) {
+	clk := clock.NewFake(midnight)
+	pkgs, err := provider.Builtin(loader(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 300 calls between 1h and 1h10, 60 calls an hour from 2h on.
+	sc := &config.Scenario{Spec: config.ScenarioSpec{Steps: []config.ScenarioStep{
+		{
+			At: config.Duration(time.Hour), For: config.Duration(10 * time.Minute),
+			ExternalConsumption: &config.ExternalConsumption{Limit: "daily", RatePerHour: 1800},
+		},
+		{At: config.Duration(2 * time.Hour), ExternalConsumption: &config.ExternalConsumption{Limit: "daily", RatePerHour: 60}},
+	}}}
+	s, err := New(provider.Find(pkgs, "example-sim"), Options{Clock: clk, Scenario: sc})
+	if err != nil {
+		t.Fatal(err)
+	}
+	remaining := func() int {
+		t.Helper()
+		v, err := strconv.Atoi(call(s, "/api/v1/sites").Header().Get("X-RateLimit-Remaining-Day"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return v
+	}
+	tests := []struct {
+		at   time.Duration
+		want int // the requests of the test count too
+	}{
+		{0, 5000 - 1},
+		{65 * time.Minute, 5000 - 2 - 150},  // halfway through the step
+		{90 * time.Minute, 5000 - 3 - 300},  // the step ended between two requests
+		{150 * time.Minute, 5000 - 4 - 330}, // 30 minutes of the open-ended step
+		{4 * time.Hour, 5000 - 5 - 420},
+	}
+	for _, tt := range tests {
+		clk.Set(midnight.Add(tt.at))
+		if got := remaining(); got != tt.want {
+			t.Errorf("remaining at %s = %d, want %d", tt.at, got, tt.want)
+		}
+	}
+}
+
 func TestInventoryChange(t *testing.T) {
 	clk := clock.NewFake(midnight)
 	s := exampleServer(t, clk, "inventory-change")

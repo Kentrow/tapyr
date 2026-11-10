@@ -112,30 +112,7 @@ func Plan(jobs []Job, opts Options) *Result {
 		stretch[i] = 1
 	}
 
-	scopes := map[string]*scope{}
-	var order []string
-	for i := range jobs {
-		j := &jobs[i]
-		fanout := float64(max(1, j.Fanout))
-		for _, ps := range j.Scopes {
-			if ps.Kind != config.LimitQuota {
-				continue
-			}
-			s, ok := scopes[ps.ID]
-			if !ok {
-				s = &scope{plan: newScopePlan(ps, opts), perJob: map[int]float64{}}
-				scopes[ps.ID] = s
-				order = append(order, ps.ID)
-			}
-			calls := j.callsPerRun()
-			if !ps.PerInstance {
-				calls *= fanout
-			}
-			s.jobs = append(s.jobs, i)
-			s.perJob[i] = calls
-		}
-	}
-	slices.Sort(order)
+	scopes, order := quotaScopes(jobs, opts)
 
 	// Stretch per scope, independently; a job keeps the largest stretch.
 	feasible := true
@@ -197,6 +174,66 @@ func Plan(jobs []Job, opts Options) *Result {
 		res.Scopes = append(res.Scopes, s.plan)
 	}
 	return res
+}
+
+// quotaScopes groups the jobs by quota scope, with the calls per run of
+// every contributing job, and returns the scope IDs sorted.
+func quotaScopes(jobs []Job, opts Options) (map[string]*scope, []string) {
+	scopes := map[string]*scope{}
+	var order []string
+	for i := range jobs {
+		j := &jobs[i]
+		fanout := float64(max(1, j.Fanout))
+		for _, ps := range j.Scopes {
+			if ps.Kind != config.LimitQuota {
+				continue
+			}
+			s, ok := scopes[ps.ID]
+			if !ok {
+				s = &scope{plan: newScopePlan(ps, opts), perJob: map[int]float64{}}
+				scopes[ps.ID] = s
+				order = append(order, ps.ID)
+			}
+			calls := j.callsPerRun()
+			if !ps.PerInstance {
+				calls *= fanout
+			}
+			s.jobs = append(s.jobs, i)
+			s.perJob[i] = calls
+		}
+	}
+	slices.Sort(order)
+	return scopes, order
+}
+
+// Evaluate projects the consumption of every quota scope over its period
+// with the given effective intervals, against the budget of opts, without
+// planning: a job missing from intervals runs at its desired interval. It
+// tells whether the current plan still fits fresh budgets (the projection
+// replan of the collector). Projected above Budget makes a scope
+// infeasible.
+func Evaluate(jobs []Job, intervals map[string]time.Duration, opts Options) []ScopePlan {
+	scopes, order := quotaScopes(jobs, opts)
+	out := make([]ScopePlan, 0, len(order))
+	for _, id := range order {
+		s := scopes[id]
+		for _, i := range s.jobs {
+			interval, ok := intervals[jobs[i].Name]
+			if !ok || interval <= 0 {
+				interval = jobs[i].Desired
+			}
+			s.plan.Projected += s.perJob[i] * s.plan.Period.Seconds() / interval.Seconds()
+			s.plan.Jobs = append(s.plan.Jobs, jobs[i].Name)
+		}
+		if s.plan.Projected > s.plan.Budget+1e-9 {
+			s.plan.Feasible = false
+			if s.plan.Projected > 0 {
+				s.plan.ExhaustionAt = opts.Now.Add(time.Duration(s.plan.Budget / s.plan.Projected * float64(s.plan.Period)))
+			}
+		}
+		out = append(out, s.plan)
+	}
+	return out
 }
 
 func newScopePlan(ps budget.PlanScope, opts Options) ScopePlan {

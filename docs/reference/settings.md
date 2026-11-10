@@ -51,6 +51,7 @@ BudgetSettings configures the budget engine and the planner.
 |---|---|---|---|
 | `maxStretch` | number |  | `maxStretch` caps the interval stretch factor applied to a priority class before the planner moves to the next class. Default `12`. Minimum 1. |
 | `replanInterval` | [Duration](#duration) |  | `replanInterval` is the period of mid-window replanning. Default `15m`. |
+| `replanOnProjection` | boolean |  | `replanOnProjection` replans at once when the consumption projected by the current plan until the end of a quota window exceeds its remaining budget, for example when another client starts spending the same quota, instead of waiting for the next replanInterval. Default `true`. |
 | `retryReserve` | [Percent](#percent) |  | `retryReserve` is the share of every quota reserved for retries, from 0% to 50%. Default `10%`. |
 
 ## CircuitBreakerSettings

@@ -422,19 +422,34 @@ func (s *Server) applyScenario() {
 		for name, l := range st.Limits {
 			overrides[name] = l.Max
 		}
-		if ec := st.ExternalConsumption; ec != nil && now.After(last) {
-			from := last
-			if stepStart := s.started.Add(st.At.Std()); stepStart.After(from) {
-				from = stepStart
-			}
-			s.mu.Lock()
-			s.external[string(ec.Limit)] += ec.RatePerHour * now.Sub(from).Hours()
-			units := int64(s.external[string(ec.Limit)])
-			s.external[string(ec.Limit)] -= float64(units)
-			s.mu.Unlock()
-			if units > 0 {
-				s.engine.Consume(provider, string(ec.Limit), units)
-			}
+	}
+	// External consumption since the last call, also for the steps that
+	// ended since: a step ending between two calls still consumed until its
+	// end.
+	for i := range s.scenario.Spec.Steps {
+		st := &s.scenario.Spec.Steps[i]
+		ec := st.ExternalConsumption
+		if ec == nil || !now.After(last) {
+			continue
+		}
+		start := s.started.Add(st.At.Std())
+		from, to := last, now
+		if start.After(from) {
+			from = start
+		}
+		if end := start.Add(st.For.Std()); st.For > 0 && end.Before(to) {
+			to = end
+		}
+		if !to.After(from) {
+			continue
+		}
+		s.mu.Lock()
+		s.external[string(ec.Limit)] += ec.RatePerHour * to.Sub(from).Hours()
+		units := int64(s.external[string(ec.Limit)])
+		s.external[string(ec.Limit)] -= float64(units)
+		s.mu.Unlock()
+		if units > 0 {
+			s.engine.Consume(provider, string(ec.Limit), units)
 		}
 	}
 	for name, m := range overrides {

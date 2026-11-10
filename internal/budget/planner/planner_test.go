@@ -187,3 +187,68 @@ func TestPlanDetails(t *testing.T) {
 		t.Errorf("infeasible scope = %+v", sc)
 	}
 }
+
+func TestEvaluate(t *testing.T) {
+	online := Options{MaxStretch: 12, Online: true, Now: now} // 12 hours left in the day
+	scope := func(remaining, external int64) budget.PlanScope {
+		q := daily("daily", 5000, 500)
+		q.Remaining, q.External = remaining, external
+		return q
+	}
+	tests := []struct {
+		name          string
+		scope         budget.PlanScope
+		intervals     map[string]time.Duration
+		wantProjected float64
+		wantBudget    float64
+		wantFeasible  bool
+	}{
+		// 144 runs of 3 pages in the 12 hours left.
+		{name: "fits", scope: scope(5000, 0), wantProjected: 432, wantBudget: 4500, wantFeasible: true},
+		{name: "remaining dropped", scope: scope(900, 0), wantProjected: 432, wantBudget: 400, wantFeasible: false},
+		{
+			name: "stretched interval", scope: scope(900, 0), intervals: map[string]time.Duration{"aps": 10 * time.Minute},
+			wantProjected: 216, wantBudget: 400, wantFeasible: true,
+		},
+		// Another client spent 4000 in the first 12 hours: 4000 more are
+		// projected until the reset.
+		{name: "external consumption", scope: scope(4600, 4000), wantProjected: 432, wantBudget: 100, wantFeasible: false},
+		{
+			name: "zero interval is the desired one", scope: scope(5000, 0), intervals: map[string]time.Duration{"aps": 0},
+			wantProjected: 432, wantBudget: 4500, wantFeasible: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Evaluate([]Job{job("aps", config.PriorityHigh, 5*time.Minute, 3, tt.scope)}, tt.intervals, online)
+			if len(got) != 1 {
+				t.Fatalf("%d scopes", len(got))
+			}
+			s := got[0]
+			if !approx(s.Projected, tt.wantProjected) || !approx(s.Budget, tt.wantBudget) || s.Feasible != tt.wantFeasible {
+				t.Errorf("projected %.1f budget %.1f feasible %t, want %.1f %.1f %t", s.Projected, s.Budget, s.Feasible,
+					tt.wantProjected, tt.wantBudget, tt.wantFeasible)
+			}
+			if !s.Feasible {
+				want := now.Add(time.Duration(s.Budget / s.Projected * float64(12*time.Hour)))
+				if !s.ExhaustionAt.Equal(want) {
+					t.Errorf("ExhaustionAt = %v, want %v", s.ExhaustionAt, want)
+				}
+			}
+		})
+	}
+	// With the effective intervals of a plan, Evaluate projects what the
+	// plan projected.
+	q := scope(900, 0)
+	jobs := []Job{job("aps", config.PriorityHigh, 5*time.Minute, 3, q), job("clients", config.PriorityLow, 5*time.Minute, 2, q)}
+	plan := Plan(jobs, online)
+	intervals := map[string]time.Duration{}
+	for _, j := range plan.Jobs {
+		intervals[j.Name] = j.Effective
+	}
+	if got := Evaluate(jobs, intervals, online); !approx(got[0].Projected, plan.Scopes[0].Projected) || got[0].Feasible != plan.Scopes[0].Feasible {
+		t.Errorf("Evaluate = %+v, plan = %+v", got[0], plan.Scopes[0])
+	}
+}
+
+func approx(a, b float64) bool { return a-b < 1e-6 && b-a < 1e-6 }

@@ -78,7 +78,7 @@ The process of `tapyr run`, wired by `cmd/tapyr`:
 - A generation per compiled graph: its budget engine, executor, discovery and scheduler. A reload builds the next generation, stops the old one once its runs end, moves the ledger to the new engine, keeps the unchanged outputs and the schedule of the instances that stay, and retires the others.
 - The run of a job instance: the executor, the mapping, the inventory update, then the samples to the outputs and the run history.
 - Discovery: the children of every parent instance follow its inventory, start from the cached inventory after a restart, and are removed when it expires.
-- The online plan (every `replanInterval`, on a learned quota, on inventory changes), the flush loop (ledger, series, expiry), the push of the self-metrics, and the adapter of the status API.
+- The online plan (every `replanInterval`, on a learned quota, on inventory changes, and when the current plan is projected to exhaust a quota), the flush loop (ledger, series, expiry), the push of the self-metrics, and the adapter of the status API.
 
 ### Collection executor (`internal/collect`)
 

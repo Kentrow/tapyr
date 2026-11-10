@@ -48,6 +48,7 @@ Self-metrics can also be pushed: setting `selfMetrics.outputs: [name]` in `Setti
 | `tapyr_budget_unexpected_429_total` | counter | provider, account | 429 not predicted by any internal limit |
 | `tapyr_budget_limit_mismatch` | gauge | provider, limit | 1 when headers disagree with the declared max |
 | `tapyr_plan_feasible` | gauge | provider, limit, scope | 1 feasible, 0 infeasible |
+| `tapyr_plan_recomputations_total` | counter | reason | start, reload, interval, limit_learned, inventory, projection (`04-budget-engine.md`, Replan on projection) |
 
 ### Jobs
 

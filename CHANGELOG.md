@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Replan on projection: between two `replanInterval`, Tapyr checks at most once a minute that the current plan still fits every quota, and replans at once when it would exhaust one before its reset, for example when another client suddenly spends the same quota (`settings.budget.replanOnProjection`, on by default). Plan computations are counted by reason in `tapyr_plan_recomputations_total`.
+- `quota-jump`, a scenario of the `example-sim` simulator: another client suddenly spends the daily quota, twice.
 - `juniper-mist`, a provider package for the Juniper Mist cloud API: device status, uptime, clients, CPU and memory of access points, switches and gateways, device and client counts per site, and alarm counts by severity, from organization-level endpoints (about 20 calls an hour of the 5000 per API token). Validated against its simulator only.
 - `format` on the `header` auth type, for APIs that expect a scheme name before the key (`format: "Token {value}"` sends `Authorization: Token <key>`). The formatted value is redacted like the secret.
 
@@ -22,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Simulator: an `externalConsumption` step ending between two requests is charged until its end; what it consumed since the last request used to be lost.
 - `tapyr record` reads the token pair of auth plugins from the state store, read-only, and no longer renews rotating refresh tokens: with `aruba-central-classic`, it started from the bootstrap pair, which `tapyr run` had already rotated, and a refresh would have left `tapyr run` with a spent refresh token. Past the expiry of the stored access token, it stops with a message instead of renewing it.
 - `tapyr record` replaces the site of a device (key `site`, the site name in Aruba Central) and zip codes (key `zipcode`), which a recording used to keep.
 - The Grafana dashboards of `Tapyr / Overview` and of the provider packages work with push outputs: the series of slow jobs (inventories, `_info` metrics) are read with `last_over_time`, where they used to vanish between two runs and leave tables and joins empty.

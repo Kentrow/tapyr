@@ -158,6 +158,7 @@ func TestDefaults(t *testing.T) {
 			{"jitter", spec.Collection.Jitter.Fraction(), 0.1},
 			{"reserve", spec.Budget.RetryReserve.Fraction(), 0.1},
 			{"replan", spec.Budget.ReplanInterval.Std(), 15 * time.Minute},
+			{"replan on projection", *spec.Budget.ReplanOnProjection, true},
 			{"stretch", spec.Budget.MaxStretch, 12.0},
 			{"attempts", spec.Retry.MaxAttempts, 4},
 			{"backoff", spec.Retry.InitialBackoff.Std(), time.Second},

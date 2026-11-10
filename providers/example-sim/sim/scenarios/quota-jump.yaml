@@ -1,0 +1,19 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: quota-jump
+  description: >-
+    A daily quota of 2000 calls, then another client suddenly spends 300 of
+    them at 12h and 600 more at 18h: the first jump makes Tapyr stretch its
+    low-priority jobs at once, the second leaves too little for any plan.
+spec:
+  steps:
+    - at: 0s
+      limits:
+        daily: { max: 2000 }
+    - at: 12h
+      for: 10m
+      externalConsumption: { limit: daily, ratePerHour: 1800 }
+    - at: 18h
+      for: 10m
+      externalConsumption: { limit: daily, ratePerHour: 3600 }

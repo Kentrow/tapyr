@@ -30,6 +30,7 @@ type Metrics struct {
 	budgetRefusals      *prometheus.CounterVec
 	budgetRateLimited   *prometheus.CounterVec
 	budgetUnexpected429 *prometheus.CounterVec
+	planRecomputations  *prometheus.CounterVec
 
 	jobRuns       *prometheus.CounterVec
 	jobDuration   *prometheus.HistogramVec
@@ -81,6 +82,7 @@ func NewMetrics(info buildinfo.Info, state func() State) *Metrics {
 			"provider", "account", "limit"),
 		budgetUnexpected429: f.counter("tapyr_budget_unexpected_429_total", "Rate-limited responses not predicted by any internal limit.",
 			"provider", "account"),
+		planRecomputations: f.counter("tapyr_plan_recomputations_total", "Plan recomputations, by reason.", "reason"),
 
 		jobRuns:       f.counter("tapyr_job_runs_total", "Job runs, by result.", "provider", "account", "job", "result"),
 		jobDuration:   f.histogram("tapyr_job_run_duration_seconds", "Duration of job runs.", prometheus.DefBuckets, "provider", "job"),
@@ -193,6 +195,12 @@ func (m *Metrics) BudgetGranted(provider, limit string, wait time.Duration) {
 // BudgetRefused records a refused reservation.
 func (m *Metrics) BudgetRefused(provider, account, job, reason string) {
 	m.budgetRefusals.WithLabelValues(provider, account, job, reason).Inc()
+}
+
+// PlanRecomputed records a recomputation of the plan: reason is start,
+// reload, interval, limit_learned, inventory or projection.
+func (m *Metrics) PlanRecomputed(reason string) {
+	m.planRecomputations.WithLabelValues(reason).Inc()
 }
 
 // RateLimited records a rate-limited response, penalizing limit.

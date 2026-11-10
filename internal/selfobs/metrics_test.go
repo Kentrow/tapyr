@@ -41,6 +41,9 @@ func TestMetricsEvents(t *testing.T) {
 	m.OutputSendFailed("vm", "transient")
 	m.OutputSendDuration("vm", 50*time.Millisecond)
 	m.ConfigLoaded(at, false)
+	m.PlanRecomputed("start")
+	m.PlanRecomputed("projection")
+	m.PlanRecomputed("projection")
 	m.StateFlushed(time.Millisecond, nil)
 	m.StateFlushed(time.Millisecond, errors.New("disk full"))
 
@@ -96,6 +99,10 @@ tapyr_output_samples_sent_total{output="vm"} 10
 # HELP tapyr_output_send_failures_total Failed send requests of an output, by class.
 # TYPE tapyr_output_send_failures_total counter
 tapyr_output_send_failures_total{class="transient",output="vm"} 1
+# HELP tapyr_plan_recomputations_total Plan recomputations, by reason.
+# TYPE tapyr_plan_recomputations_total counter
+tapyr_plan_recomputations_total{reason="projection"} 2
+tapyr_plan_recomputations_total{reason="start"} 1
 # HELP tapyr_samples_deduplicated_total Samples dropped because their source timestamp was already sent.
 # TYPE tapyr_samples_deduplicated_total counter
 tapyr_samples_deduplicated_total{job="devices",provider="meraki"} 4
@@ -109,7 +116,7 @@ tapyr_state_flush_failures_total 1
 		"tapyr_config_last_reload_timestamp_seconds", "tapyr_http_in_flight", "tapyr_http_requests_total",
 		"tapyr_http_retries_total", "tapyr_job_partial_runs_total", "tapyr_job_runs_total", "tapyr_mapping_errors_total",
 		"tapyr_output_samples_dropped_total", "tapyr_output_samples_sent_total", "tapyr_output_send_failures_total",
-		"tapyr_samples_deduplicated_total", "tapyr_state_flush_failures_total",
+		"tapyr_plan_recomputations_total", "tapyr_samples_deduplicated_total", "tapyr_state_flush_failures_total",
 	}
 	if err := testutil.GatherAndCompare(m.reg, strings.NewReader(want), names...); err != nil {
 		t.Error(err)

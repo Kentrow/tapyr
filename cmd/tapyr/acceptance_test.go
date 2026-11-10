@@ -17,6 +17,141 @@ import (
 	"github.com/kentrow/tapyr/internal/clock"
 )
 
+// TestTwentyFourHoursProjectionReplan checks the projection trigger end to
+// end: with a replanInterval longer than the day, only the projection check
+// can react when another client suddenly spends the quota (the quota-jump
+// scenario of example-sim). The first jump replans at once and stretches the
+// low-priority job; the second leaves too little for any plan, which replans
+// once and does not loop. Turned off, the trigger never fires.
+func TestTwentyFourHoursProjectionReplan(t *testing.T) {
+	if testing.Short() {
+		t.Skip("24 simulated hours")
+	}
+	t.Run("on", func(t *testing.T) { projectionReplanDay(t, true) })
+	t.Run("off", func(t *testing.T) { projectionReplanDay(t, false) })
+}
+
+func projectionReplanDay(t *testing.T, enabled bool) {
+	midnight := time.Date(2026, time.November, 2, 0, 0, 0, 0, time.UTC)
+	clk := clock.NewFake(midnight)
+	simAddr, stopSim := backgroundWith(t, nil, clk, "sim", "--provider", "example-sim", "--scenario", "quota-jump")
+	defer stopSim()
+
+	dir := t.TempDir()
+	config := fmt.Sprintf(`apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: shared }
+spec:
+  provider: example-sim
+  params: { baseURL: "http://%s/api/v1" }
+  secrets: { apiKey: { env: TAPYR_SHARED_API_KEY } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: devices }
+spec: { account: shared, template: example-sim-devices, interval: 5m, priority: normal }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: sites }
+spec: { account: shared, template: example-sim-sites, interval: 5m, priority: low }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: prom }
+spec: { type: prometheus }
+---
+apiVersion: tapyr/v1alpha1
+kind: Settings
+metadata: { name: shared }
+spec:
+  server: { listen: "127.0.0.1:0" }
+  state: { path: %q }
+  collection: { jitter: 0%% }
+  budget: { replanInterval: 25h, replanOnProjection: %t }
+  log: { format: text }
+`, simAddr, filepath.Join(dir, "tapyr.db"), enabled)
+	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(config), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	vars := map[string]string{"TAPYR_SHARED_API_KEY": "sim-api-key"}
+	var inFlight atomic.Int64
+	addr, stopRun := backgroundEnv(t, vars, clk, func(d int) { inFlight.Add(int64(d)) }, "run", "--config", dir)
+
+	// Two scheduled jobs, the ledger flush and the replan tickers.
+	const idleWaiters = 4
+	quiet := func() {
+		deadline := time.Now().Add(10 * time.Second)
+		for (clk.Waiters() != idleWaiters || inFlight.Load() != 0) && time.Now().Before(deadline) { // timers first, see collectorIdle
+			time.Sleep(100 * time.Microsecond)
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("collector not idle: %d runs in flight, %d timers", inFlight.Load(), clk.Waiters())
+		}
+	}
+	recomputations := func() string {
+		_, self := httpGet(t, "http://"+addr+"/metrics/self")
+		return grepLines(self, "tapyr_plan_recomputations_total{")
+	}
+	advanceTo := func(until time.Time) {
+		for clk.Now().Before(until) {
+			quiet()
+			clk.Advance(10 * time.Second)
+		}
+		quiet()
+	}
+
+	if !enabled {
+		advanceTo(midnight.Add(24*time.Hour - 30*time.Second))
+		if got := recomputations(); strings.Contains(got, `reason="projection"`) {
+			t.Errorf("projection replans with replanOnProjection off:\n%s", got)
+		}
+		if res := stopRun(); res.code != exitOK {
+			t.Fatalf("run exited with %d:\n%s", res.code, tail(res.stderr, 40))
+		}
+		return
+	}
+	advanceTo(midnight.Add(12 * time.Hour))
+	if got := recomputations(); strings.Contains(got, `reason="projection"`) {
+		t.Fatalf("projection replans before the first jump:\n%s", got)
+	}
+	// Within minutes of the first jump, one projection replan.
+	advanceTo(midnight.Add(12*time.Hour + 20*time.Minute))
+	if got := recomputations(); !strings.Contains(got, `tapyr_plan_recomputations_total{reason="projection"} 1`) {
+		t.Errorf("after the first jump:\n%s", got)
+	}
+	advanceTo(midnight.Add(24*time.Hour - 30*time.Second))
+	got := recomputations()
+	t.Logf("plan recomputations:\n%s", got)
+	if !strings.Contains(got, `tapyr_plan_recomputations_total{reason="projection"} 2`) {
+		t.Errorf("projection replans over the day, want 2 (one per jump):\n%s", got)
+	}
+	if !strings.Contains(got, `tapyr_plan_recomputations_total{reason="start"} 1`) || strings.Contains(got, `reason="interval"`) {
+		t.Errorf("other recomputations:\n%s", got)
+	}
+
+	_, body := httpGet(t, "http://"+simAddr+"/_sim/status")
+	var status struct {
+		Stats struct {
+			Refused map[string]int64 `json:"rate_limited"`
+		} `json:"stats"`
+	}
+	if err := json.Unmarshal([]byte(body), &status); err != nil {
+		t.Fatal(err)
+	}
+	if n := status.Stats.Refused["quota_exhausted"]; n != 0 {
+		t.Errorf("%d requests refused by the quota of the simulator", n)
+	}
+	res := stopRun()
+	if res.code != exitOK {
+		t.Fatalf("run exited with %d:\n%s", res.code, tail(res.stderr, 40))
+	}
+	if !strings.Contains(res.stderr, `msg="replanning: the current plan would exhaust a quota before its reset"`) ||
+		!strings.Contains(res.stderr, `msg="effective interval changed" component=planner provider=example-sim account=shared job=sites`) {
+		t.Errorf("no projection replan stretching the low-priority job:\n%s", grepLines(res.stderr, "component=planner"))
+	}
+}
+
 // TestTwentyFourHoursQuotaTight checks the budget engine end to end: 24 simulated
 // hours against the quota-tight simulator, Tapyr and the simulator sharing
 // one fake clock.
