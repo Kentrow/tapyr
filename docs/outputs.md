@@ -49,6 +49,10 @@ spec:
 - Metric metadata (type, help, unit) is sent on the first request and every minute.
 - Network errors, `5xx` and `429` are retried with exponential backoff (1 second doubling up to 1 minute), honoring `Retry-After`. Other `4xx` drop the batch, except a batch refused for out-of-order samples ([below](#out-of-order-samples)).
 
+### Series of slow jobs
+
+A push output sends a sample of a series when its job runs, while a scraped exposition (`prometheus`) shows the last value at every scrape. Prometheus and VictoriaMetrics answer a query with the last sample of the previous 5 minutes (the lookback delta): the series of a job that runs every 15 minutes or every hour drop out of instant queries and graphs between two runs. Read them with `last_over_time(metric[window])`, the window two to three times the job interval, as the built-in dashboards do ([dashboard conventions](providers.md#dashboard-conventions)). A series that goes away stays visible for that window.
+
 ### Out-of-order samples
 
 Source timestamps can be older than samples already ingested for a series, for example after a restart, when a job interval changes or when an API reports late data. They can also be older than what the backend still accepts at all: Prometheus refuses samples older than its in-memory head (about an hour) as "out of bounds", even on a fresh server, so any API reporting a timestamp of the day before hits it.

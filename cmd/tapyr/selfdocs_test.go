@@ -93,6 +93,9 @@ func TestOverviewDashboard(t *testing.T) {
 		}
 	}
 	walk(d.Panels)
+	for _, p := range panelProblems("tapyr-overview.json", d.Panels) {
+		t.Error(p)
+	}
 	if len(exprs) < 10 {
 		t.Fatalf("only %d queries", len(exprs))
 	}

@@ -10,7 +10,7 @@
   "editable": true,
   "graphTooltip": 1,
   "schemaVersion": 39,
-  "version": 1,
+  "version": 3,
   "refresh": "1m",
   "time": {
     "from": "now-6h",
@@ -107,7 +107,20 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "s"
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
         },
         "overrides": []
       },
@@ -149,7 +162,21 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -206,7 +233,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -248,7 +276,21 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -289,7 +331,9 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0
+        },
         "overrides": []
       },
       "options": {
@@ -333,7 +377,32 @@
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "max": 1
+          "max": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -378,7 +447,32 @@
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "max": 1
+          "max": 1,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.8
+              },
+              {
+                "color": "red",
+                "value": 0.9
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -415,14 +509,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rutos_device_info{router=~\"$router\"}",
+          "expr": "last_over_time(rutos_device_info{router=~\"$router\"}[1h])",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "No router"
+        },
         "overrides": []
       },
       "options": {},
@@ -432,8 +528,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -479,7 +575,32 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "dBm"
+          "unit": "dBm",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -100
+              },
+              {
+                "color": "green",
+                "value": -90
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -493,7 +614,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Reference signal received power. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 12,
@@ -522,7 +644,32 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "dB"
+          "unit": "dB",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 13
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -536,7 +683,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Signal to interference and noise ratio. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 13,
@@ -565,7 +713,32 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "dBm"
+          "unit": "dBm",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -85
+              },
+              {
+                "color": "green",
+                "value": -75
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -579,7 +752,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Received signal strength indicator, unreliable alone in 4G. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 14,
@@ -608,7 +782,32 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "dB"
+          "unit": "dB",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -20
+              },
+              {
+                "color": "green",
+                "value": -15
+              }
+            ]
+          },
+          "custom": {
+            "thresholdsStyle": {
+              "mode": "dashed"
+            }
+          }
         },
         "overrides": []
       },
@@ -622,7 +821,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Reference signal received quality. Dashed lines: the categories of the Teltonika recommendations for 4G (orange: fair to poor, red: poor), https://wiki.teltonika-networks.com/view/Mobile_Signal_Strength_Recommendations"
     },
     {
       "id": 15,
@@ -703,7 +903,8 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "Bps",
+          "min": 0
         },
         "overrides": []
       },
@@ -747,7 +948,9 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "No modem"
+        },
         "overrides": []
       },
       "options": {},
@@ -757,8 +960,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -804,7 +1007,8 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "Bps",
+          "min": 0
         },
         "overrides": []
       },
@@ -847,7 +1051,8 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "Bps"
+          "unit": "Bps",
+          "min": 0
         },
         "overrides": []
       },
@@ -865,7 +1070,7 @@
     },
     {
       "id": 21,
-      "type": "timeseries",
+      "type": "state-timeline",
       "title": "Failover state",
       "datasource": {
         "type": "prometheus",
@@ -890,26 +1095,65 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "min": 0,
-          "max": 1
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Online",
+                  "color": "green",
+                  "index": 0
+                },
+                "0": {
+                  "text": "Offline",
+                  "color": "red",
+                  "index": 1
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
       "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
       }
     },
     {
       "id": 22,
-      "type": "timeseries",
+      "type": "state-timeline",
       "title": "Interfaces up",
       "datasource": {
         "type": "prometheus",
@@ -934,20 +1178,59 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "min": 0,
-          "max": 1
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "custom": {
+            "fillOpacity": 80,
+            "lineWidth": 0
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Up",
+                  "color": "green",
+                  "index": 0
+                },
+                "0": {
+                  "text": "Down",
+                  "color": "red",
+                  "index": 1
+                }
+              }
+            }
+          ]
         },
         "overrides": []
       },
       "options": {
+        "mergeValues": true,
+        "showValue": "never",
+        "alignValue": "left",
+        "rowHeight": 0.8,
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
-          "showLegend": true
+          "showLegend": false
         },
         "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "mode": "single",
+          "sort": "none"
         }
       }
     }

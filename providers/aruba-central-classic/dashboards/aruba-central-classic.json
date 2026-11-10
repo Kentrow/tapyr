@@ -10,7 +10,7 @@
   "editable": true,
   "graphTooltip": 1,
   "schemaVersion": 39,
-  "version": 1,
+  "version": 3,
   "refresh": "1m",
   "time": {
     "from": "now-6h",
@@ -101,12 +101,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(aruba_ap_up * on (serial) group_left (site) aruba_ap_info{site=~\"$site\"})",
+          "expr": "sum(last_over_time(aruba_ap_up[15m]) * on (serial) group_left (site) max by (serial, site) (last_over_time(aruba_ap_info{site=~\"$site\"}[15m])))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -142,7 +156,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count((aruba_ap_up == 0) * on (serial) group_left (site) aruba_ap_info{site=~\"$site\"}) or vector(0)",
+          "expr": "count((last_over_time(aruba_ap_up[15m]) == 0) * on (serial) group_left (site) max by (serial, site) (last_over_time(aruba_ap_info{site=~\"$site\"}[15m]))) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -163,7 +177,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -200,7 +215,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count((aruba_switch_up == 0) * on (serial) group_left (site) aruba_switch_info{site=~\"$site\"}) or vector(0)",
+          "expr": "count((last_over_time(aruba_switch_up[45m]) == 0) * on (serial) group_left (site) max by (serial, site) (last_over_time(aruba_switch_info{site=~\"$site\"}[45m]))) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -221,7 +236,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -258,7 +274,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count((aruba_gateway_up == 0) * on (serial) group_left (site) aruba_gateway_info{site=~\"$site\"}) or vector(0)",
+          "expr": "count((last_over_time(aruba_gateway_up[45m]) == 0) * on (serial) group_left (site) max by (serial, site) (last_over_time(aruba_gateway_info{site=~\"$site\"}[45m]))) or vector(0)",
           "legendFormat": ""
         }
       ],
@@ -279,7 +295,8 @@
           },
           "color": {
             "mode": "thresholds"
-          }
+          },
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -316,12 +333,26 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(aruba_ap_clients * on (serial) group_left (site) aruba_ap_info{site=~\"$site\"})",
+          "expr": "sum(last_over_time(aruba_ap_clients[15m]) * on (serial) group_left (site) max by (serial, site) (last_over_time(aruba_ap_info{site=~\"$site\"}[15m])))",
           "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
@@ -391,7 +422,8 @@
                 }
               }
             }
-          ]
+          ],
+          "noValue": "0"
         },
         "overrides": []
       },
@@ -442,12 +474,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (site) (aruba_ap_clients * on (serial) group_left (site) aruba_ap_info{site=~\"$site\"})",
+          "expr": "sum by (site) (last_over_time(aruba_ap_clients[15m]) * on (serial) group_left (site) max by (serial, site) (last_over_time(aruba_ap_info{site=~\"$site\"}[15m])))",
           "legendFormat": "{{site}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -483,12 +518,15 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (site) (aruba_ap_up * on (serial) group_left (site) aruba_ap_info{site=~\"$site\"})",
+          "expr": "sum by (site) (last_over_time(aruba_ap_up[15m]) * on (serial) group_left (site) max by (serial, site) (last_over_time(aruba_ap_info{site=~\"$site\"}[15m])))",
           "legendFormat": "{{site}}"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "min": 0,
+          "unit": "none"
+        },
         "overrides": []
       },
       "options": {
@@ -505,7 +543,7 @@
     },
     {
       "id": 11,
-      "type": "timeseries",
+      "type": "bargauge",
       "title": "Busiest access points",
       "datasource": {
         "type": "prometheus",
@@ -524,25 +562,49 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(10, aruba_ap_clients * on (serial) group_left (name) aruba_ap_info{site=~\"$site\"})",
-          "legendFormat": "{{name}}"
+          "expr": "topk(10, last_over_time(aruba_ap_clients[15m]) * on (serial) group_left (name) max by (serial, name) (last_over_time(aruba_ap_info{site=~\"$site\"}[15m])))",
+          "legendFormat": "{{name}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "none",
+          "min": 0,
+          "noValue": "No data",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "orientation": "horizontal",
+        "displayMode": "basic",
+        "valueMode": "color",
+        "showUnfilled": true,
+        "namePlacement": "left",
+        "sizing": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
-      }
+      },
+      "description": "The 10 access points with the most clients now."
     },
     {
       "id": 12,
@@ -565,14 +627,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(aruba_ap_up == 0) * on (serial) group_left (name, model, site) aruba_ap_info{site=~\"$site\"}",
+          "expr": "(last_over_time(aruba_ap_up[15m]) == 0) * on (serial) group_left (name, model, site) max by (serial, name, model, site) (last_over_time(aruba_ap_info{site=~\"$site\"}[15m]))",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "None"
+        },
         "overrides": []
       },
       "options": {},
@@ -582,8 +646,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -623,14 +687,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "aruba_switch_info{site=~\"$site\"}",
+          "expr": "last_over_time(aruba_switch_info{site=~\"$site\"}[45m])",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "No switch"
+        },
         "overrides": []
       },
       "options": {},
@@ -640,8 +706,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -668,14 +734,16 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "aruba_gateway_info{site=~\"$site\"}",
+          "expr": "last_over_time(aruba_gateway_info{site=~\"$site\"}[45m])",
           "legendFormat": "",
           "instant": true,
           "format": "table"
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "No gateway"
+        },
         "overrides": []
       },
       "options": {},
@@ -685,8 +753,8 @@
           "options": {
             "excludeByName": {
               "Time": true,
-              "__name__": true,
-              "Value": true
+              "Value": true,
+              "__name__": true
             }
           }
         }
@@ -715,7 +783,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 18,
         "x": 0,
         "y": 32
       },
@@ -749,8 +817,74 @@
         }
       ],
       "fieldConfig": {
-        "defaults": {},
-        "overrides": []
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^limit$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^used by Tapyr$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "blue"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "^used by others$"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "orange"
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
         "legend": {
@@ -767,16 +901,16 @@
     },
     {
       "id": 18,
-      "type": "timeseries",
-      "title": "Remaining calls today",
+      "type": "stat",
+      "title": "Daily quota left",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
-        "x": 12,
+        "w": 6,
+        "x": 18,
         "y": 32
       },
       "targets": [
@@ -786,25 +920,53 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "max(tapyr_budget_remaining{provider=\"aruba-central-classic\", limit=\"daily\"})",
-          "legendFormat": "remaining"
+          "expr": "min(tapyr_budget_remaining{provider=\"aruba-central-classic\", limit=\"daily\"} / tapyr_budget_limit{provider=\"aruba-central-classic\", limit=\"daily\"})",
+          "legendFormat": ""
         }
       ],
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 0.1
+              },
+              {
+                "color": "green",
+                "value": 0.25
+              }
+            ]
+          }
+        },
         "overrides": []
       },
       "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "textMode": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
         }
-      }
+      },
+      "description": "Share of the daily quota still available to Tapyr (its share of the quota, less what it and other clients spent)."
     }
   ]
 }

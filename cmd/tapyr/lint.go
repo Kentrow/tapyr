@@ -484,8 +484,8 @@ func packageMetrics(pkg *config.Package) map[string]bool {
 var identifierPattern = regexp.MustCompile(`[a-zA-Z_:][a-zA-Z0-9_:]*`)
 
 // lintDashboards checks the Grafana dashboards of a package: valid JSON, a
-// datasource variable, and queries on metrics of the package or tapyr_
-// self-metrics only.
+// datasource variable, queries on metrics of the package or tapyr_
+// self-metrics only, and the conventions of panelProblems.
 func lintDashboards(pkg *config.Package, metrics map[string]bool) []string {
 	files, err := fs.Glob(pkg.FS, "dashboards/*.json")
 	if err != nil || len(files) == 0 {
@@ -547,6 +547,7 @@ func lintDashboards(pkg *config.Package, metrics map[string]bool) []string {
 			}
 		}
 		walk(d.Panels)
+		problems = append(problems, panelProblems(f, d.Panels)...)
 		for _, id := range slices.Sorted(maps.Keys(unknown)) {
 			problems = append(problems, fmt.Sprintf("%s: %s is not a metric of the package", f, id))
 		}
@@ -555,10 +556,34 @@ func lintDashboards(pkg *config.Package, metrics map[string]bool) []string {
 }
 
 type dashboardPanel struct {
+	Type        string `json:"type"`
+	Title       string `json:"title"`
+	FieldConfig struct {
+		Defaults struct {
+			Thresholds json.RawMessage `json:"thresholds"`
+		} `json:"defaults"`
+	} `json:"fieldConfig"`
 	Targets []struct {
 		Expr string `json:"expr"`
 	} `json:"targets"`
 	Panels []dashboardPanel `json:"panels"`
+}
+
+// panelProblems checks the dashboard conventions a reader can miss
+// (docs/providers.md, "Dashboard conventions"): a stat, gauge or bar gauge
+// declares its thresholds, else Grafana colors it red from 80.
+func panelProblems(file string, panels []dashboardPanel) []string {
+	var problems []string
+	for _, p := range panels {
+		switch p.Type {
+		case "stat", "gauge", "bargauge":
+			if len(p.FieldConfig.Defaults.Thresholds) == 0 {
+				problems = append(problems, fmt.Sprintf("%s: panel %q has no thresholds (Grafana colors it red from 80)", file, p.Title))
+			}
+		}
+		problems = append(problems, panelProblems(file, p.Panels)...)
+	}
+	return problems
 }
 
 // stripStrings removes quoted strings (label values, regexps) and
