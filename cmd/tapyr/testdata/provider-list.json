@@ -256,6 +256,80 @@
       ]
     },
     {
+      "name": "juniper-mist",
+      "version": "0.1.0",
+      "displayName": "Juniper Mist",
+      "description": "Juniper Mist cloud REST API (access points, switches, WAN edge)",
+      "docs": "https://networkingdocs.hpe.com/documentation/us/en/software/mist/automation-integration/topics/concept/restful-api-overview.html",
+      "categories": [
+        "wireless",
+        "network"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "simulator",
+        "notes": "Built from the Mist documentation (rate limits, pagination, regional clouds) and the Mist OpenAPI description (github.com/mistsys/mist_openapi, 2610.1.0); not run against a real Mist organization yet"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/juniper-mist/README.md",
+      "simulator": true,
+      "auth": "header",
+      "templates": [
+        {
+          "name": "mist-alarms",
+          "path": "/api/v1/orgs/{orgId}/alarms/count",
+          "defaultInterval": "15m",
+          "metrics": [
+            "mist_alarms_last_day"
+          ]
+        },
+        {
+          "name": "mist-devices",
+          "path": "/api/v1/orgs/{orgId}/stats/devices",
+          "defaultInterval": "5m",
+          "metrics": [
+            "mist_device_clients",
+            "mist_device_cpu_usage_ratio",
+            "mist_device_info",
+            "mist_device_memory_usage_ratio",
+            "mist_device_up",
+            "mist_device_uptime_seconds"
+          ]
+        },
+        {
+          "name": "mist-sites",
+          "path": "/api/v1/orgs/{orgId}/stats/sites",
+          "defaultInterval": "15m",
+          "metrics": [
+            "mist_site_clients",
+            "mist_site_devices",
+            "mist_site_devices_connected",
+            "mist_site_info"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "hourly",
+          "kind": "quota",
+          "value": "5000 per hour",
+          "scope": [
+            "credential"
+          ],
+          "description": "5000 API calls per hour, reset at the hourly boundary (mist.com, API rate limiting), counted per organization API token (mist.com, Org API token; a user token counts for the whole user account); 429 when exceeded (HPE Mist documentation, REST API HTTP response codes)",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://www.mist.com/documentation/api-rate-limiting/",
+            "date": "2026-11"
+          }
+        }
+      ]
+    },
+    {
       "name": "meraki-dashboard",
       "version": "0.1.0",
       "displayName": "Cisco Meraki Dashboard",

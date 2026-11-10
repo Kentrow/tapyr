@@ -1,0 +1,54 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: mist-sites
+spec:
+  provider: juniper-mist
+  # Device and client counts of every site in one list: 4 calls an hour per
+  # 1000 sites.
+  defaultInterval: 15m
+  defaultPriority: normal
+  request:
+    path: /api/v1/orgs/{orgId}/stats/sites
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: response.body
+    metrics:
+      - name: mist_site_devices
+        help: Devices of the site, by type
+        value: toFloat(default(item.num_ap, 0))
+        labels: { site_id: item.id, type: "'ap'" }
+      - name: mist_site_devices
+        help: Devices of the site, by type
+        value: toFloat(default(item.num_switch, 0))
+        labels: { site_id: item.id, type: "'switch'" }
+      - name: mist_site_devices
+        help: Devices of the site, by type
+        value: toFloat(default(item.num_gateway, 0))
+        labels: { site_id: item.id, type: "'gateway'" }
+      - name: mist_site_devices_connected
+        help: Devices of the site connected to the Mist cloud, by type
+        value: toFloat(default(item.num_ap_connected, 0))
+        labels: { site_id: item.id, type: "'ap'" }
+      - name: mist_site_devices_connected
+        help: Devices of the site connected to the Mist cloud, by type
+        value: toFloat(default(item.num_switch_connected, 0))
+        labels: { site_id: item.id, type: "'switch'" }
+      - name: mist_site_devices_connected
+        help: Devices of the site connected to the Mist cloud, by type
+        value: toFloat(default(item.num_gateway_connected, 0))
+        labels: { site_id: item.id, type: "'gateway'" }
+      - name: mist_site_clients
+        help: Clients counted in the site
+        value: toFloat(item.num_clients)
+        labels: { site_id: item.id }
+        skipIf: "!has(item.num_clients) || item.num_clients == null"
+    info:
+      - name: mist_site_info
+        help: Descriptive attributes of a site
+        labels:
+          site_id: item.id
+          name: "default(item.name, '')"
+          country_code: "default(item.country_code, '')"
+          timezone: "default(item.timezone, '')"

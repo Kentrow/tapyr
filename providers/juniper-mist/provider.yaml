@@ -1,0 +1,73 @@
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata:
+  name: juniper-mist
+  version: 0.1.0
+  description: Juniper Mist cloud REST API (access points, switches, WAN edge)
+  docs: https://networkingdocs.hpe.com/documentation/us/en/software/mist/automation-integration/topics/concept/restful-api-overview.html
+  displayName: Juniper Mist
+  categories: [wireless, network]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: simulator
+    notes: >-
+      Built from the Mist documentation (rate limits, pagination, regional
+      clouds) and the Mist OpenAPI description (github.com/mistsys/mist_openapi,
+      2610.1.0); not run against a real Mist organization yet
+spec:
+  baseURL: '{{ .params.baseURL | default "https://api.mist.com" | trimSuffix "/" }}'
+  params:
+    - name: baseURL
+      description: >-
+        API host of the Mist cloud of the organization: https://api.mist.com
+        (default, Global 01), or a regional one such as https://api.eu.mist.com
+        or https://api.gc1.mist.com (see the README)
+    - name: orgId
+      required: true
+      description: Organization ID (Organization > Settings in the Mist portal)
+  secrets:
+    - name: apiToken
+      required: true
+      description: Organization API token with a read-only role (Organization > Settings > API Token)
+  auth:
+    type: header
+    header:
+      name: Authorization
+      value: { secret: apiToken }
+      format: "Token {value}"
+  defaults:
+    headers:
+      Accept: application/json
+    timeout: 30s
+  # Lists are pages of up to 1000 items (limit and page). Mist also sends the
+  # total in X-Page-Total; the stop on a short page needs no header.
+  pagination:
+    type: page
+    page:
+      pageParam: page
+      sizeParam: limit
+      pageSize: 1000
+      start: 1
+  limits:
+    - name: hourly
+      description: >-
+        5000 API calls per hour, reset at the hourly boundary (mist.com, API
+        rate limiting), counted per organization API token (mist.com, Org API
+        token; a user token counts for the whole user account); 429 when
+        exceeded (HPE Mist documentation, REST API HTTP response codes)
+      source:
+        kind: vendor-docs
+        url: https://www.mist.com/documentation/api-rate-limiting/
+        date: 2026-11
+      kind: quota
+      max: 5000
+      window: { period: hour, timezone: UTC }
+      scope: { by: [credential] }
+  errors:
+    rateLimited:
+      statuses: [429]
+      # No Retry-After is documented; the quota resets at the next hour.
+      defaultPenalty: 60s
+    authFailed:
+      statuses: [401]

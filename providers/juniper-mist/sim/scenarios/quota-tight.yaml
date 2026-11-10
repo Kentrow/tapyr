@@ -1,0 +1,12 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: quota-tight
+  description: >-
+    The API token is shared with a script that spends 4990 of its 5000 calls
+    an hour: about 10 calls are left, fewer than the 20 the default jobs
+    need, so Tapyr must stretch them.
+spec:
+  steps:
+    - at: 0s
+      externalConsumption: { limit: hourly, ratePerHour: 4990 }

@@ -1,0 +1,70 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: mist-devices
+spec:
+  provider: juniper-mist
+  # One organization-wide list of every access point, switch and gateway:
+  # 12 calls an hour per 1000 devices.
+  defaultInterval: 5m
+  defaultPriority: high
+  request:
+    path: /api/v1/orgs/{orgId}/stats/devices
+    query: { type: all }
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: response.body
+    metrics:
+      - name: mist_device_up
+        help: Device connected to the Mist cloud (1 connected, 0 otherwise)
+        value: "default(item.status, '') == 'connected'"
+        labels: { mac: item.mac }
+      - name: mist_device_uptime_seconds
+        help: Time since the device last booted
+        unit: seconds
+        value: toFloat(item.uptime)
+        labels: { mac: item.mac }
+        skipIf: "!has(item.uptime) || item.uptime == null"
+      - name: mist_device_clients
+        help: Wireless clients connected to the access point
+        value: toFloat(item.num_clients)
+        labels: { mac: item.mac }
+        skipIf: "!has(item.num_clients) || item.num_clients == null"
+      # Access points report cpu_util (percent), switches and gateways a
+      # cpu_stat breakdown with its idle percent.
+      - name: mist_device_cpu_usage_ratio
+        help: CPU utilization of the device
+        unit: ratio
+        value: >-
+          has(item.cpu_util) && item.cpu_util != null
+            ? toFloat(item.cpu_util) / 100.0
+            : (100.0 - toFloat(item.cpu_stat.idle)) / 100.0
+        labels: { mac: item.mac }
+        skipIf: >-
+          !(has(item.cpu_util) && item.cpu_util != null) &&
+          !(has(item.cpu_stat) && item.cpu_stat != null && has(item.cpu_stat.idle))
+      # Access points report used and total kilobytes, switches and gateways
+      # a usage percent.
+      - name: mist_device_memory_usage_ratio
+        help: Memory utilization of the device
+        unit: ratio
+        value: >-
+          has(item.mem_used_kb) && item.mem_used_kb != null && has(item.mem_total_kb) && item.mem_total_kb != null
+            ? toFloat(item.mem_used_kb) / toFloat(item.mem_total_kb)
+            : toFloat(item.memory_stat.usage) / 100.0
+        labels: { mac: item.mac }
+        skipIf: >-
+          !(has(item.mem_used_kb) && item.mem_used_kb != null && has(item.mem_total_kb) && item.mem_total_kb != null && item.mem_total_kb > 0) &&
+          !(has(item.memory_stat) && item.memory_stat != null && has(item.memory_stat.usage))
+    info:
+      - name: mist_device_info
+        help: Descriptive attributes of a device
+        labels:
+          mac: item.mac
+          name: "default(item.name, '')"
+          type: "default(item.type, '')"
+          model: "default(item.model, '')"
+          serial: "default(item.serial, '')"
+          version: "default(item.version, '')"
+          site_id: "default(item.site_id, '')"

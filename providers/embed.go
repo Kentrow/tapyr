@@ -8,5 +8,5 @@ import "embed"
 // (categories.yaml). A new package directory must be added to the embed
 // pattern below.
 //
-//go:embed aruba-central-classic example-sim meraki-dashboard teltonika-rms teltonika-rutos categories.yaml
+//go:embed aruba-central-classic example-sim juniper-mist meraki-dashboard teltonika-rms teltonika-rutos categories.yaml
 var FS embed.FS

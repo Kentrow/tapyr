@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `juniper-mist`, a provider package for the Juniper Mist cloud API: device status, uptime, clients, CPU and memory of access points, switches and gateways, device and client counts per site, and alarm counts by severity, from organization-level endpoints (about 20 calls an hour of the 5000 per API token). Validated against its simulator only.
 - `format` on the `header` auth type, for APIs that expect a scheme name before the key (`format: "Token {value}"` sends `Authorization: Token <key>`). The formatted value is redacted like the secret.
 
 ### Changed
