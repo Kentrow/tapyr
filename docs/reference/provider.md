@@ -189,6 +189,7 @@ HeaderAuth sends a static credential in a request header.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `format` | string |  | Format of the header value; {value} is replaced by the value, for example "Token {value}". Default `{value}`. |
 | `name` | string | yes | Name of the header, for example X-API-Key. Minimum length 1. |
 | `value` | [Value](#value) | yes | Value of the header, usually {secret: name}. |
 

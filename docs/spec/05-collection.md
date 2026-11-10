@@ -21,7 +21,7 @@ Token requests issued by authenticators go through the budget engine with `authR
 | Type | Config | Notes |
 |---|---|---|
 | `none` | - | |
-| `header` | `name`, `value` (secret or template) | Static API key header, e.g. `X-Cisco-Meraki-API-Key` |
+| `header` | `name`, `value` (literal or secret), `format` (optional, `{value}` replaced by the value) | Static API key header, e.g. `X-Cisco-Meraki-API-Key`, or `Authorization: Token <key>` with `format: "Token {value}"` |
 | `bearer` | `token` (secret) | `Authorization: Bearer <token>` |
 | `basic` | `username`, `password` | |
 | `oauth2_client_credentials` | `tokenURL`, `clientId`, `clientSecret`, `scopes`, `audience`, `extraParams`, `authStyle` (header or body) | Token cached until `expires_in - skew`; persisted |

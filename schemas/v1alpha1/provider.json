@@ -307,6 +307,11 @@
       "additionalProperties": false,
       "description": "HeaderAuth sends a static credential in a request header.",
       "properties": {
+        "format": {
+          "default": "{value}",
+          "description": "Format of the header value; {value} is replaced by the value, for\nexample \"Token {value}\".",
+          "type": "string"
+        },
         "name": {
           "description": "Name of the header, for example X-API-Key.",
           "minLength": 1,

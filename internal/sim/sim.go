@@ -879,9 +879,13 @@ func acceptor(a *config.Auth, sa *config.SimulationAuth, is *issuer, plugin auth
 		}, nil
 	case config.AuthHeader:
 		name := a.Header.Name
+		accepted := make([]string, len(accept.Header))
+		for i, v := range accept.Header {
+			accepted[i] = a.Header.Formatted(v)
+		}
 		return func(r *http.Request) (string, bool) {
 			v := r.Header.Get(name)
-			return v, oneOf(v, accept.Header)
+			return v, oneOf(v, accepted)
 		}, nil
 	case config.AuthBasic:
 		return func(r *http.Request) (string, bool) {

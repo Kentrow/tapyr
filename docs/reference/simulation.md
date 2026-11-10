@@ -78,7 +78,7 @@ SimulationCredentials are accepted credentials per auth type.
 | `basic` | list of [SimulationBasicCredential](#simulationbasiccredential) |  | Basic credentials accepted with auth type basic. |
 | `bearer` | list of string |  | Bearer tokens accepted with auth type bearer. |
 | `clients` | list of [SimulationClient](#simulationclient) |  | Clients accepted by the token endpoint with auth type oauth2\_client\_credentials. |
-| `header` | list of string |  | Header values accepted with auth type header. |
+| `header` | list of string |  | Header values accepted with auth type header, before the format of the provider auth is applied. |
 | `logins` | list of [SimulationBasicCredential](#simulationbasiccredential) |  | Logins accepted by the login endpoint with auth type session\_login: the login body must carry both values. |
 | `plugin` | object |  | Plugin holds the credentials accepted by the simulator side of an auth plugin (type plugin), read by the plugin. |
 

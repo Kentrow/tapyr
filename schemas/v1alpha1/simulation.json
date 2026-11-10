@@ -115,7 +115,7 @@
           "type": "array"
         },
         "header": {
-          "description": "Header values accepted with auth type header.",
+          "description": "Header values accepted with auth type header, before the format of\nthe provider auth is applied.",
           "items": {
             "type": "string"
           },
