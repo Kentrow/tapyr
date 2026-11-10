@@ -195,9 +195,10 @@ func keyRule(key string) (Rule, bool) {
 		return RuleEmail, true
 	case slices.Contains([]string{"lat", "lng", "lon", "latitude", "longitude"}, k):
 		return RuleCoordinate, true
-	case strings.Contains(k, "address") || slices.Contains([]string{"street", "city", "zip", "postcode", "postalcode"}, k):
+	case strings.Contains(k, "address") || slices.Contains([]string{"street", "city", "zip", "zipcode", "postcode", "postalcode"}, k):
 		return RuleAddress, true
-	case k == "name" || strings.HasSuffix(k, "name"):
+	// A site is usually referenced by its name (Aruba Central devices).
+	case k == "name" || strings.HasSuffix(k, "name") || k == "site":
 		return RuleName, true
 	case k == "id" || strings.HasSuffix(key, "_id") || strings.HasSuffix(key, "Id") || strings.HasSuffix(key, "ID") ||
 		k == "uuid" || k == "cellid":

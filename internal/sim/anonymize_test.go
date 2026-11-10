@@ -131,6 +131,37 @@ func TestAnonymizer(t *testing.T) {
 	}
 }
 
+// TestAnonymizerSiteAndZipcode is a regression test: a recording of Aruba
+// Central kept the site name of every device (key site) and the zip code of
+// the sites (key zipcode).
+func TestAnonymizerSiteAndZipcode(t *testing.T) {
+	doc, err := mapping.DecodeJSON([]byte(`{
+	  "aps": [{"serial": "CN0000001", "site": "North campus", "status": "Up"}],
+	  "sites": [{"site_id": 7, "site_name": "North campus", "zipcode": "99999", "state": "online"}]
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, err := NewAnonymizer(AnonymizeRules{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := a.Document(doc).(map[string]any)
+	ap := out["aps"].([]any)[0].(map[string]any)
+	site := out["sites"].([]any)[0].(map[string]any)
+	if ap["site"] == "North campus" || site["zipcode"] == "99999" {
+		t.Fatalf("site or zipcode kept: %v %v", ap, site)
+	}
+	// The site of a device keeps pointing at its site.
+	if ap["site"] != site["site_name"] {
+		t.Errorf("site = %v, site_name = %v", ap["site"], site["site_name"])
+	}
+	// state is often a status (online, Up): it is left to the review.
+	if ap["status"] != "Up" || site["state"] != "online" {
+		t.Errorf("status or state changed: %v %v", ap, site)
+	}
+}
+
 // TestPseudonymNeverEqualsValue checks every value of up to 3 digits, and
 // short letter values, under many keys: none comes out unchanged.
 func TestPseudonymNeverEqualsValue(t *testing.T) {
