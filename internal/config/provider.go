@@ -1,6 +1,10 @@
 package config
 
-import "github.com/invopop/jsonschema"
+import (
+	"strings"
+
+	"github.com/invopop/jsonschema"
+)
 
 // Provider describes an API family once: base URL, auth, pagination, error
 // semantics and every rate limit. Written by provider package authors.
@@ -136,6 +140,17 @@ type HeaderAuth struct {
 	Name string `json:"name" jsonschema:"required,minLength=1"`
 	// Value of the header, usually {secret: name}.
 	Value Value `json:"value" jsonschema:"required"`
+	// Format of the header value; {value} is replaced by the value, for
+	// example "Token {value}".
+	Format string `json:"format,omitempty" jsonschema:"default={value}"`
+}
+
+// Formatted returns the header value for value, with Format applied.
+func (h *HeaderAuth) Formatted(value string) string {
+	if h.Format == "" {
+		return value
+	}
+	return strings.ReplaceAll(h.Format, "{value}", value)
 }
 
 // BearerAuth sends Authorization: Bearer <token>.

@@ -1,0 +1,1 @@
+testdata/invalid/auth-header-format.yaml:9:68: spec.auth.header.format: format must contain {value}

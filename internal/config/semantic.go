@@ -260,6 +260,9 @@ func (c *checker) checkAuth(a at, auth *Auth, p *Provider) {
 	switch {
 	case auth.Type == AuthHeader && auth.Header != nil:
 		secret(a.child("header", "value"), auth.Header.Value)
+		if f := auth.Header.Format; f != "" && !strings.Contains(f, "{value}") {
+			c.errorf(a.child("header", "format"), "format must contain {value}")
+		}
 	case auth.Type == AuthBearer && auth.Bearer != nil:
 		secret(a.child("bearer", "token"), auth.Bearer.Token)
 	case auth.Type == AuthBasic && auth.Basic != nil:

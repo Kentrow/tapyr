@@ -47,7 +47,7 @@ spec:
 ```
 
 - `basePath` (default `/`) is the path prefix of the API (the path part of the provider base URL); routes are relative to it.
-- Credentials are checked the way the `Provider` declares its auth (`bearer`: `Authorization: Bearer <one of accept.bearer>`; `header`: the declared header with one of `accept.header`; `basic`: one of `accept.basic`). Wrong or missing credentials get the provider's `authFailed` status.
+- Credentials are checked the way the `Provider` declares its auth (`bearer`: `Authorization: Bearer <one of accept.bearer>`; `header`: the declared header with one of `accept.header`, formatted with the `format` of the auth; `basic`: one of `accept.basic`). Wrong or missing credentials get the provider's `authFailed` status.
 - A route with `pagination` serves the items of its fixture (a JSON array) page by page. The pagination parameters are not redeclared: they come from the job templates requesting that path, or from the provider default.
 - Fixtures are JSON templates (Go `text/template` with helpers: `range` over inventory, deterministic pseudo-random values, counters increasing with time, timestamps from the simulated clock).
 - Static JSON fixtures (e.g. recorded) are supported directly.

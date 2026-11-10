@@ -28,6 +28,13 @@ func TestNew(t *testing.T) {
 			wantHeader: map[string]string{"X-Api-Key": "k3y"},
 		},
 		{
+			name: "header with a format",
+			auth: &config.Auth{Type: config.AuthHeader, Header: &config.HeaderAuth{
+				Name: "Authorization", Value: config.Value{Secret: "key"}, Format: "Token {value}",
+			}},
+			wantHeader: map[string]string{"Authorization": "Token k3y"},
+		},
+		{
 			name:       "header literal",
 			auth:       &config.Auth{Type: config.AuthHeader, Header: &config.HeaderAuth{Name: "X-Client", Value: config.Value{Literal: "tapyr"}}},
 			wantHeader: map[string]string{"X-Client": "tapyr"},

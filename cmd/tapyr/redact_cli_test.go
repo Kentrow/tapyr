@@ -16,6 +16,15 @@ import (
 // is redacted in the logs (assertNoSecrets checks every line) and in what
 // the status API serves (the runs, the last run of the job).
 func TestRunRedactsSecrets(t *testing.T) {
+	for _, tt := range []struct{ name, auth, scheme string }{
+		{"bearer", `{ type: bearer, bearer: { token: { secret: apiKey } } }`, "Bearer"},
+		{"header with a format", `{ type: header, header: { name: Authorization, value: { secret: apiKey }, format: "Token {value}" } }`, "Token"},
+	} {
+		t.Run(tt.name, func(t *testing.T) { testRunRedactsSecrets(t, tt.auth, tt.scheme) })
+	}
+}
+
+func testRunRedactsSecrets(t *testing.T, auth, scheme string) {
 	requests := make(chan struct{}, 16)
 	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -33,7 +42,7 @@ metadata: { name: echo, version: 0.1.0 }
 spec:
   baseURL: %q
   secrets: [{ name: apiKey, required: true }]
-  auth: { type: bearer, bearer: { token: { secret: apiKey } } }
+  auth: %s
 ---
 apiVersion: tapyr/v1alpha1
 kind: Account
@@ -63,7 +72,7 @@ spec:
   server: { listen: "127.0.0.1:0" }
   state: { path: %q }
   log: { format: json }
-`, api.URL, filepath.Join(dir, "tapyr.db"))
+`, api.URL, auth, filepath.Join(dir, "tapyr.db"))
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +99,7 @@ spec:
 		if strings.Contains(body, "echo-api-key-1234") {
 			t.Errorf("%s serves the secret: %s", path, body)
 		}
-		if path == "/api/v1/jobs/items/runs" && !strings.Contains(body, "invalid header Bearer [REDACTED]") {
+		if path == "/api/v1/jobs/items/runs" && !strings.Contains(body, "invalid header "+scheme+" [REDACTED]") {
 			t.Errorf("%s does not serve the redacted error: %s", path, body)
 		}
 		// The failed run still counts the request it sent.
@@ -100,7 +109,7 @@ spec:
 	}
 	// The shutdown waits for the run in flight, which logs its failure.
 	res := stop()
-	if !strings.Contains(res.stderr, `invalid header Bearer [REDACTED]`) {
+	if !strings.Contains(res.stderr, "invalid header "+scheme+" [REDACTED]") {
 		t.Errorf("the redacted error is not logged:\n%s", tail(res.stderr, 10))
 	}
 }

@@ -213,6 +213,26 @@ func TestAuthTypesAndVariables(t *testing.T) {
 			t.Errorf("missing fixture: status %d", resp.StatusCode)
 		}
 	})
+	t.Run("header with a format", func(t *testing.T) {
+		s, err := New(pkg(t, `{ type: header, header: { name: Authorization, value: "x", format: "Token {value}" } }`, routes, files), Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		srv := httptest.NewServer(s.Handler())
+		defer srv.Close()
+		for value, want := range map[string]int{"Token k1": http.StatusCreated, "k1": http.StatusForbidden, "Bearer k1": http.StatusForbidden} {
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, srv.URL+"/orgs/o1/devices", http.NoBody)
+			req.Header.Set("Authorization", value)
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != want {
+				t.Errorf("Authorization %q: status %d, want %d", value, resp.StatusCode, want)
+			}
+		}
+	})
 	t.Run("basic", func(t *testing.T) {
 		s, err := New(pkg(t, "{ type: basic, basic: { username: u, password: p } }", routes, files), Options{})
 		if err != nil {

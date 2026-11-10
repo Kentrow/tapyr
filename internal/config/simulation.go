@@ -81,7 +81,8 @@ type SimulationAuth struct {
 type SimulationCredentials struct {
 	// Bearer tokens accepted with auth type bearer.
 	Bearer []string `json:"bearer,omitempty"`
-	// Header values accepted with auth type header.
+	// Header values accepted with auth type header, before the format of
+	// the provider auth is applied.
 	Header []string `json:"header,omitempty"`
 	// Basic credentials accepted with auth type basic.
 	Basic []SimulationBasicCredential `json:"basic,omitempty"`

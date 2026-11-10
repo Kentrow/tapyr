@@ -43,7 +43,7 @@ func New(a *config.Auth, secrets Secrets) (Authenticator, error) {
 		if err != nil {
 			return nil, fmt.Errorf("auth header value: %w", err)
 		}
-		return header{name: a.Header.Name, value: v}, nil
+		return header{name: a.Header.Name, value: secret.New(a.Header.Formatted(v.Reveal()))}, nil
 	case config.AuthBearer:
 		v, err := resolve(a.Bearer.Token, secrets)
 		if err != nil {
