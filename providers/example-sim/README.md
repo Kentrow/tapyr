@@ -45,6 +45,7 @@ The simulator serves static fixtures under `/api/v1`: 3 sites, 5 devices, and th
 | `default` | No fault |
 | `quota-tight` | The daily quota drops to 600 calls |
 | `bad-day` | Another client consumes 60 calls per hour; from 2h to 2h20, 30% of `/devices` requests fail with 503 |
+| `quota-jump` | A daily quota of 2000 calls; another client spends 300 of them between 12h and 12h10, then 600 more between 18h and 18h10 |
 | `inventory-change` | After 2h, `site-c` is closed, `site-d` opens, `site-a` loses a network and `site-b` gains one |
 
 ```sh

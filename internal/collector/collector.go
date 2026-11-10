@@ -209,7 +209,7 @@ func (c *Collector) Run(ctx context.Context, cfg *config.Config, graph *runtime.
 		return err
 	}
 	restored := g.engine.Restore(entries)
-	c.start(ctx, g, nil)
+	c.start(ctx, g, nil, reasonStart)
 	c.metrics.ConfigLoaded(c.clock.Now(), true)
 	c.recordLoad(cfg, nil)
 	active, dynamic := g.disc.counts()
@@ -364,7 +364,7 @@ func (c *Collector) reload(ctx context.Context) error {
 	resume := old.sched.Next()
 	next.engine.Restore(old.engine.Export())
 	c.applyOutputs(ctx, graph)
-	c.start(ctx, next, resume)
+	c.start(ctx, next, resume, reasonReload)
 	after := next.disc.activeKeys()
 	retired := 0
 	for key := range before {

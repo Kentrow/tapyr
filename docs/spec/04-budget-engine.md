@@ -185,7 +185,7 @@ The planner turns desired intervals into **effective intervals** that fit every 
 3. Otherwise, stretch intervals starting from the lowest priority class: within a class, apply a common multiplier `k >= 1` to all jobs of that class contributing to the scope, choose the smallest `k` that makes the sum fit (or stretch up to `settings.budget.maxStretch`, default 12x, then move to the next class).
 4. `critical` jobs are never stretched. If critical jobs alone do not fit, the plan is **infeasible**: `validate` and `plan` report an error, `run` starts anyway with a loud warning and the status API flags it.
 5. A job contributing to several quota scopes takes the largest stretch required by any of them.
-6. Mid-window replanning (every `replanInterval`, on reload, on inventory change, on header-learned max change): recompute using the **remaining** budget and the **remaining** time in the window, so a burst of failures in the morning tightens the afternoon instead of exhausting the quota. The remaining budget is `min(U - c, r_obs)` (see Header sync), less the reserve, less the consumption of other clients projected to the end of a calendar window at their pace so far (`external * time_left / time_elapsed`, the elapsed time counting as at least 1/24 of the window): another integration sharing the quota keeps spending until the reset.
+6. Mid-window replanning (every `replanInterval`, on reload, on inventory change, on header-learned max change, and when the current plan is projected to exhaust a quota before its reset, see Projections): recompute using the **remaining** budget and the **remaining** time in the window, so a burst of failures in the morning tightens the afternoon instead of exhausting the quota. The remaining budget is `min(U - c, r_obs)` (see Header sync), less the reserve, less the consumption of other clients projected to the end of a calendar window at their pace so far (`external * time_left / time_elapsed`, the elapsed time counting as at least 1/24 of the window): another integration sharing the quota keeps spending until the reset.
 7. Rate-limit feasibility: if a run's estimated calls cannot complete within its interval given applicable rate limits, the interval is stretched to the minimum feasible value.
 
 ### Outputs
@@ -196,11 +196,19 @@ The same planner code runs offline in `tapyr plan`, which can take inventory siz
 
 ## Projections
 
-For each quota scope, the engine continuously computes:
+For each quota scope of a fixed window, the projected exhaustion time (`tapyr_budget_exhaustion_eta_seconds`, absent if not projected to exhaust) extrapolates the consumption rate since the window start.
 
-- consumption rate over the last 15 minutes and since window start,
-- projected end-of-window consumption,
-- projected exhaustion time (`tapyr_budget_exhaustion_eta_seconds`, absent if not projected to exhaust).
+### Replan on projection
+
+Between two `replanInterval`, the collector checks that the current plan still fits (`settings.budget.replanOnProjection`, on by default):
+
+- The engine signals every change of the consumption of a quota: a granted request, and a remaining reported by a response header. The check runs on such a signal, at most once a minute; a signal within the minute is checked at the next one (the next request), so no timer is added.
+- The check projects the consumption of the **current** effective intervals until the end of every quota window (`planner.Evaluate`, same inputs as the online plan) and compares it with the remaining budget of the online plan (step 6 of the algorithm, external consumption projected to the reset included). Without quota headers, it only sees Tapyr's own consumption: more pages or retries than planned.
+- A scope whose projection exceeds its budget by more than 10% triggers a replan at once, at most once every 5 minutes per scope. The new plan fits the budget exactly; a later jump of external consumption crosses the 10% again.
+- A scope still infeasible after its replan (maximum stretch reached, critical jobs alone over budget) is disarmed until its projection fits its budget again, so that a plan that cannot fit never replans in a loop.
+- Only a tightening triggers it: a relaxation waits for the next `replanInterval`.
+
+Every plan computation counts in `tapyr_plan_recomputations_total{reason}`: `start`, `reload`, `interval`, `limit_learned`, `inventory` or `projection`.
 
 ## Implementation notes
 

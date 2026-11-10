@@ -122,6 +122,7 @@ Before running, and again while running, the planner checks that the jobs fit ev
 - When it does not, the planner **stretches** the intervals, lowest priority first: all the `low` jobs of the scope by a common factor, up to 12 times (`settings.budget.maxStretch`), then the `normal` ones, then `high`. The interval actually used is the **effective interval**.
 - `critical` jobs are never stretched. When they alone exceed a quota, the plan is **infeasible**: `tapyr plan` exits with code 3, and `tapyr run` starts anyway with a warning.
 - Every 15 minutes (`settings.budget.replanInterval`), and after a reload or an inventory change, the planner starts again from what is left in the window and from the pace of the external usage, so that a morning of retries tightens the afternoon instead of exhausting the quota.
+- Between two of these, when another client suddenly spends the same quota, or Tapyr needs more requests than planned, the current plan may no longer fit: Tapyr checks it at most once a minute and replans at once when it would exhaust a quota before the reset (`settings.budget.replanOnProjection`, on by default).
 
 `tapyr plan` runs the same planner offline, before you deploy a configuration: see the [getting started](getting-started.md#3-check-what-it-will-spend) guide.
 

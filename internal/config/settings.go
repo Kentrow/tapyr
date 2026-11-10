@@ -115,6 +115,11 @@ type BudgetSettings struct {
 	RetryReserve *Percent `json:"retryReserve,omitempty" jsonschema:"default=10%"`
 	// ReplanInterval is the period of mid-window replanning.
 	ReplanInterval Duration `json:"replanInterval,omitempty" jsonschema:"default=15m"`
+	// ReplanOnProjection replans at once when the consumption projected by
+	// the current plan until the end of a quota window exceeds its remaining
+	// budget, for example when another client starts spending the same
+	// quota, instead of waiting for the next replanInterval.
+	ReplanOnProjection *bool `json:"replanOnProjection,omitempty" jsonschema:"default=true"`
 	// MaxStretch caps the interval stretch factor applied to a priority
 	// class before the planner moves to the next class.
 	MaxStretch float64 `json:"maxStretch,omitempty" jsonschema:"minimum=1,default=12"`

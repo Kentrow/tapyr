@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"net/http"
 	"slices"
 	"strings"
@@ -46,6 +47,43 @@ type generation struct {
 	planAt time.Time
 	// planSig summarizes the plan applied, to publish its changes.
 	planSig string
+
+	// projection is the state of the projection check, owned by
+	// replanLoop: when it last ran, and the scopes that triggered a replan.
+	projection struct {
+		checked time.Time
+		scopes  map[string]*projectionScope
+	}
+}
+
+// Plan recomputation reasons (tapyr_plan_recomputations_total).
+const (
+	reasonStart        = "start"
+	reasonReload       = "reload"
+	reasonInterval     = "interval"
+	reasonLimitLearned = "limit_learned"
+	reasonInventory    = "inventory"
+	reasonProjection   = "projection"
+)
+
+// The projection check (docs/spec/04-budget-engine.md, Replan on
+// projection) runs at most once per projectionSpacing. A quota scope
+// triggers a replan when the consumption projected by the current intervals
+// exceeds its remaining budget by more than projectionMargin, at most once
+// per projectionCooldown.
+// A scope still over budget after its replan (a plan that cannot fit) is
+// disarmed until its projection fits again, so that it never replans in a
+// loop.
+const (
+	projectionSpacing  = time.Minute
+	projectionMargin   = 0.1
+	projectionCooldown = 5 * time.Minute
+)
+
+// projectionScope is the projection state of a quota scope.
+type projectionScope struct {
+	triggered time.Time
+	disarmed  bool
 }
 
 // newGeneration builds the pipeline of a graph; it is started by start.
@@ -84,7 +122,7 @@ func (c *Collector) newGeneration(cfg *config.Config, graph *runtime.Graph) (*ge
 // start schedules the instances of a generation and makes it current.
 // resume holds the next due times of the instances of the previous
 // generation, which keep their schedule.
-func (c *Collector) start(ctx context.Context, g *generation, resume map[string]time.Time) {
+func (c *Collector) start(ctx context.Context, g *generation, resume map[string]time.Time, reason string) {
 	opts := scheduler.Options{
 		Clock: c.clock, Jitter: g.graph.Settings.Collection.Jitter.Fraction(), Logger: c.logger, Runner: g.runJob,
 		OnRun: c.opts.OnRun, Sequence: &c.runs,
@@ -97,7 +135,7 @@ func (c *Collector) start(ctx context.Context, g *generation, resume map[string]
 	}
 	g.sched = scheduler.New(nil, opts)
 	g.disc.attach(ctx, g.sched, c.clock.Now())
-	g.replan(ctx)
+	g.replan(ctx, reason)
 	c.tokens.SetSender(g.executor)
 	c.gmu.Lock()
 	c.gen = g
@@ -119,8 +157,9 @@ func (g *generation) stop(ctx context.Context, canceledMsg string) {
 }
 
 // replanLoop recomputes the effective intervals every replanInterval,
-// whenever a response header changes the max of a quota and whenever
-// discovery adds or removes instances, with the remaining budget and time of
+// whenever a response header changes the max of a quota, whenever discovery
+// adds or removes instances, and when the current plan is projected to
+// exhaust a quota before its reset, with the remaining budget and time of
 // the current windows.
 func (g *generation) replanLoop(ctx context.Context) {
 	var tick <-chan time.Time
@@ -129,27 +168,100 @@ func (g *generation) replanLoop(ctx context.Context) {
 		defer ticker.Stop()
 		tick = ticker.C()
 	}
+	projection := g.graph.Settings.Budget.ReplanOnProjection == nil || *g.graph.Settings.Budget.ReplanOnProjection
 	for {
+		// No timer: a signal arriving within projectionSpacing of the last
+		// check is checked at the next one (the next request).
+		var quota <-chan struct{}
+		if projection {
+			quota = g.engine.QuotaChanged()
+		}
 		select {
 		case <-ctx.Done():
 			return
 		case <-tick:
+			g.replan(ctx, reasonInterval)
 		case <-g.engine.LimitLearned():
+			g.replan(ctx, reasonLimitLearned)
 		case <-g.disc.changed:
+			g.replan(ctx, reasonInventory)
+		case <-quota:
+			if now := g.c.clock.Now(); now.Sub(g.projection.checked) >= projectionSpacing {
+				g.projection.checked = now
+				g.checkProjection(ctx, now)
+			}
 		}
-		g.replan(ctx)
 	}
 }
 
-// replan applies an online plan to the scheduler.
-func (g *generation) replan(ctx context.Context) {
+// checkProjection replans when the current intervals are projected to spend
+// more than the remaining budget of a quota scope before its reset: another
+// client started spending the same quota, or Tapyr needs more pages or
+// retries than planned. Only a tightening triggers it; a relaxation waits for
+// the next replanInterval.
+func (g *generation) checkProjection(ctx context.Context, now time.Time) {
+	jobs, err := PlanInputs(ctx, g.disc.planEntries(), g.engine, g.c.store)
+	if err != nil {
+		g.c.logger.Warn("projection check", "component", "planner", "error", err)
+		return
+	}
+	intervals := make(map[string]time.Duration, len(jobs))
+	for _, j := range jobs {
+		intervals[j.Name] = g.sched.Interval(j.Name)
+	}
+	if g.projection.scopes == nil {
+		g.projection.scopes = map[string]*projectionScope{}
+	}
+	var over []planner.ScopePlan
+	for _, s := range planner.Evaluate(jobs, intervals, g.options(now)) {
+		st := g.projection.scopes[s.ID]
+		if st == nil {
+			st = &projectionScope{}
+			g.projection.scopes[s.ID] = st
+		}
+		if st.disarmed {
+			st.disarmed = s.Projected > s.Budget
+			continue
+		}
+		if s.Projected > s.Budget*(1+projectionMargin) && now.Sub(st.triggered) >= projectionCooldown {
+			st.triggered = now
+			over = append(over, s)
+		}
+	}
+	if len(over) == 0 {
+		return
+	}
+	for _, s := range over {
+		g.c.logger.Info("replanning: the current plan would exhaust a quota before its reset", "component", "planner",
+			"limit", s.Limit, "scope", s.Key, "budget", math.Round(s.Budget), "projected", math.Round(s.Projected))
+	}
+	res := g.replan(ctx, reasonProjection)
+	if res == nil {
+		return
+	}
+	for _, s := range res.Scopes {
+		if st := g.projection.scopes[s.ID]; st != nil && !s.Feasible {
+			st.disarmed = true
+		}
+	}
+}
+
+// options are the options of an online plan at now.
+func (g *generation) options(now time.Time) planner.Options {
+	return planner.Options{MaxStretch: g.graph.Settings.Budget.MaxStretch, Online: true, Now: now}
+}
+
+// replan applies an online plan to the scheduler and returns it, or nil when
+// planning failed.
+func (g *generation) replan(ctx context.Context, reason string) *planner.Result {
 	logger := g.c.logger
 	jobs, err := PlanInputs(ctx, g.disc.planEntries(), g.engine, g.c.store)
 	if err != nil {
 		logger.Warn("planning", "component", "planner", "error", err)
-		return
+		return nil
 	}
-	res := planner.Plan(jobs, planner.Options{MaxStretch: g.graph.Settings.Budget.MaxStretch, Online: true, Now: g.c.clock.Now()})
+	g.c.metrics.PlanRecomputed(reason)
+	res := planner.Plan(jobs, g.options(g.c.clock.Now()))
 	var sig strings.Builder
 	for _, j := range res.Jobs {
 		fmt.Fprintf(&sig, "%s=%s;", j.Name, j.Effective)
@@ -179,6 +291,7 @@ func (g *generation) replan(ctx context.Context) {
 				"limit", s.Limit, "scope", s.Key, "budget", s.Budget, "projected", s.Projected)
 		}
 	}
+	return res
 }
 
 // runJob executes one run: requests, mapping, then outputs and history.

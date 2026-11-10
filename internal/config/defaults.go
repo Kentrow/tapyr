@@ -214,6 +214,7 @@ func defaultSettings(s *SettingsSpec) {
 	setDefault(&s.Collection.Jitter, ptr(Percent(0.1)))
 	setDefault(&s.Budget.RetryReserve, ptr(Percent(0.1)))
 	setDefault(&s.Budget.ReplanInterval, Duration(15*time.Minute))
+	setDefault(&s.Budget.ReplanOnProjection, ptr(true))
 	setDefault(&s.Budget.MaxStretch, 12)
 	setDefault(&s.Retry.MaxAttempts, 4)
 	setDefault(&s.Retry.InitialBackoff, Duration(time.Second))

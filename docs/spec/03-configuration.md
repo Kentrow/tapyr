@@ -398,6 +398,7 @@ spec:
   budget:
     retryReserve: 10%                    # 0% to 50%
     replanInterval: 15m
+    replanOnProjection: true             # replan at once when the plan would exhaust a quota before its reset
     maxStretch: 12                       # planner stretch cap per priority class
   retry:
     maxAttempts: 4
