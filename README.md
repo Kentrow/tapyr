@@ -70,6 +70,7 @@ The planner computes an effective interval for every job so that the configurati
 |---|---|---|---|
 | [`aruba-central-classic`](providers/aruba-central-classic/README.md) | HPE Aruba Networking Central (classic platform) REST API | Official | Real platform (Central classic API Gateway, 2026-11-10) and simulator |
 | [`example-sim`](providers/example-sim/README.md) | Vendor-neutral example API, served by tapyr sim, for development, tests and demos | Official | Simulator only |
+| [`juniper-mist`](providers/juniper-mist/README.md) | Juniper Mist cloud REST API (access points, switches, WAN edge) | Official | Simulator only |
 | [`meraki-dashboard`](providers/meraki-dashboard/README.md) | Cisco Meraki Dashboard API v1 | Official | Real platform (Dashboard API v1, 2026-11-07) and simulator |
 | [`teltonika-rms`](providers/teltonika-rms/README.md) | Teltonika Remote Management System (RMS) cloud API | Official | Real platform (RMS API v3-BETA, 2026-11) and simulator |
 | [`teltonika-rutos`](providers/teltonika-rutos/README.md) | Local REST API of Teltonika routers running RutOS 07.06 or later | Official | Real platform (RutOS 07.24.5, 2026-11) and simulator |

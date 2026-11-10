@@ -1,6 +1,6 @@
 # 10 - Built-in providers
 
-The built-in provider packages of v0.1.0. Each section was checked against the vendor documentation (and, for the Teltonika packages, the real platforms) in November 2026; each package README cites the source of every declared limit.
+The built-in provider packages. Each section was checked against the vendor documentation (and, where its section says so, the real platform) in November 2026; each package README cites the source of every declared limit.
 
 | Package | Kind of API | Testing | What it validates |
 |---|---|---|---|
@@ -8,6 +8,7 @@ The built-in provider packages of v0.1.0. Each section was checked against the v
 | `teltonika-rutos` | Local device API, multi-target, session auth | Real devices + simulator | Validates multi-target accounts and `session_login` |
 | `meraki-dashboard` | Cloud, per-org rate limits, Link pagination | DevNet sandbox (e2e) + simulator (docs + public OpenAPI spec) | Validates scoped rate limits and discovery chains |
 | `aruba-central-classic` | Cloud, daily quota, rotating refresh tokens | Real account, read-only (November 2026) + simulator | Validates quota windows, header sync, auth plugin |
+| `juniper-mist` | Cloud, hourly quota per token, regional clouds | Simulator only (docs + public OpenAPI spec) | Validates header auth with a format, page pagination, hourly windows |
 
 ---
 
@@ -92,6 +93,25 @@ HPE Aruba Networking Central (classic platform) REST API. Checked in November 20
 The newer HPE Aruba Networking Central platform uses a different API surface and OAuth client credentials through HPE GreenLake. It will be a separate provider package (`aruba-central`), after v0.1.0. Its client-credentials auth should work with the declarative `oauth2_client_credentials` type, which is a good sign for the abstraction.
 
 ---
+
+## juniper-mist
+
+Juniper Mist cloud REST API. Checked in November 2026 against the Mist documentation and the [Mist OpenAPI description](https://github.com/mistsys/mist_openapi) (2610.1.0).
+
+- **Auth**: API token as `Authorization: Token <key>` (`header` auth with `format: "Token {value}"`). An organization token with a read-only role is recommended; a user token works too ([Org API token](https://www.mist.com/documentation/org-api-token/)).
+- **Base URL**: the API host of the cloud of the organization (account param `baseURL`, default `https://api.mist.com`), 12 regional hosts ([endpoints by global region](https://networkingdocs.hpe.com/documentation/us/en/software/mist/automation-integration/topics/topic-map/api-endpoint-url-global-regions.html)); the organization ID is the account param `orgId`.
+- **Rate limits**:
+  - 5000 calls per hour, reset at the hourly boundary ([API rate limiting](https://www.mist.com/documentation/api-rate-limiting/), [RESTful API overview](https://networkingdocs.hpe.com/documentation/us/en/software/mist/automation-integration/topics/concept/restful-api-overview.html));
+  - counted per organization token, or for the whole user account with a user token, portal logins included;
+  - `429` when exceeded; no `Retry-After` and no rate-limit headers documented; no per-second or concurrency limit documented;
+  - declared as `kind: quota`, `period: hour`, `timezone: UTC`, `max: 5000`, `scope: { by: [credential] }`.
+- **Pagination**: `limit` (maximum 1000) and `page`, with the total in `X-Page-Total` ([pagination](https://networkingdocs.hpe.com/documentation/us/en/software/mist/automation-integration/topics/concept/rest-api-pagination.html)); the package stops on a short page.
+- **Budget strategy**: organization-level statistics only, about 20 calls an hour for an organization of up to 1000 devices.
+- **Templates** (metrics in the [package README](../../providers/juniper-mist/README.md)):
+  - `mist-devices` (`GET /api/v1/orgs/{orgId}/stats/devices?type=all`: access points, switches and gateways in one list);
+  - `mist-sites` (`GET /api/v1/orgs/{orgId}/stats/sites`: device and client counts per site);
+  - `mist-alarms` (`GET /api/v1/orgs/{orgId}/alarms/count?distinct=severity&duration=1d`).
+- **Deliverables**: provider package, synthetic simulator enforcing the hourly quota, scenarios, dashboard, contract test. No e2e test (no access).
 
 ## Provider package checklist (definition of done)
 

@@ -1,0 +1,13 @@
+{{- /* GET /api/v1/orgs/{org_id}/stats/sites */ -}}
+[
+{{- range $i, $s := items "sites" }}{{ if $i }},{{ end }}
+{{- $aps := children "aps" $s }}{{ $sws := children "switches" $s }}{{ $gws := children "gateways" $s }}
+  {"id": "site-{{ id $s "" }}", "org_id": "org-sim", "name": "Site {{ add $s.index 1 }}", "address": "{{ add $s.index 1 }} Example Road, Example City",
+   "country_code": {{ json (pick $s "country" "FR" "DE" "US") }}, "timezone": {{ json (pick $s "tz" "Europe/Paris" "Europe/Berlin" "America/New_York") }},
+   "lat": 1.{{ add $s.index 1 }}, "lng": 2.{{ add $s.index 1 }},
+   "num_ap": {{ len $aps }}, "num_ap_connected": {{ len $aps }}, "num_switch": {{ len $sws }}, "num_switch_connected": {{ len $sws }},
+   "num_gateway": {{ len $gws }}, "num_gateway_connected": {{ len $gws }},
+   "num_devices": {{ add (add (len $aps) (len $sws)) (len $gws) }}, "num_devices_connected": {{ add (add (len $aps) (len $sws)) (len $gws) }},
+   "num_clients": {{ printf "%.0f" (walk $s "clients" 20 200 "5m") }}, "sitegroup_ids": [], "notes": ""}
+{{- end }}
+]

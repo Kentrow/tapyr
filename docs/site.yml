@@ -31,6 +31,7 @@ nav:
       - providers/teltonika-rutos/README.md
       - providers/meraki-dashboard/README.md
       - providers/aruba-central-classic/README.md
+      - providers/juniper-mist/README.md
       - providers/example-sim/README.md
       - docs/provider-ideas.md
   - Reference:

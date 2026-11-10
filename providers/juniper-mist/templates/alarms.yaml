@@ -1,0 +1,23 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: mist-alarms
+spec:
+  provider: juniper-mist
+  # One count of the alarms of the organization over the last day, grouped
+  # by severity (critical, warn, info): 4 calls an hour.
+  defaultInterval: 15m
+  defaultPriority: normal
+  request:
+    path: /api/v1/orgs/{orgId}/alarms/count
+    query: { distinct: severity, duration: 1d }
+  pagination: { type: none }
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: response.body.results
+    metrics:
+      - name: mist_alarms_last_day
+        help: Alarms raised in the organization over the last 24 hours, by severity
+        value: toFloat(item.count)
+        labels: { severity: "default(item.severity, '')" }

@@ -1,0 +1,29 @@
+# Example configuration for a Juniper Mist organization. The hourly quota of
+# 5000 calls per API token is far from binding: the defaults spend about 20
+# calls an hour for an organization of up to 1000 devices and 1000 sites.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: campus }
+spec:
+  provider: juniper-mist
+  params:
+    # baseURL: https://api.eu.mist.com   # the API host of your Mist cloud (default https://api.mist.com)
+    orgId: 00000000-0000-0000-0000-000000000000   # Organization > Settings in the Mist portal
+  secrets:
+    # An organization API token with a read-only role.
+    apiToken: { env: TAPYR_MIST_API_TOKEN }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: mist-devices }
+spec: { account: campus, template: mist-devices }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: mist-sites }
+spec: { account: campus, template: mist-sites }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: mist-alarms }
+spec: { account: campus, template: mist-alarms }

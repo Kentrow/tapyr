@@ -1,0 +1,45 @@
+{{- /* GET /api/v1/orgs/{org_id}/stats/devices?type=all: access points, then switches, then gateways */ -}}
+[
+{{- range $i, $a := items "aps" }}{{ if $i }},{{ end }}
+{{- $status := flap $a "status" "15m" "connected:0.96" "disconnected:0.04" }}
+  {"type": "ap", "id": "00000000-0000-0000-1000-{{ id $a "" }}00", "mac": {{ json (mac $a) }}, "name": "AP-{{ add $a.parent.index 1 }}-{{ add $a.n 1 }}",
+   "serial": {{ json (serial $a "A999999999999") }}, "model": {{ json (pick $a "model" "AP34" "AP45" "AP47") }}, "hw_rev": "B01",
+   "version": "0.14.29313", "site_id": "site-{{ id $a.parent "" }}", "ip": {{ json (ipv4 $a) }}, "ext_ip": "203.0.113.{{ add $a.parent.index 10 }}",
+   "status": "{{ $status }}", "last_seen": {{ unix $.now }}, "num_wlans": 2,
+   {{- if eq $status "connected" }}
+   "uptime": {{ mod (unix $.now) 1209600 }}, "num_clients": {{ printf "%.0f" (walk $a "clients" 0 45 "5m") }},
+   "cpu_util": {{ printf "%.0f" (walk $a "cpu" 2 40 "5m") }}, "cpu_user": 3, "cpu_system": 2,
+   "mem_total_kb": 505468, "mem_used_kb": {{ printf "%.0f" (walk $a "mem" 150000 350000 "15m") }}}
+   {{- else }}
+   "uptime": null, "num_clients": null, "cpu_util": null, "mem_total_kb": null, "mem_used_kb": null}
+   {{- end }}
+{{- end }}
+{{- range $s := items "switches" }},
+{{- $status := flap $s "status" "30m" "connected:0.98" "disconnected:0.02" }}
+  {"type": "switch", "id": "00000000-0000-0000-1000-{{ id $s "" }}00", "mac": {{ json (mac $s) }}, "name": "SW-{{ add $s.parent.index 1 }}-{{ add $s.n 1 }}",
+   "hostname": "SW-{{ add $s.parent.index 1 }}-{{ add $s.n 1 }}", "serial": {{ json (serial $s "XX9999999999") }},
+   "model": {{ json (pick $s "model" "EX2300-24P" "EX4100-48P") }}, "hw_rev": "A", "version": "23.4R2-S2.1",
+   "site_id": "site-{{ id $s.parent "" }}", "ip": {{ json (ipv4 $s) }}, "status": "{{ $status }}", "last_seen": {{ unix $.now }},
+   {{- if eq $status "connected" }}
+   "uptime": {{ mod (unix $.now) 2419200 }},
+   "cpu_stat": {"idle": {{ printf "%.0f" (walk $s "idle" 55 95 "5m") }}, "interrupt": 0, "system": 8, "user": 10, "load_avg": [0.8, 0.75, 0.78]},
+   "memory_stat": {"usage": {{ printf "%.0f" (walk $s "mem" 15 60 "15m") }}}}
+   {{- else }}
+   "uptime": null}
+   {{- end }}
+{{- end }}
+{{- range $g := items "gateways" }},
+{{- $status := flap $g "status" "1h" "connected:0.99" "disconnected:0.01" }}
+  {"type": "gateway", "id": "00000000-0000-0000-1000-{{ id $g "" }}00", "mac": {{ json (mac $g) }}, "name": "GW-{{ add $g.parent.index 1 }}",
+   "hostname": "GW-{{ add $g.parent.index 1 }}", "serial": {{ json (serial $g "XX9999999999") }}, "model": "SRX320",
+   "version": "22.4R3-S2.11", "site_id": "site-{{ id $g.parent "" }}", "ip": {{ json (ipv4 $g) }},
+   "ext_ip": "203.0.113.{{ add $g.parent.index 10 }}", "status": "{{ $status }}", "last_seen": {{ unix $.now }},
+   {{- if eq $status "connected" }}
+   "uptime": {{ mod (unix $.now) 4838400 }},
+   "cpu_stat": {"idle": {{ printf "%.0f" (walk $g "idle" 40 90 "5m") }}, "interrupt": 0, "system": 10, "user": 14, "load_avg": [0.18, 0.31, 0.39]},
+   "memory_stat": {"usage": {{ printf "%.0f" (walk $g "mem" 30 70 "15m") }}}}
+   {{- else }}
+   "uptime": null}
+   {{- end }}
+{{- end }}
+]

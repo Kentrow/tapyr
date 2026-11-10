@@ -1,0 +1,28 @@
+apiVersion: tapyr/v1alpha1
+kind: Simulation
+metadata:
+  name: juniper-mist
+spec:
+  # tapyr sim --all serves this simulator at --listen-base plus this offset.
+  portOffset: 5
+  # A synthetic organization: 3 sites, each with 6 access points, 2 switches
+  # and a gateway. Fields follow the Mist OpenAPI description (2610.1.0).
+  inventory:
+    seed: 42
+    sets:
+      - { name: sites, count: 3 }
+      - { name: aps, parent: sites, count: 6 }
+      - { name: switches, parent: sites, count: 2 }
+      - { name: gateways, parent: sites, count: 1 }
+  auth:
+    accept:
+      header: [sim-mist-token]
+  routes:
+    - path: /api/v1/orgs/{orgId}/stats/devices
+      pagination: page
+      response: { template: fixtures/devices.json.tmpl }
+    - path: /api/v1/orgs/{orgId}/stats/sites
+      pagination: page
+      response: { template: fixtures/sites.json.tmpl }
+    - path: /api/v1/orgs/{orgId}/alarms/count
+      response: { template: fixtures/alarms.json.tmpl }

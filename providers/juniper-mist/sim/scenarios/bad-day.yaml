@@ -1,0 +1,18 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: bad-day
+  description: >-
+    Slow responses from the Mist cloud, then intermittent 503 on the
+    organization statistics, then a short outage.
+spec:
+  steps:
+    - at: 1h
+      for: 1h
+      latency: { p50: 800ms, p99: 5s }
+    - at: 2h
+      for: 30m
+      errors: { routes: ["/api/v1/orgs/*/stats/**"], status: 503, ratio: 0.3 }
+    - at: 4h
+      for: 10m
+      outage: true

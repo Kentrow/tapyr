@@ -1,0 +1,7 @@
+{{- /* GET /api/v1/orgs/{org_id}/alarms/count?distinct=severity&duration=1d */ -}}
+{{- $org := index (items "sites") 0 -}}
+{"distinct": "severity", "start": {{ sub (unix $.now) 86400 }}, "end": {{ unix $.now }}, "limit": 100, "total": 3, "results": [
+  {"severity": "critical", "count": {{ printf "%.0f" (walk $org "critical" 0 3 "1h") }}},
+  {"severity": "warn", "count": {{ printf "%.0f" (walk $org "warn" 2 15 "1h") }}},
+  {"severity": "info", "count": {{ printf "%.0f" (walk $org "info" 5 40 "1h") }}}
+]}

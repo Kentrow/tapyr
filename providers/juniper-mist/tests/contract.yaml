@@ -1,0 +1,24 @@
+# Contract test of juniper-mist: every template once against the synthetic
+# organization of the simulator ($SIM_URL).
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: contract }
+spec:
+  provider: juniper-mist
+  params: { baseURL: "$SIM_URL", orgId: org-sim }
+  secrets: { apiToken: { env: MIST_API_TOKEN } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: devices }
+spec: { account: contract, template: mist-devices }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: sites }
+spec: { account: contract, template: mist-sites }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: alarms }
+spec: { account: contract, template: mist-alarms }
