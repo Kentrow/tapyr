@@ -28,12 +28,6 @@ spec:
         value: toFloat(item.client_count)
         labels: { serial: item.serial }
         skipIf: "!has(item.client_count) || item.client_count == null"
-      - name: aruba_ap_uptime_seconds
-        help: Access point uptime
-        unit: seconds
-        value: toFloat(item.uptime)
-        labels: { serial: item.serial }
-        skipIf: "!has(item.uptime) || item.uptime == null"
     info:
       - name: aruba_ap_info
         help: Descriptive attributes of an access point

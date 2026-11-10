@@ -24,30 +24,30 @@ aruba_ap_clients{serial="VB11487466"} 30
 aruba_ap_clients{serial="X137172098"} 8
 aruba_ap_clients{serial="X403796857"} 9
 # TYPE aruba_ap_info gauge
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-1-2",serial="GD25230548",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-1-3",serial="0R22094583",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-1-4",serial="UD12197915",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-1-5",serial="FB02145065",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-2-2",serial="EY96996803",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-2-7",serial="GK64897647",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-3-1",serial="4U49148572",site="Site 3"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-3-2",serial="P286838110",site="Site 3"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-3-3",serial="QS07799541",site="Site 3"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-515",name="AP-3-6",serial="6688798871",site="Site 3"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-535",name="AP-1-1",serial="B800644595",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-535",name="AP-1-7",serial="X137172098",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-535",name="AP-1-8",serial="VB11487466",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-535",name="AP-2-1",serial="ED21462594",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-535",name="AP-2-3",serial="X403796857",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-535",name="AP-2-8",serial="1599487655",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-535",name="AP-3-4",serial="LF52665078",site="Site 3"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-635",name="AP-1-6",serial="QP34493713",site="Site 1"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-635",name="AP-2-4",serial="DK34420583",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-635",name="AP-2-5",serial="CH96783994",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-635",name="AP-2-6",serial="8653388015",site="Site 2"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-635",name="AP-3-5",serial="2441157190",site="Site 3"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-635",name="AP-3-7",serial="2T73659117",site="Site 3"} 1
-aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="AP-635",name="AP-3-8",serial="5W17951998",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-1-2",serial="GD25230548",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-1-3",serial="0R22094583",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-1-4",serial="UD12197915",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-1-5",serial="FB02145065",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-2-2",serial="EY96996803",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-2-7",serial="GK64897647",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-3-1",serial="4U49148572",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-3-2",serial="P286838110",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-3-3",serial="QS07799541",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="515",name="AP-3-6",serial="6688798871",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="535",name="AP-1-1",serial="B800644595",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="535",name="AP-1-7",serial="X137172098",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="535",name="AP-1-8",serial="VB11487466",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="535",name="AP-2-1",serial="ED21462594",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="535",name="AP-2-3",serial="X403796857",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="535",name="AP-2-8",serial="1599487655",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="535",name="AP-3-4",serial="LF52665078",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="635",name="AP-1-6",serial="QP34493713",site="Site 1"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="635",name="AP-2-4",serial="DK34420583",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="635",name="AP-2-5",serial="CH96783994",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="635",name="AP-2-6",serial="8653388015",site="Site 2"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="635",name="AP-3-5",serial="2441157190",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="635",name="AP-3-7",serial="2T73659117",site="Site 3"} 1
+aruba_ap_info{firmware="10.6.0.2_90581",group="Campus",model="635",name="AP-3-8",serial="5W17951998",site="Site 3"} 1
 # TYPE aruba_ap_up gauge
 aruba_ap_up{serial="0R22094583"} 1
 aruba_ap_up{serial="1599487655"} 1
@@ -73,37 +73,8 @@ aruba_ap_up{serial="UD12197915"} 0
 aruba_ap_up{serial="VB11487466"} 1
 aruba_ap_up{serial="X137172098"} 1
 aruba_ap_up{serial="X403796857"} 1
-# TYPE aruba_ap_uptime_seconds gauge
-aruba_ap_uptime_seconds{serial="0R22094583"} 0
-aruba_ap_uptime_seconds{serial="1599487655"} 0
-aruba_ap_uptime_seconds{serial="2441157190"} 0
-aruba_ap_uptime_seconds{serial="2T73659117"} 0
-aruba_ap_uptime_seconds{serial="4U49148572"} 0
-aruba_ap_uptime_seconds{serial="5W17951998"} 0
-aruba_ap_uptime_seconds{serial="6688798871"} 0
-aruba_ap_uptime_seconds{serial="8653388015"} 0
-aruba_ap_uptime_seconds{serial="B800644595"} 0
-aruba_ap_uptime_seconds{serial="CH96783994"} 0
-aruba_ap_uptime_seconds{serial="DK34420583"} 0
-aruba_ap_uptime_seconds{serial="ED21462594"} 0
-aruba_ap_uptime_seconds{serial="EY96996803"} 0
-aruba_ap_uptime_seconds{serial="FB02145065"} 0
-aruba_ap_uptime_seconds{serial="GD25230548"} 0
-aruba_ap_uptime_seconds{serial="GK64897647"} 0
-aruba_ap_uptime_seconds{serial="LF52665078"} 0
-aruba_ap_uptime_seconds{serial="P286838110"} 0
-aruba_ap_uptime_seconds{serial="QP34493713"} 0
-aruba_ap_uptime_seconds{serial="QS07799541"} 0
-aruba_ap_uptime_seconds{serial="UD12197915"} 0
-aruba_ap_uptime_seconds{serial="VB11487466"} 0
-aruba_ap_uptime_seconds{serial="X137172098"} 0
-aruba_ap_uptime_seconds{serial="X403796857"} 0
 # TYPE aruba_aps gauge
 aruba_aps 24
-# TYPE aruba_gateway_aps gauge
-aruba_gateway_aps{serial="EV71776858"} 8
-aruba_gateway_aps{serial="HB94432884"} 8
-aruba_gateway_aps{serial="T327634227"} 8
 # TYPE aruba_gateway_info gauge
 aruba_gateway_info{firmware="10.5.1.0_89234",group="Branch",model="A9004",name="GW-1",role="BGW",serial="EV71776858",site="Site 1"} 1
 aruba_gateway_info{firmware="10.5.1.0_89234",group="Branch",model="A9004",name="GW-2",role="BGW",serial="HB94432884",site="Site 2"} 1

@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `format` on the `header` auth type, for APIs that expect a scheme name before the key (`format: "Token {value}"` sends `Authorization: Token <key>`). The formatted value is redacted like the secret.
 
+### Changed
+
+- `aruba-central-classic` is validated against a real Central account, strictly read-only: every template, the refresh of the rotating token pair, a restart resuming from the stored pair, and the daily quota headers. Its simulator follows the shape of the real responses (the access point model comes without the `AP-` prefix, as from the API).
+
+### Removed
+
+- `aruba_ap_uptime_seconds` and `aruba_gateway_aps` (`aruba-central-classic`): the real API carries no uptime in the access point list and no access point count in the gateway list, so these metrics were never produced outside the simulator.
+
 ### Fixed
 
 - `tapyr record` reads the token pair of auth plugins from the state store, read-only, and no longer renews rotating refresh tokens: with `aruba-central-classic`, it started from the bootstrap pair, which `tapyr run` had already rotated, and a refresh would have left `tapyr run` with a spent refresh token. Past the expiry of the stored access token, it stops with a message instead of renewing it.

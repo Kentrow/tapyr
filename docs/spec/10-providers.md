@@ -7,7 +7,7 @@ The built-in provider packages of v0.1.0. Each section was checked against the v
 | `teltonika-rms` | Cloud, central | Real platform (maintainer access) + simulator | The whole pipeline against a real platform |
 | `teltonika-rutos` | Local device API, multi-target, session auth | Real devices + simulator | Validates multi-target accounts and `session_login` |
 | `meraki-dashboard` | Cloud, per-org rate limits, Link pagination | DevNet sandbox (e2e) + simulator (docs + public OpenAPI spec) | Validates scoped rate limits and discovery chains |
-| `aruba-central-classic` | Cloud, daily quota, rotating refresh tokens | Simulator only (docs) | Validates quota windows, header sync, auth plugin |
+| `aruba-central-classic` | Cloud, daily quota, rotating refresh tokens | Real account, read-only (November 2026) + simulator | Validates quota windows, header sync, auth plugin |
 
 ---
 
@@ -68,7 +68,7 @@ Cisco Meraki Dashboard API v1. Checked in November 2026 against the [developer d
 
 ## aruba-central-classic
 
-HPE Aruba Networking Central (classic platform) REST API. Checked in November 2026 against the [Aruba developer hub](https://developer.arubanetworks.com/aruba-central/) and the official `pycentral` SDK.
+HPE Aruba Networking Central (classic platform) REST API. Checked in November 2026 against the [Aruba developer hub](https://developer.arubanetworks.com/aruba-central/) and the official `pycentral` SDK, then against a real Central account, read-only: every template, the token rotation and the quota headers.
 
 - **Auth**: OAuth access tokens valid 2 hours and **rotating refresh tokens** valid 15 days, implemented by the `aruba_central_classic` auth plugin (see `05-collection.md`). Bootstrap: client ID and secret of an API Gateway application and the token pair downloaded from API Gateway > System Apps & Tokens (or My Apps & Tokens).
 - **Base URL**: regional API gateway (account param `baseURL`, required), for example `https://apigw-eucentral3.central.arubanetworks.com`; the README lists the clusters. A token only works on the gateway of its cluster.

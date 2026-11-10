@@ -4,7 +4,11 @@
 {{- range $i, $s := $sw }}{{ if $i }},{{ end }}
   {"serial": {{ json (serial $s "XX99999999") }}, "name": "SW-{{ add $s.parent.index 1 }}-{{ add $s.n 1 }}", "macaddr": {{ json (mac $s) }},
    "model": {{ json (pick $s "model" "Aruba 6100 24G" "Aruba 6200F 48G") }}, "firmware_version": "10.13.1000",
-   "ip_address": {{ json (ipv4 $s) }}, "group_name": "Campus", "site": "Site {{ add $s.parent.index 1 }}",
-   "status": "{{ flap $s "status" "30m" "Up:0.98" "Down:0.02" }}", "switch_type": "AOS-CX", "labels": [], "usage": {{ counter $s "usage" 50000 }}}
+   "ip_address": {{ json (ipv4 $s) }}, "public_ip_address": "203.0.113.{{ add $s.parent.index 10 }}",
+   "group_name": "Campus", "group_id": 1, "site": "Site {{ add $s.parent.index 1 }}", "site_id": {{ add 9 $s.parent.index }},
+   "status": "{{ flap $s "status" "30m" "Up:0.98" "Down:0.02" }}", "switch_type": "AOS-CX", "stack_id": null,
+   "labels": [], "label_ids": [], "uplink_ports": [{"port": "1/1/49"}],
+   "cpu_utilization": {{ printf "%.0f" (walk $s "cpu" 1 40 "5m") }}, "mem_total": 2097152,
+   "mem_free": {{ printf "%.0f" (walk $s "memfree" 524288 1572864 "15m") }}, "usage": {{ counter $s "usage" 50000 }}}
 {{- end }}
 ]}

@@ -4,15 +4,18 @@
 {{- range $i, $a := $aps }}{{ if $i }},{{ end }}
 {{- $status := flap $a "status" "15m" "Up:0.96" "Down:0.04" }}
   {"serial": {{ json (serial $a "XX99999999") }}, "name": "AP-{{ add $a.parent.index 1 }}-{{ add $a.n 1 }}", "macaddr": {{ json (mac $a) }},
-   "swarm_id": "", "group_name": "Campus", "site": "Site {{ add $a.parent.index 1 }}", "status": "{{ $status }}",
-   "model": {{ json (pick $a "model" "AP-515" "AP-535" "AP-635") }}, "firmware_version": "10.6.0.2_90581",
-   "ip_address": {{ json (ipv4 $a) }}, "cluster_id": "", "labels": [],
+   "swarm_id": "", "swarm_name": "", "swarm_master": false, "cluster_id": "", "controller_name": "",
+   "gateway_cluster_id": "", "gateway_cluster_name": "", "ap_deployment_mode": "IAP", "ap_group": null, "mesh_role": "Portal",
+   "group_name": "Campus", "site": "Site {{ add $a.parent.index 1 }}", "status": "{{ $status }}", "sleep_status": false,
+   "model": {{ json (pick $a "model" "515" "535" "635") }}, "firmware_version": "10.6.0.2_90581",
+   "ip_address": {{ json (ipv4 $a) }}, "public_ip_address": "203.0.113.{{ add $a.parent.index 10 }}", "subnet_mask": "255.255.255.0",
+   "labels": [], "notes": null, "last_modified": {{ unix $.now }},
    {{- if eq $status "Up" }}
-   "client_count": {{ printf "%.0f" (walk $a "clients" 0 60 "5m") }}, "uptime": {{ mod (unix $.now) 1209600 }},
+   "client_count": {{ printf "%.0f" (walk $a "clients" 0 60 "5m") }}, "down_reason": "",
    {{- else }}
-   "client_count": 0, "uptime": 0, "down_reason": "Heartbeat lost",
+   "client_count": 0, "down_reason": "Heartbeat lost",
    {{- end }}
-   "radios": [{"band": 0, "channel": "36E", "status": "Up", "tx_power": 18, "utilization": {{ printf "%.0f" (walk $a "util5" 2 70 "5m") }}, "index": 0},
-              {"band": 1, "channel": "6", "status": "Up", "tx_power": 12, "utilization": {{ printf "%.0f" (walk $a "util24" 5 90 "5m") }}, "index": 1}]}
+   "radios": [{"band": 0, "index": 0, "radio_name": "Radio 5 GHz", "radio_type": "802.11ax", "spatial_stream": "2x2:2", "status": "{{ $status }}"},
+              {"band": 1, "index": 1, "radio_name": "Radio 2.4 GHz", "radio_type": "802.11ax", "spatial_stream": "2x2:2", "status": "{{ $status }}"}]}
 {{- end }}
 ]}
