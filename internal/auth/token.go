@@ -96,6 +96,12 @@ type ManagerOptions struct {
 	OnToken func(token string)
 	// Plugins are the auth plugins available to providers.
 	Plugins Plugins
+	// ReadOnly is for commands that run next to tapyr run on the same state
+	// store (tapyr record): the store is never written, plugins read their
+	// stored state but must not renew credentials whose renewal invalidates
+	// the previous ones (PluginEnv.ReadOnly), and other tokens are obtained
+	// in memory, so that a logout never ends a session of tapyr run.
+	ReadOnly bool
 }
 
 // Observer receives the token and login requests of a Manager: result is
@@ -128,7 +134,8 @@ type Manager struct {
 	obs    Observer
 	onTok  func(string)
 
-	plugins Plugins
+	plugins  Plugins
+	readOnly bool
 
 	mu             sync.Mutex
 	sender         Sender
@@ -147,6 +154,7 @@ func NewManager(opts ManagerOptions) (*Manager, error) {
 	m := &Manager{
 		clock: opts.Clock, logger: opts.Logger, store: opts.Store, sessions: map[string]*session{},
 		pluginSessions: map[string]*pluginSession{}, obs: opts.Observer, onTok: opts.OnToken, plugins: opts.Plugins,
+		readOnly: opts.ReadOnly,
 	}
 	if m.obs == nil {
 		m.obs = nopObserver{}
@@ -567,7 +575,7 @@ func (m *Manager) load(ctx context.Context, key string) (secret.Value, time.Time
 }
 
 func (m *Manager) save(ctx context.Context, key string, token secret.Value, expiry time.Time) {
-	if m.store == nil {
+	if m.store == nil || m.readOnly {
 		return
 	}
 	if m.aead == nil {
@@ -585,7 +593,7 @@ func (m *Manager) save(ctx context.Context, key string, token secret.Value, expi
 }
 
 func (m *Manager) forget(ctx context.Context, key string) {
-	if m.store == nil {
+	if m.store == nil || m.readOnly {
 		return
 	}
 	if err := m.store.DeleteToken(ctx, key); err != nil {
@@ -681,9 +689,13 @@ func (s *session) current(ctx context.Context) (secret.Value, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := s.m.clock.Now()
+	// Read-only, a stored token is not used: its session belongs to tapyr
+	// run, and a logout (on renewal or Close) would end it.
 	if !s.loaded {
 		s.loaded = true
-		s.token, s.expiry, _ = s.m.load(ctx, s.key)
+		if !s.m.readOnly {
+			s.token, s.expiry, _ = s.m.load(ctx, s.key)
+		}
 		if !s.token.IsZero() {
 			s.m.onTok(s.token.Reveal())
 		}

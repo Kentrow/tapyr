@@ -18,6 +18,7 @@ description: Record real API responses with tapyr record, anonymized, to build o
   set -a; . ~/.config/tapyr/record.env; set +a; tapyr record ...
   ```
 
+- If the provider rotates its refresh tokens (`aruba-central-classic`) and `tapyr run` already uses the account, record with the state path of its configuration and its `TAPYR_STATE_KEY`: `tapyr record` reads the current pair, read-only, and never renews it. A separate state starts from the bootstrap pair, which `tapyr run` has spent.
 - Run `tapyr plan --config ~/tapyr-record` first: it shows the requests a run costs. One run of a fan-out job costs one request per instance; select what you need.
 
 ## 2. Record

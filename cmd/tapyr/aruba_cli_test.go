@@ -124,6 +124,23 @@ spec:
 	if n := tokens(); n != 4 {
 		t.Errorf("%d tokens issued after 7 hours, want 4", n)
 	}
+	// tapyr record, next to tapyr run, uses the stored pair without
+	// refreshing it. Regression: it started from the spent bootstrap pair,
+	// and a refresh would have spent the refresh token of tapyr run.
+	rec := executeWith(t, vars, clk, "record", "--config", filepath.Join(dir, "config.yaml"), "--job", "aps", "--out", filepath.Join(t.TempDir(), "recording"))
+	if rec.code != 0 {
+		t.Fatalf("record: exit %d\n%s%s", rec.code, rec.stdout, rec.stderr)
+	}
+	if n := tokens(); n != 4 {
+		t.Errorf("%d tokens issued after the recording, want 4", n)
+	}
+	// Once the stored access token expires (at 8h), it says so instead of
+	// renewing it.
+	clk.Advance(61 * time.Minute)
+	rec = executeWith(t, vars, clk, "record", "--config", filepath.Join(dir, "config.yaml"), "--job", "aps", "--out", filepath.Join(t.TempDir(), "recording"))
+	if rec.code == 0 || !strings.Contains(rec.stdout+rec.stderr, "retry while tapyr run holds a valid access token") || tokens() != 4 {
+		t.Errorf("record with an expired token: exit %d, %d tokens issued\n%s%s", rec.code, tokens(), rec.stdout, rec.stderr)
+	}
 	// A changed bootstrap secret replaces the stored pair; a rejected
 	// refresh token stops the account and raises the condition.
 	vars["TAPYR_ARUBA_REFRESH_TOKEN"] = "revoked-refresh-token"

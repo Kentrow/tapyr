@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"net/http"
 	"os"
@@ -26,6 +28,7 @@ import (
 	"github.com/kentrow/tapyr/internal/runtime"
 	"github.com/kentrow/tapyr/internal/selfobs"
 	"github.com/kentrow/tapyr/internal/sim"
+	"github.com/kentrow/tapyr/internal/state"
 )
 
 // recordEntry is an instance of index.yaml.
@@ -84,13 +87,29 @@ func newRecordCmd(e *env, flags *globalFlags) *cobra.Command {
 			if err != nil {
 				return &exitError{code: exitFailure, err: err}
 			}
+			// The state store of tapyr run, read-only: auth plugins read their
+			// state (a rotating refresh token is only valid in its latest
+			// version) and never renew it in a way that would spend it.
+			ctx := cmd.Context()
+			var store auth.TokenStore
+			var salt []byte
+			if st, err := state.OpenSQLite(ctx, cfg.Settings.Spec.State.Path, true); err == nil {
+				defer st.Close()
+				store = st
+				if v, ok, err := st.Meta(ctx, saltKey); err == nil && ok {
+					salt, _ = hex.DecodeString(v)
+				}
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				return &exitError{code: exitFailure, err: err}
+			}
 			tokens, err := auth.NewManager(auth.ManagerOptions{
-				Clock: e.clock, Logger: logger, OnToken: func(token string) { redactor.Add(token) }, Plugins: plugins.Builtin(),
+				Clock: e.clock, Logger: logger, Store: store, StateKey: e.getenv("TAPYR_STATE_KEY"), ReadOnly: true,
+				OnToken: func(token string) { redactor.Add(token) }, Plugins: plugins.Builtin(),
 			})
 			if err != nil {
 				return &exitError{code: exitFailure, err: err}
 			}
-			graph, err := compileGraph(e, cfg, runtime.Options{Secrets: secrets, Auth: tokens})
+			graph, err := compileGraph(e, cfg, runtime.Options{Secrets: secrets, CredentialSalt: salt, Auth: tokens})
 			if err != nil {
 				return err
 			}

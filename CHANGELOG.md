@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `tapyr record` reads the token pair of auth plugins from the state store, read-only, and no longer renews rotating refresh tokens: with `aruba-central-classic`, it started from the bootstrap pair, which `tapyr run` had already rotated, and a refresh would have left `tapyr run` with a spent refresh token. Past the expiry of the stored access token, it stops with a message instead of renewing it.
 - `tapyr record` replaces the site of a device (key `site`, the site name in Aruba Central) and zip codes (key `zipcode`), which a recording used to keep.
 - The Grafana dashboards of `Tapyr / Overview` and of the provider packages work with push outputs: the series of slow jobs (inventories, `_info` metrics) are read with `last_over_time`, where they used to vanish between two runs and leave tables and joins empty.
 - The dashboards follow one set of conventions (documented in the provider guide): colors with a meaning instead of Grafana's default thresholds (counts turned red from 80), the same quota thresholds and colors everywhere, state timelines for up/down states, mobile signal thresholds from the Teltonika recommendations, rankings as bars, and a message when there is nothing to show. The interval table of `Tapyr / Overview` shows the effective intervals and instances again.
