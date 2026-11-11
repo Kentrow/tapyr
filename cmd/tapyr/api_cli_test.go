@@ -120,6 +120,18 @@ spec:
 		return body
 	}
 
+	// The flush loop ticks on the fake clock in its own goroutine: under
+	// load, it can still be flushing while the loop above advances the clock
+	// several times, and /healthz then reports a heartbeat it has not stored
+	// yet. Its pending tick stores it: wait for it, in real time.
+	deadline := time.Now().Add(10 * time.Second)
+	for code, body := httpGet(t, base+"/healthz"); code != http.StatusOK; code, body = httpGet(t, base+"/healthz") {
+		if time.Now().After(deadline) {
+			t.Fatalf("/healthz = %d: %s", code, body)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	// Basic auth protects the API and the metrics, not the health checks.
 	for path, want := range map[string]int{"/api/v1/status": 401, "/metrics": 401, "/metrics/self": 401, "/healthz": 200, "/readyz": 200} {
 		if status, _ := call(path, false); status != want {
