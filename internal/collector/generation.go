@@ -48,9 +48,12 @@ type generation struct {
 	// planSig summarizes the plan applied, to publish its changes.
 	planSig string
 
-	// projection is the state of the projection check, owned by
-	// replanLoop: when it last ran, and the scopes that triggered a replan.
+	// projection is the state of the projection check: whether it is on,
+	// the runs that ask for it (pending, buffered by one), and, owned by
+	// replanLoop, when it last ran and the scopes that triggered a replan.
 	projection struct {
+		on      bool
+		pending chan struct{}
 		checked time.Time
 		scopes  map[string]*projectionScope
 	}
@@ -135,6 +138,8 @@ func (c *Collector) start(ctx context.Context, g *generation, resume map[string]
 	}
 	g.sched = scheduler.New(nil, opts)
 	g.disc.attach(ctx, g.sched, c.clock.Now())
+	g.projection.on = g.graph.Settings.Budget.ReplanOnProjection == nil || *g.graph.Settings.Budget.ReplanOnProjection
+	g.projection.pending = make(chan struct{}, 1)
 	g.replan(ctx, reason)
 	c.tokens.SetSender(g.executor)
 	c.gmu.Lock()
@@ -168,16 +173,17 @@ func (g *generation) replanLoop(ctx context.Context) {
 		defer ticker.Stop()
 		tick = ticker.C()
 	}
-	projection := g.graph.Settings.Budget.ReplanOnProjection == nil || *g.graph.Settings.Budget.ReplanOnProjection
+	onRun := g.c.opts.OnRun
 	for {
-		// No timer: a signal arriving within projectionSpacing of the last
-		// check is checked at the next one (the next request).
-		var quota <-chan struct{}
-		if projection {
-			quota = g.engine.QuotaChanged()
-		}
 		select {
 		case <-ctx.Done():
+			select {
+			case <-g.projection.pending:
+				if onRun != nil {
+					onRun(-1)
+				}
+			default:
+			}
 			return
 		case <-tick:
 			g.replan(ctx, reasonInterval)
@@ -185,11 +191,37 @@ func (g *generation) replanLoop(ctx context.Context) {
 			g.replan(ctx, reasonLimitLearned)
 		case <-g.disc.changed:
 			g.replan(ctx, reasonInventory)
-		case <-quota:
+		case <-g.projection.pending:
+			// No timer: a run ending within projectionSpacing of the last
+			// check is checked with the next one.
 			if now := g.c.clock.Now(); now.Sub(g.projection.checked) >= projectionSpacing {
 				g.projection.checked = now
 				g.checkProjection(ctx, now)
 			}
+			if onRun != nil {
+				onRun(-1)
+			}
+		}
+	}
+}
+
+// requestProjection asks replanLoop for a projection check, once a run
+// ended: its requests counted against the quotas, and its responses
+// reported their remaining. The check counts as work in flight for OnRun
+// (tests), from before the run ends until it is done.
+func (g *generation) requestProjection() {
+	if !g.projection.on {
+		return
+	}
+	onRun := g.c.opts.OnRun
+	if onRun != nil {
+		onRun(+1)
+	}
+	select {
+	case g.projection.pending <- struct{}{}:
+	default: // a check is already pending
+		if onRun != nil {
+			onRun(-1)
 		}
 	}
 }
@@ -296,6 +328,7 @@ func (g *generation) replan(ctx context.Context, reason string) *planner.Result 
 
 // runJob executes one run: requests, mapping, then outputs and history.
 func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
+	defer g.requestProjection() // last: once the run is recorded
 	c := g.c
 	job := run.Job
 	log := c.logger.With("component", "run", "provider", job.Provider, "account", job.Account, "job", job.Name,

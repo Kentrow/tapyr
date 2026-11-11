@@ -102,7 +102,6 @@ type Engine struct {
 	seq      uint64
 	changed  chan struct{}
 	learned  chan struct{}
-	quotaCh  chan struct{}
 }
 
 // NewEngine compiles the limits of the configuration.
@@ -118,7 +117,6 @@ func NewEngine(cfg Config, clk clock.Clock, logger *slog.Logger) (*Engine, error
 		states: map[string]*state{}, breakers: map[string]*breaker{},
 		changed: make(chan struct{}),
 		learned: make(chan struct{}),
-		quotaCh: make(chan struct{}),
 	}
 	if e.observer == nil {
 		e.observer = nopObserver{}
@@ -515,7 +513,6 @@ func (e *Engine) try(d *Descriptor, now time.Time, wp **waiter) (Reservation, ti
 					s.used++
 					s.record(now)
 				}
-				e.quotaChangedLocked()
 			case config.LimitConcurrency:
 				s.inUse++
 			case config.LimitRate:
@@ -594,7 +591,6 @@ func (e *Engine) syncHeaders(s *state, h http.Header, now time.Time) {
 	}
 	if v, ok := headerInt(h, sync.RemainingHeader); ok {
 		s.observed, s.observedRemaining, s.usedAtObservation = true, v, e.quotaUsed(s, now)
-		e.quotaChangedLocked()
 		if v <= 0 {
 			s.exhaustedUntil = s.windowEnd
 		}
@@ -700,20 +696,6 @@ func (e *Engine) LimitLearned() <-chan struct{} {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.learned
-}
-
-// QuotaChanged returns a channel closed the next time the consumption of a
-// quota changes: a request granted, or a remaining reported by a response
-// header. It triggers the projection check of the collector.
-func (e *Engine) QuotaChanged() <-chan struct{} {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	return e.quotaCh
-}
-
-func (e *Engine) quotaChangedLocked() {
-	close(e.quotaCh)
-	e.quotaCh = make(chan struct{})
 }
 
 // IsRefusal reports whether err is a budget refusal, and its reason.

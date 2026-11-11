@@ -36,7 +36,7 @@ spec:
 apiVersion: tapyr/v1alpha1
 kind: Job
 metadata: { name: devices }
-spec: { account: fleet, template: example-sim-devices, interval: 2s }
+spec: { account: fleet, template: example-sim-devices, interval: 2s, priority: critical }
 ---
 apiVersion: tapyr/v1alpha1
 kind: Output
