@@ -31,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Grafana dashboards of `Tapyr / Overview` and of the provider packages work with push outputs: the series of slow jobs (inventories, `_info` metrics) are read with `last_over_time`, where they used to vanish between two runs and leave tables and joins empty.
 - The dashboards follow one set of conventions (documented in the provider guide): colors with a meaning instead of Grafana's default thresholds (counts turned red from 80), the same quota thresholds and colors everywhere, state timelines for up/down states, mobile signal thresholds from the Teltonika recommendations, rankings as bars, and a message when there is nothing to show. The interval table of `Tapyr / Overview` shows the effective intervals and instances again.
 
+### Security
+
+- Built with Go 1.27.4, which fixes GO-2026-6859: an HTTP/1 server could crash on a race between `MaxBytesReader` and a response header (`net/http`).
+
 ## [0.2.1] - 2026-11-09
 
 ### Added

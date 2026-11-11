@@ -69,8 +69,9 @@ type Options struct {
 	// Reload receives the reload requests (SIGHUP).
 	Reload <-chan struct{}
 	// OnReload, when set, observes the outcome of every reload; OnRun the
-	// runs (+1 before a run, -1 after); OnInstances the number of scheduled
-	// instances (tests).
+	// work in flight (+1 before a run, -1 after, and the same for the
+	// projection check that follows a run); OnInstances the number of
+	// scheduled instances (tests).
 	OnReload    func(err error)
 	OnRun       func(delta int)
 	OnInstances func(n int)
