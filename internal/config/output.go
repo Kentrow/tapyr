@@ -50,6 +50,44 @@ type OutputSpec struct {
 	Queue *Queue `json:"queue,omitempty"`
 	// ExternalLabels added to every sample sent through this output.
 	ExternalLabels map[string]string `json:"externalLabels,omitempty"`
+	// Processing is an ordered list of rules applied to the samples of the
+	// jobs sent to this output only, with the semantics of Prometheus
+	// metric_relabel_configs (ADR 0012). Self-metrics are never processed.
+	Processing []ProcessingRule `json:"processing,omitempty"`
+}
+
+// JSONSchemaExtend implements the schema reflector hook.
+func (ProcessingRule) JSONSchemaExtend(s *jsonschema.Schema) {
+	if p, ok := s.Properties.Get("sourceLabels"); ok && p.Items != nil {
+		p.Items.Pattern = labelNamePattern
+	}
+}
+
+// ProcessingAction is the action of a processing rule.
+type ProcessingAction string
+
+// Processing actions.
+const (
+	ProcessingKeep      ProcessingAction = "keep"
+	ProcessingDrop      ProcessingAction = "drop"
+	ProcessingLabelKeep ProcessingAction = "labelkeep"
+	ProcessingLabelDrop ProcessingAction = "labeldrop"
+)
+
+// ProcessingRule keeps or drops samples, or labels, of an output.
+type ProcessingRule struct {
+	// Action: keep or drop the samples whose joined sourceLabels match
+	// regex; labelkeep or labeldrop the labels whose name matches regex.
+	Action ProcessingAction `json:"action" jsonschema:"required,enum=keep,enum=drop,enum=labelkeep,enum=labeldrop"`
+	// SourceLabels are the labels whose values are joined and matched
+	// (keep and drop, required); __name__ is the metric name, a missing
+	// label the empty string.
+	SourceLabels []string `json:"sourceLabels,omitempty"`
+	// Separator joins the values of sourceLabels (keep and drop).
+	Separator *string `json:"separator,omitempty" jsonschema:"default=;"`
+	// Regex is an RE2 regular expression, fully anchored. keep and drop
+	// default to (.*); labelkeep and labeldrop require it.
+	Regex string `json:"regex,omitempty"`
 }
 
 // JSONSchemaExtend implements the schema reflector hook.

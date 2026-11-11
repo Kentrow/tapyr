@@ -399,11 +399,20 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 		var targets []series.Output
 		for _, name := range slices.Sorted(maps.Keys(c.outputs)) {
 			if len(job.Outputs) == 0 || slices.Contains(job.Outputs, name) {
-				targets = append(targets, series.Output{Name: name, Dedup: c.outputs[name].dedup})
+				ro := c.outputs[name]
+				targets = append(targets, series.Output{Name: name, Dedup: ro.dedup, Processor: ro.proc})
 			}
 		}
 		for name, d := range c.series.Success(job.Instance, out.Samples, targets, started) {
 			deduplicated += d.Deduplicated
+			if d.Filtered > 0 {
+				c.metrics.OutputFiltered(name, d.Filtered)
+			}
+			if d.Duplicates > 0 {
+				c.metrics.OutputDropped(name, "duplicate", d.Duplicates)
+				log.Warn("samples dropped: the processing rules of the output made them identical", "output", name,
+					"samples", d.Duplicates)
+			}
 			c.outputs[name].out.Enqueue(model.Batch{
 				Instance: job.Instance, Job: job.Name, RunID: run.ID, Provider: job.Provider, Account: job.Account, At: started,
 				Samples: d.Samples, Stale: d.Stale,

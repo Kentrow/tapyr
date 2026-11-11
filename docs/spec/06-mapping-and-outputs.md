@@ -114,11 +114,32 @@ Per job instance, the registry keeps the set of series emitted by the last succe
 
 ### Implementation notes
 
-- The registry is keyed by job instance. Pull exposition follows it directly: a successful run replaces the series of its instance; an instance whose last success is older than `staleAfter` is withdrawn; a removed instance is withdrawn at once.
+- The registry is keyed by job instance. For an output with processing rules (see Processing), it also keeps the processed series last sent to that output, and staleness and deduplication use them; they are not persisted, but derived from the series of the snapshot with the current rules after a restart.
+- Pull exposition follows the registry directly: a successful run replaces the series of its instance; an instance whose last success is older than `staleAfter` is withdrawn; a removed instance is withdrawn at once.
 - Push outputs receive, per output, the samples that pass deduplication and the series to mark stale; the registry computes both.
 - Deduplication only concerns samples with a source timestamp; samples stamped with the collection time are never deduplicated.
 - The registry is snapshotted with the ledger (every 5 seconds and on shutdown): the series of every instance, and the last source timestamp sent per series and output.
 - The source timestamps of a series are forgotten when it goes stale, which bounds the registry to the live series. After a restart, instances of the snapshot that are no longer scheduled (removed from the configuration, or children waiting for the first run of their parent without a cached inventory) are withdrawn at the first check.
+
+## Processing
+
+An output may declare `spec.processing`, an ordered list of rules applied to the samples of the jobs sent to it only ([ADR 0012](../adr/0012-output-processing.md)), with the semantics of Prometheus `metric_relabel_configs`:
+
+| Action | Fields | Effect |
+|---|---|---|
+| `keep` | `sourceLabels` (required), `separator` (default `;`), `regex` (default `(.*)`) | keeps the samples whose joined source label values match |
+| `drop` | same | drops the samples whose joined source label values match |
+| `labelkeep` | `regex` (required) | keeps only the labels whose name matches |
+| `labeldrop` | `regex` (required) | removes the labels whose name matches |
+
+- `regex` is RE2, fully anchored. `__name__` is the metric name; a missing label is the empty string. Rules apply in order; a dropped sample stops at once.
+- Rules apply on the delivery of each output: after the mapping and the counter reconstruction, before deduplication and before the `externalLabels` of the output. Without rules, nothing changes.
+- Staleness follows the series the output receives: a series that a rule starts dropping (after a reload) or that `labeldrop` renames gets a stale marker once, at the next successful run of its instance. A rule change applies from that run.
+- Two samples of one run that end up with the same series and timestamp (a `labeldrop` removing the label that told them apart): the first is kept, the others are dropped and counted in `tapyr_output_samples_dropped_total{reason="duplicate"}`.
+- Samples removed by `keep` and `drop` are counted in `tapyr_output_samples_filtered_total`.
+- Self-metrics are never processed, on `/metrics/self` or pushed through an output.
+- `tapyr validate` rejects an unknown action, a missing or extra field, an invalid regex or label name, and a rule that would remove `__name__` (`labelkeep` not matching it, `labeldrop` matching it); it warns about a `keep` or `drop` on `__name__` alone that matches no metric of the jobs sent to the output.
+- Not yet: `replace`, `labelmap`, conditions in CEL, aggregation, an interval per output, sending on change (follow-ups of ADR 0012).
 
 ## Timestamps
 
@@ -172,4 +193,4 @@ type Output interface {
 
 ### Multiple outputs
 
-A job sends to all outputs by default, or to the subset listed in `spec.outputs`. Each output has its own queue: a slow backend never blocks collection or other outputs.
+A job sends to all outputs by default, or to the subset listed in `spec.outputs`. Each output has its own queue: a slow backend never blocks collection or other outputs, and its own processing rules: a local backend can stay complete next to a reduced hosted one.

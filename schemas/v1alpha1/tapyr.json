@@ -1601,6 +1601,13 @@
           "$ref": "#/$defs/OTLPOutput",
           "description": "OTLP pushes OTLP metrics (type otlp)."
         },
+        "processing": {
+          "description": "Processing is an ordered list of rules applied to the samples of the\njobs sent to this output only, with the semantics of Prometheus\nmetric_relabel_configs (ADR 0012). Self-metrics are never processed.",
+          "items": {
+            "$ref": "#/$defs/ProcessingRule"
+          },
+          "type": "array"
+        },
         "prometheus": {
           "$ref": "#/$defs/PrometheusOutput",
           "description": "Prometheus pull exposition on /metrics (type prometheus, at most one)."
@@ -1840,6 +1847,43 @@
         "low"
       ],
       "type": "string"
+    },
+    "ProcessingRule": {
+      "additionalProperties": false,
+      "description": "ProcessingRule keeps or drops samples, or labels, of an output.",
+      "properties": {
+        "action": {
+          "description": "Action: keep or drop the samples whose joined sourceLabels match\nregex; labelkeep or labeldrop the labels whose name matches regex.",
+          "enum": [
+            "keep",
+            "drop",
+            "labelkeep",
+            "labeldrop"
+          ],
+          "type": "string"
+        },
+        "regex": {
+          "description": "Regex is an RE2 regular expression, fully anchored. keep and drop\ndefault to (.*); labelkeep and labeldrop require it.",
+          "type": "string"
+        },
+        "separator": {
+          "default": ";",
+          "description": "Separator joins the values of sourceLabels (keep and drop).",
+          "type": "string"
+        },
+        "sourceLabels": {
+          "description": "SourceLabels are the labels whose values are joined and matched\n(keep and drop, required); __name__ is the metric name, a missing\nlabel the empty string.",
+          "items": {
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "type": "object"
     },
     "PrometheusOutput": {
       "additionalProperties": false,

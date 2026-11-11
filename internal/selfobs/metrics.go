@@ -43,6 +43,7 @@ type Metrics struct {
 
 	outputSent     *prometheus.CounterVec
 	outputDropped  *prometheus.CounterVec
+	outputFiltered *prometheus.CounterVec
 	outputFailures *prometheus.CounterVec
 	outputDuration *prometheus.HistogramVec
 
@@ -94,8 +95,10 @@ func NewMetrics(info buildinfo.Info, state func() State) *Metrics {
 
 		tokenRequests: f.counter("tapyr_auth_token_requests_total", "Token and login requests, by result.", "provider", "account", "result"),
 
-		outputSent:     f.counter("tapyr_output_samples_sent_total", "Samples accepted by the output backend.", "output"),
-		outputDropped:  f.counter("tapyr_output_samples_dropped_total", "Samples dropped by an output, by reason.", "output", "reason"),
+		outputSent:    f.counter("tapyr_output_samples_sent_total", "Samples accepted by the output backend.", "output"),
+		outputDropped: f.counter("tapyr_output_samples_dropped_total", "Samples dropped by an output, by reason.", "output", "reason"),
+		outputFiltered: f.counter("tapyr_output_samples_filtered_total", "Samples removed by the keep and drop processing rules of an output.",
+			"output"),
 		outputFailures: f.counter("tapyr_output_send_failures_total", "Failed send requests of an output, by class.", "output", "class"),
 		outputDuration: f.histogram("tapyr_output_send_duration_seconds", "Duration of the send requests of an output.",
 			prometheus.DefBuckets, "output"),
@@ -257,6 +260,12 @@ func (m *Metrics) OutputSent(output string, n int) {
 // OutputDropped records samples dropped by an output.
 func (m *Metrics) OutputDropped(output, reason string, n int) {
 	m.outputDropped.WithLabelValues(output, reason).Add(float64(n))
+}
+
+// OutputFiltered records the samples removed by the processing rules of an
+// output: intended, unlike the samples dropped.
+func (m *Metrics) OutputFiltered(output string, n int) {
+	m.outputFiltered.WithLabelValues(output).Add(float64(n))
 }
 
 // OutputSendFailed records a failed send request.

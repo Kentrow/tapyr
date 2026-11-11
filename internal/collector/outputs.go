@@ -10,6 +10,7 @@ import (
 	"github.com/kentrow/tapyr/internal/output/otlp"
 	"github.com/kentrow/tapyr/internal/output/prometheus"
 	"github.com/kentrow/tapyr/internal/output/remotewrite"
+	"github.com/kentrow/tapyr/internal/processing"
 	"github.com/kentrow/tapyr/internal/runtime"
 )
 
@@ -20,7 +21,9 @@ type runningOutput struct {
 	creds *runtime.OutputCredentials
 	// dedup tells whether the output deduplicates samples by source
 	// timestamp (push outputs).
-	dedup  bool
+	dedup bool
+	// proc applies the processing rules of the output (nil without).
+	proc   *processing.Processor
 	cancel context.CancelFunc
 	done   chan struct{}
 }
@@ -55,6 +58,10 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 		ro, ok := next[name]
 		if !ok {
 			out, err := c.newOutput(name, o.Spec, graph.OutputCredentials[name])
+			var proc *processing.Processor
+			if err == nil {
+				proc, err = processing.Compile(o.Spec.Processing)
+			}
 			if err != nil {
 				// The compiler validated the output: this is not expected.
 				c.logger.Error("output not started", "component", "output", "output", name, "error", err)
@@ -63,7 +70,7 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 			octx, cancel := context.WithCancel(context.WithoutCancel(ctx))
 			ro = &runningOutput{
 				out: out, spec: o.Spec, creds: graph.OutputCredentials[name], dedup: o.Spec.Type != config.OutputPrometheus,
-				cancel: cancel, done: make(chan struct{}),
+				proc: proc, cancel: cancel, done: make(chan struct{}),
 			}
 			go func() {
 				defer close(ro.done)

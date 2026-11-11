@@ -340,6 +340,12 @@ spec:
     flushInterval: 5s
   externalLabels:
     tapyr_instance: lab
+  processing:                           # for this output only, metric_relabel_configs semantics (ADR 0012)
+    - action: drop
+      sourceLabels: [__name__]
+      regex: "meraki_uplink_.*"
+    - action: labeldrop
+      regex: firmware
 ---
 apiVersion: tapyr/v1alpha1
 kind: Output

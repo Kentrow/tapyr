@@ -1300,6 +1300,15 @@
           },
           "expr": "sum by (output) (rate(tapyr_output_samples_sent_total[5m]))",
           "legendFormat": "{{output}}"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (output) (rate(tapyr_output_samples_filtered_total[5m]))",
+          "legendFormat": "{{output}} filtered by rules"
         }
       ],
       "fieldConfig": {
@@ -1319,7 +1328,8 @@
           "mode": "multi",
           "sort": "desc"
         }
-      }
+      },
+      "description": "Samples accepted by each backend, and samples removed by the keep and drop processing rules of the output (intended, not a loss)."
     },
     {
       "id": 23,

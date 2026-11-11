@@ -70,6 +70,7 @@ nav:
           - docs/adr/0009-window-values-as-gauges.md
           - docs/adr/0010-documentation-site.md
           - docs/adr/0011-provider-ecosystem.md
+          - docs/adr/0012-output-processing.md
 
 # Pages for contributors and maintainers, read on GitHub.
 unpublished:

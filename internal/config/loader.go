@@ -165,9 +165,11 @@ func Assemble(cfg *Config, packages []*Package) (*Config, error) {
 		cfg.Providers = append(cfg.Providers, pkg.Provider)
 		cfg.JobTemplates = append(cfg.JobTemplates, pkg.JobTemplates...)
 	}
-	if diags := validateSemantics(cfg); len(diags) > 0 {
+	diags, warnings := validateSemantics(cfg)
+	if len(diags) > 0 {
 		return nil, diags.Sorted()
 	}
+	cfg.Warnings = append(cfg.Warnings, warnings...)
 	applyDefaults(cfg)
 	cfg.Warnings = cfg.Warnings.Sorted()
 	return cfg, nil
