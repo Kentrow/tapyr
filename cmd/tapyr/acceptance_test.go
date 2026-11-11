@@ -21,8 +21,11 @@ import (
 // end: with a replanInterval longer than the day, only the projection check
 // can react when another client suddenly spends the quota (the quota-jump
 // scenario of example-sim). The first jump replans at once and stretches the
-// low-priority job; the second leaves too little for any plan, which replans
-// once and does not loop. Turned off, the trigger never fires.
+// low-priority job. The second spans two checks: the first half replans to a
+// plan that still fits, the second half (seen at the next run) leaves too
+// little for any plan, which replans once more, then never again. Turned off,
+// the trigger never fires. The checks count as work in flight, so the clock
+// only advances once they are done: the times are deterministic.
 func TestTwentyFourHoursProjectionReplan(t *testing.T) {
 	if testing.Short() {
 		t.Skip("24 simulated hours")
@@ -116,16 +119,22 @@ spec:
 		t.Fatalf("projection replans before the first jump:\n%s", got)
 	}
 	// Within minutes of the first jump, one projection replan.
-	advanceTo(midnight.Add(12*time.Hour + 20*time.Minute))
-	if got := recomputations(); !strings.Contains(got, `tapyr_plan_recomputations_total{reason="projection"} 1`) {
-		t.Errorf("after the first jump:\n%s", got)
+	projection := func(at time.Duration, want string) string {
+		t.Helper()
+		advanceTo(midnight.Add(at))
+		got := recomputations()
+		if !strings.Contains(got+"\n", `tapyr_plan_recomputations_total{reason="projection"} `+want+"\n") {
+			t.Errorf("projection replans at %s, want %s:\n%s", at, want, got)
+		}
+		return got
 	}
-	advanceTo(midnight.Add(24*time.Hour - 30*time.Second))
-	got := recomputations()
-	t.Logf("plan recomputations:\n%s", got)
-	if !strings.Contains(got, `tapyr_plan_recomputations_total{reason="projection"} 2`) {
-		t.Errorf("projection replans over the day, want 2 (one per jump):\n%s", got)
-	}
+	// Within minutes of the first jump, one replan.
+	projection(12*time.Hour+20*time.Minute, "1")
+	// The second jump: one replan at once, one more at the next run.
+	projection(18*time.Hour+20*time.Minute, "2")
+	projection(19*time.Hour, "3")
+	// Then the plan cannot fit: no loop until the reset.
+	got := projection(24*time.Hour-30*time.Second, "3")
 	if !strings.Contains(got, `tapyr_plan_recomputations_total{reason="start"} 1`) || strings.Contains(got, `reason="interval"`) {
 		t.Errorf("other recomputations:\n%s", got)
 	}
@@ -143,6 +152,9 @@ spec:
 		t.Errorf("%d requests refused by the quota of the simulator", n)
 	}
 	res := stopRun()
+	if t.Failed() {
+		t.Logf("planner logs:\n%s", grepLines(res.stderr, "component=planner"))
+	}
 	if res.code != exitOK {
 		t.Fatalf("run exited with %d:\n%s", res.code, tail(res.stderr, 40))
 	}

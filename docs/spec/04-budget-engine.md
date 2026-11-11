@@ -202,7 +202,7 @@ For each quota scope of a fixed window, the projected exhaustion time (`tapyr_bu
 
 Between two `replanInterval`, the collector checks that the current plan still fits (`settings.budget.replanOnProjection`, on by default):
 
-- The engine signals every change of the consumption of a quota: a granted request, and a remaining reported by a response header. The check runs on such a signal, at most once a minute; a signal within the minute is checked at the next one (the next request), so no timer is added.
+- The check follows every completed run: its requests counted against the quotas, and its responses reported their remaining. It runs at most once a minute; a run ending within the minute is checked with the next one, so no timer is added.
 - The check projects the consumption of the **current** effective intervals until the end of every quota window (`planner.Evaluate`, same inputs as the online plan) and compares it with the remaining budget of the online plan (step 6 of the algorithm, external consumption projected to the reset included). Without quota headers, it only sees Tapyr's own consumption: more pages or retries than planned.
 - A scope whose projection exceeds its budget by more than 10% triggers a replan at once, at most once every 5 minutes per scope. The new plan fits the budget exactly; a later jump of external consumption crosses the 10% again.
 - A scope still infeasible after its replan (maximum stretch reached, critical jobs alone over budget) is disarmed until its projection fits its budget again, so that a plan that cannot fit never replans in a loop.
