@@ -9,7 +9,7 @@
 # VictoriaMetrics: http://127.0.0.1:8428/vmui/. See README.md.
 name: tapyr-demo
 
-x-tapyr-image: &tapyr-image ${TAPYR_IMAGE:-ghcr.io/kentrow/tapyr:0.2.1}
+x-tapyr-image: &tapyr-image ${TAPYR_IMAGE:-ghcr.io/kentrow/tapyr:0.3.0}
 
 services:
   sim:
