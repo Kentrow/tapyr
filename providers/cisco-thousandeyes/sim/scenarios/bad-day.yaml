@@ -1,0 +1,18 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: bad-day
+  description: >-
+    Slow responses, then intermittent 502 on the test results, then a short
+    outage.
+spec:
+  steps:
+    - at: 1h
+      for: 1h
+      latency: { p50: 700ms, p99: 4s }
+    - at: 2h
+      for: 30m
+      errors: { routes: ["/test-results/**"], status: 502, ratio: 0.3 }
+    - at: 4h
+      for: 10m
+      outage: true

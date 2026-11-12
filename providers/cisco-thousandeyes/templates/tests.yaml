@@ -1,0 +1,42 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: thousandeyes-tests
+spec:
+  provider: cisco-thousandeyes
+  # The tests change rarely; they are the inventory of the network results.
+  defaultInterval: 1h
+  defaultPriority: low
+  role: both
+  request:
+    path: /tests
+    query:
+      aid: { expr: "default(account.params.accountGroupId, dyn(null))" }
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: response.body.tests
+    inventory:
+      key: string(item.testId)
+      fields:
+        testId: string(item.testId)
+        type: "default(item.type, '')"
+        enabled: "string(default(item.enabled, true))"
+    metrics:
+      - name: thousandeyes_test_interval_seconds
+        help: Interval between two rounds of the test
+        unit: seconds
+        value: toFloat(item.interval)
+        labels: { test_id: string(item.testId) }
+        skipIf: "!has(item.interval) || item.interval == null"
+      - name: thousandeyes_test_enabled
+        help: Test enabled (1) or disabled (0)
+        value: "default(item.enabled, true)"
+        labels: { test_id: string(item.testId) }
+    info:
+      - name: thousandeyes_test_info
+        help: Descriptive attributes of a test
+        labels:
+          test_id: string(item.testId)
+          name: "default(item.testName, '')"
+          type: "default(item.type, '')"

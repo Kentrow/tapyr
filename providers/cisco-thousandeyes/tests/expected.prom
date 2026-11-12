@@ -1,0 +1,127 @@
+# TYPE thousandeyes_agent_info gauge
+thousandeyes_agent_info{agent_id="3000",country="FR",location="Cloud area 1",name="Cloud 1",type="cloud"} 1
+thousandeyes_agent_info{agent_id="3001",country="DE",location="Cloud area 2",name="Cloud 2",type="cloud"} 1
+thousandeyes_agent_info{agent_id="3002",country="US",location="Cloud area 3",name="Cloud 3",type="cloud"} 1
+thousandeyes_agent_info{agent_id="3003",country="FR",location="Branch 1",name="Branch 1",type="enterprise"} 1
+thousandeyes_agent_info{agent_id="3004",country="FR",location="Branch 2",name="Branch 2",type="enterprise"} 1
+# TYPE thousandeyes_agent_up gauge
+thousandeyes_agent_up{agent_id="3003"} 1
+thousandeyes_agent_up{agent_id="3004"} 1
+# TYPE thousandeyes_network_health_score gauge
+thousandeyes_network_health_score{agent_id="3000",test_id="281000"} 0.73
+thousandeyes_network_health_score{agent_id="3000",test_id="281001"} 0.89
+thousandeyes_network_health_score{agent_id="3000",test_id="281002"} 0.94
+thousandeyes_network_health_score{agent_id="3001",test_id="281000"} 0.71
+thousandeyes_network_health_score{agent_id="3001",test_id="281001"} 0.83
+thousandeyes_network_health_score{agent_id="3001",test_id="281002"} 0.64
+thousandeyes_network_health_score{agent_id="3002",test_id="281000"} 0.67
+thousandeyes_network_health_score{agent_id="3002",test_id="281001"} 0.91
+thousandeyes_network_health_score{agent_id="3002",test_id="281002"} 0.87
+thousandeyes_network_health_score{agent_id="3003",test_id="281000"} 0.74
+thousandeyes_network_health_score{agent_id="3003",test_id="281001"} 0.68
+thousandeyes_network_health_score{agent_id="3003",test_id="281002"} 0.71
+thousandeyes_network_health_score{agent_id="3004",test_id="281000"} 0.69
+thousandeyes_network_health_score{agent_id="3004",test_id="281001"} 0.67
+thousandeyes_network_health_score{agent_id="3004",test_id="281002"} 0.63
+# TYPE thousandeyes_network_jitter_seconds gauge
+thousandeyes_network_jitter_seconds{agent_id="3000",test_id="281000"} 0.00228
+thousandeyes_network_jitter_seconds{agent_id="3000",test_id="281001"} 0.00857
+thousandeyes_network_jitter_seconds{agent_id="3000",test_id="281002"} 0.008029999999999999
+thousandeyes_network_jitter_seconds{agent_id="3001",test_id="281000"} 0.0033799999999999998
+thousandeyes_network_jitter_seconds{agent_id="3001",test_id="281001"} 0.004719999999999999
+thousandeyes_network_jitter_seconds{agent_id="3001",test_id="281002"} 0.00532
+thousandeyes_network_jitter_seconds{agent_id="3002",test_id="281000"} 0.00443
+thousandeyes_network_jitter_seconds{agent_id="3002",test_id="281001"} 0.004030000000000001
+thousandeyes_network_jitter_seconds{agent_id="3002",test_id="281002"} 0.01175
+thousandeyes_network_jitter_seconds{agent_id="3003",test_id="281000"} 0.0057599999999999995
+thousandeyes_network_jitter_seconds{agent_id="3003",test_id="281001"} 0.00026000000000000003
+thousandeyes_network_jitter_seconds{agent_id="3003",test_id="281002"} 0.00796
+thousandeyes_network_jitter_seconds{agent_id="3004",test_id="281000"} 0.00108
+thousandeyes_network_jitter_seconds{agent_id="3004",test_id="281001"} 0.00094
+thousandeyes_network_jitter_seconds{agent_id="3004",test_id="281002"} 0.00041999999999999996
+# TYPE thousandeyes_network_latency_max_seconds gauge
+thousandeyes_network_latency_max_seconds{agent_id="3000",test_id="281000"} 0.1173
+thousandeyes_network_latency_max_seconds{agent_id="3000",test_id="281001"} 0.1353
+thousandeyes_network_latency_max_seconds{agent_id="3000",test_id="281002"} 0.10640000000000001
+thousandeyes_network_latency_max_seconds{agent_id="3001",test_id="281000"} 0.0912
+thousandeyes_network_latency_max_seconds{agent_id="3001",test_id="281001"} 0.1559
+thousandeyes_network_latency_max_seconds{agent_id="3001",test_id="281002"} 0.15830000000000002
+thousandeyes_network_latency_max_seconds{agent_id="3002",test_id="281000"} 0.0992
+thousandeyes_network_latency_max_seconds{agent_id="3002",test_id="281001"} 0.1139
+thousandeyes_network_latency_max_seconds{agent_id="3002",test_id="281002"} 0.12940000000000002
+thousandeyes_network_latency_max_seconds{agent_id="3003",test_id="281000"} 0.1071
+thousandeyes_network_latency_max_seconds{agent_id="3003",test_id="281001"} 0.1171
+thousandeyes_network_latency_max_seconds{agent_id="3003",test_id="281002"} 0.15580000000000002
+thousandeyes_network_latency_max_seconds{agent_id="3004",test_id="281000"} 0.12329999999999999
+thousandeyes_network_latency_max_seconds{agent_id="3004",test_id="281001"} 0.1076
+thousandeyes_network_latency_max_seconds{agent_id="3004",test_id="281002"} 0.12
+# TYPE thousandeyes_network_latency_min_seconds gauge
+thousandeyes_network_latency_min_seconds{agent_id="3000",test_id="281000"} 0.0077
+thousandeyes_network_latency_min_seconds{agent_id="3000",test_id="281001"} 0.0047
+thousandeyes_network_latency_min_seconds{agent_id="3000",test_id="281002"} 0.0065
+thousandeyes_network_latency_min_seconds{agent_id="3001",test_id="281000"} 0.0043
+thousandeyes_network_latency_min_seconds{agent_id="3001",test_id="281001"} 0.007
+thousandeyes_network_latency_min_seconds{agent_id="3001",test_id="281002"} 0.004900000000000001
+thousandeyes_network_latency_min_seconds{agent_id="3002",test_id="281000"} 0.006900000000000001
+thousandeyes_network_latency_min_seconds{agent_id="3002",test_id="281001"} 0.0062
+thousandeyes_network_latency_min_seconds{agent_id="3002",test_id="281002"} 0.0073
+thousandeyes_network_latency_min_seconds{agent_id="3003",test_id="281000"} 0.0056
+thousandeyes_network_latency_min_seconds{agent_id="3003",test_id="281001"} 0.0058
+thousandeyes_network_latency_min_seconds{agent_id="3003",test_id="281002"} 0.006900000000000001
+thousandeyes_network_latency_min_seconds{agent_id="3004",test_id="281000"} 0.0044
+thousandeyes_network_latency_min_seconds{agent_id="3004",test_id="281001"} 0.0045
+thousandeyes_network_latency_min_seconds{agent_id="3004",test_id="281002"} 0.0072
+# TYPE thousandeyes_network_latency_seconds gauge
+thousandeyes_network_latency_seconds{agent_id="3000",test_id="281000"} 0.0633
+thousandeyes_network_latency_seconds{agent_id="3000",test_id="281001"} 0.0132
+thousandeyes_network_latency_seconds{agent_id="3000",test_id="281002"} 0.0106
+thousandeyes_network_latency_seconds{agent_id="3001",test_id="281000"} 0.04
+thousandeyes_network_latency_seconds{agent_id="3001",test_id="281001"} 0.062200000000000005
+thousandeyes_network_latency_seconds{agent_id="3001",test_id="281002"} 0.085
+thousandeyes_network_latency_seconds{agent_id="3002",test_id="281000"} 0.0474
+thousandeyes_network_latency_seconds{agent_id="3002",test_id="281001"} 0.047799999999999995
+thousandeyes_network_latency_seconds{agent_id="3002",test_id="281002"} 0.0318
+thousandeyes_network_latency_seconds{agent_id="3003",test_id="281000"} 0.0839
+thousandeyes_network_latency_seconds{agent_id="3003",test_id="281001"} 0.0516
+thousandeyes_network_latency_seconds{agent_id="3003",test_id="281002"} 0.0616
+thousandeyes_network_latency_seconds{agent_id="3004",test_id="281000"} 0.0544
+thousandeyes_network_latency_seconds{agent_id="3004",test_id="281001"} 0.0343
+thousandeyes_network_latency_seconds{agent_id="3004",test_id="281002"} 0.0724
+# TYPE thousandeyes_network_loss_ratio gauge
+thousandeyes_network_loss_ratio{agent_id="3000",test_id="281000"} 0.019
+thousandeyes_network_loss_ratio{agent_id="3000",test_id="281001"} 0.003
+thousandeyes_network_loss_ratio{agent_id="3000",test_id="281002"} 0.018000000000000002
+thousandeyes_network_loss_ratio{agent_id="3001",test_id="281000"} 0.028999999999999998
+thousandeyes_network_loss_ratio{agent_id="3001",test_id="281001"} 0.003
+thousandeyes_network_loss_ratio{agent_id="3001",test_id="281002"} 0.027000000000000003
+thousandeyes_network_loss_ratio{agent_id="3002",test_id="281000"} 0.012
+thousandeyes_network_loss_ratio{agent_id="3002",test_id="281001"} 0.02
+thousandeyes_network_loss_ratio{agent_id="3002",test_id="281002"} 0.021
+thousandeyes_network_loss_ratio{agent_id="3003",test_id="281000"} 0.006999999999999999
+thousandeyes_network_loss_ratio{agent_id="3003",test_id="281001"} 0.003
+thousandeyes_network_loss_ratio{agent_id="3003",test_id="281002"} 0.028999999999999998
+thousandeyes_network_loss_ratio{agent_id="3004",test_id="281000"} 0.027999999999999997
+thousandeyes_network_loss_ratio{agent_id="3004",test_id="281001"} 0.009000000000000001
+thousandeyes_network_loss_ratio{agent_id="3004",test_id="281002"} 0.027999999999999997
+# TYPE thousandeyes_network_results_truncated gauge
+thousandeyes_network_results_truncated{test_id="281000"} 0
+thousandeyes_network_results_truncated{test_id="281001"} 0
+thousandeyes_network_results_truncated{test_id="281002"} 0
+# TYPE thousandeyes_test_enabled gauge
+thousandeyes_test_enabled{test_id="281000"} 1
+thousandeyes_test_enabled{test_id="281001"} 1
+thousandeyes_test_enabled{test_id="281002"} 1
+thousandeyes_test_enabled{test_id="281003"} 1
+thousandeyes_test_enabled{test_id="281004"} 0
+# TYPE thousandeyes_test_info gauge
+thousandeyes_test_info{name="Test 1",test_id="281000",type="agent-to-server"} 1
+thousandeyes_test_info{name="Test 2",test_id="281001",type="agent-to-server"} 1
+thousandeyes_test_info{name="Test 3",test_id="281002",type="agent-to-agent"} 1
+thousandeyes_test_info{name="Test 4",test_id="281003",type="http-server"} 1
+thousandeyes_test_info{name="Test 5",test_id="281004",type="agent-to-server"} 1
+# TYPE thousandeyes_test_interval_seconds gauge
+thousandeyes_test_interval_seconds{test_id="281000"} 300
+thousandeyes_test_interval_seconds{test_id="281001"} 120
+thousandeyes_test_interval_seconds{test_id="281002"} 300
+thousandeyes_test_interval_seconds{test_id="281003"} 300
+thousandeyes_test_interval_seconds{test_id="281004"} 300

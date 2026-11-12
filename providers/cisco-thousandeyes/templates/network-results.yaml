@@ -1,0 +1,74 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: thousandeyes-network-results
+spec:
+  provider: cisco-thousandeyes
+  # Without a window, the API returns the latest round of every agent of the
+  # test; rounds run every 1 to 60 minutes (the interval of the test).
+  defaultInterval: 5m
+  defaultPriority: high
+  forEach:
+    template: thousandeyes-tests
+    vars:
+      testId: parent.testId
+    # The network tests, enabled.
+    filter: "parent.type in ['agent-to-server', 'agent-to-agent'] && parent.enabled == 'true'"
+  request:
+    path: /test-results/{testId}/network
+    query:
+      aid: { expr: "default(account.params.accountGroupId, dyn(null))" }
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: "default(response.body.results, [])"
+    metrics:
+      - name: thousandeyes_network_latency_seconds
+        help: Average round trip time to the target, last round
+        unit: seconds
+        value: toFloat(item.avgLatency) / 1000.0
+        labels: { test_id: vars.testId, agent_id: string(item.agent.agentId) }
+        timestamp: fromUnix(item.roundId)
+        skipIf: "!has(item.avgLatency) || item.avgLatency == null"
+      - name: thousandeyes_network_latency_min_seconds
+        help: Minimum round trip time to the target, last round
+        unit: seconds
+        value: toFloat(item.minLatency) / 1000.0
+        labels: { test_id: vars.testId, agent_id: string(item.agent.agentId) }
+        timestamp: fromUnix(item.roundId)
+        skipIf: "!has(item.minLatency) || item.minLatency == null"
+      - name: thousandeyes_network_latency_max_seconds
+        help: Maximum round trip time to the target, last round
+        unit: seconds
+        value: toFloat(item.maxLatency) / 1000.0
+        labels: { test_id: vars.testId, agent_id: string(item.agent.agentId) }
+        timestamp: fromUnix(item.roundId)
+        skipIf: "!has(item.maxLatency) || item.maxLatency == null"
+      - name: thousandeyes_network_jitter_seconds
+        help: Standard deviation of the round trip time, last round
+        unit: seconds
+        value: toFloat(item.jitter) / 1000.0
+        labels: { test_id: vars.testId, agent_id: string(item.agent.agentId) }
+        timestamp: fromUnix(item.roundId)
+        skipIf: "!has(item.jitter) || item.jitter == null"
+      - name: thousandeyes_network_loss_ratio
+        help: Share of the packets that did not reach the target, last round
+        unit: ratio
+        value: toFloat(item.loss) / 100.0
+        labels: { test_id: vars.testId, agent_id: string(item.agent.agentId) }
+        timestamp: fromUnix(item.roundId)
+        skipIf: "!has(item.loss) || item.loss == null"
+      # Negative values are error codes of the API, not scores.
+      - name: thousandeyes_network_health_score
+        help: Network health of the target from the agent, from 0 to 1, last round
+        value: toFloat(item.healthScore)
+        labels: { test_id: vars.testId, agent_id: string(item.agent.agentId) }
+        timestamp: fromUnix(item.roundId)
+        skipIf: "!has(item.healthScore) || item.healthScore == null || toFloat(item.healthScore) < 0.0"
+    post:
+      # One page is read: without a window, the latest round of every agent
+      # fits it. 1 means the API had more pages: report it.
+      - name: thousandeyes_network_results_truncated
+        help: The API had more pages of results than the run read (1)
+        value: "has(responses[0].body._links) && has(responses[0].body._links.next) ? 1.0 : 0.0"
+        labels: { test_id: vars.testId }

@@ -1,0 +1,16 @@
+{{- /* GET /agents: 3 cloud agents, 2 enterprise agents */ -}}
+{"agents": [
+{{- range $i, $a := items "agents" }}{{ if $i }},{{ end }}
+{{- if lt $i 3 }}
+{{- $country := "FR" }}{{ if eq $i 1 }}{{ $country = "DE" }}{{ else if eq $i 2 }}{{ $country = "US" }}{{ end }}
+  {"agentId": "{{ add 3000 $i }}", "agentName": "Cloud {{ add $i 1 }}", "agentType": "cloud",
+   "location": "Cloud area {{ add $i 1 }}", "countryId": "{{ $country }}",
+   "enabled": true, "ipAddresses": ["192.0.2.{{ add 10 $i }}"], "publicIpAddresses": ["198.51.100.{{ add 10 $i }}"]}
+{{- else }}
+  {"agentId": "{{ add 3000 $i }}", "agentName": "Branch {{ sub $i 2 }}", "agentType": "enterprise",
+   "location": "Branch {{ sub $i 2 }}", "countryId": "FR", "enabled": true, "hostname": "agent-{{ sub $i 2 }}.example.com",
+   "agentState": "{{ flap $a "state" "1h" "online:0.97" "offline:0.03" }}", "lastSeen": {{ json (ts "2006-01-02T15:04:05Z" $.now) }},
+   "ipAddresses": ["10.0.0.{{ add 10 $i }}"], "publicIpAddresses": ["203.0.113.{{ add 10 $i }}"]}
+{{- end }}
+{{- end }}
+], "_links": {"self": {"href": "https://api.thousandeyes.com/v7/agents"}}}

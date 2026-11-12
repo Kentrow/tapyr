@@ -1,0 +1,32 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: thousandeyes-agents
+spec:
+  provider: cisco-thousandeyes
+  defaultInterval: 15m
+  defaultPriority: normal
+  request:
+    path: /agents
+    query:
+      aid: { expr: "default(account.params.accountGroupId, dyn(null))" }
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: response.body.agents
+    metrics:
+      # Enterprise agents only: cloud agents report no state.
+      - name: thousandeyes_agent_up
+        help: Enterprise agent online (1 online, 0 offline, disabled or unknown)
+        value: "item.agentState == 'online'"
+        labels: { agent_id: string(item.agentId) }
+        skipIf: "!has(item.agentState) || item.agentState == null"
+    info:
+      - name: thousandeyes_agent_info
+        help: Descriptive attributes of an agent (no address, hostname or serial)
+        labels:
+          agent_id: string(item.agentId)
+          name: "default(item.agentName, '')"
+          type: "default(item.agentType, '')"
+          location: "default(item.location, '')"
+          country: "default(item.countryId, '')"

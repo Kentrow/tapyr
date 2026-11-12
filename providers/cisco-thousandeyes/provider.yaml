@@ -1,0 +1,69 @@
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata:
+  name: cisco-thousandeyes
+  version: 0.1.0
+  description: Cisco ThousandEyes API v7 (tests, agents, network results)
+  docs: https://developer.cisco.com/docs/thousandeyes/
+  displayName: Cisco ThousandEyes
+  categories: [internet-measurement, network]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: simulator
+    notes: >-
+      Built from the rate limit documentation of API v7 and the official SDKs
+      (thousandeyes-sdk-python 7.0.110, the paths and fields of their
+      generated docs); not run against a real ThousandEyes account yet
+spec:
+  baseURL: '{{ .params.baseURL | default "https://api.thousandeyes.com/v7" | trimSuffix "/" }}'
+  params:
+    - name: baseURL
+      description: Base URL of API v7 (default https://api.thousandeyes.com/v7)
+    - name: accountGroupId
+      description: >-
+        Account group to read (the aid parameter); without it, the default
+        account group of the user of the token
+  secrets:
+    - name: apiToken
+      required: true
+      description: API bearer token of a user with read access to the tests and agents
+  auth:
+    type: bearer
+    bearer:
+      token: { secret: apiToken }
+  defaults:
+    headers:
+      Accept: application/json
+    timeout: 30s
+  limits:
+    - name: organization
+      description: >-
+        240 requests a minute per organization, the minute starting at the
+        first request of a batch; X-Organization-Rate-Limit-Limit, -Remaining
+        and -Reset (the epoch of the next rollover) on every response, 429
+        when exceeded (developer.cisco.com/docs/thousandeyes/rate-limits).
+        The documented example shows a limit of 20: the max is learned from
+        the limit header. The reset header keeps the window on the one of
+        the API (spec 04, Header sync).
+      source:
+        kind: vendor-docs
+        url: https://developer.cisco.com/docs/thousandeyes/rate-limits/
+        date: 2026-11
+      kind: quota
+      max: auto
+      initialMax: 240
+      window: { period: minute, timezone: UTC }
+      scope: { by: [account] }
+      sync:
+        limitHeader: X-Organization-Rate-Limit-Limit
+        remainingHeader: X-Organization-Rate-Limit-Remaining
+        resetHeader: X-Organization-Rate-Limit-Reset
+  errors:
+    rateLimited:
+      statuses: [429]
+      # No Retry-After: the documentation says to wait for the reset header,
+      # which the quota follows.
+      defaultPenalty: 5s
+    authFailed:
+      statuses: [401]

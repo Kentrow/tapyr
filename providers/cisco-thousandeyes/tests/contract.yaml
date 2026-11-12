@@ -1,0 +1,24 @@
+# Contract test of cisco-thousandeyes: every template once against the
+# synthetic account group of the simulator ($SIM_URL).
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: contract }
+spec:
+  provider: cisco-thousandeyes
+  params: { baseURL: "$SIM_URL" }
+  secrets: { apiToken: { env: THOUSANDEYES_API_TOKEN } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: tests }
+spec: { account: contract, template: thousandeyes-tests }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: agents }
+spec: { account: contract, template: thousandeyes-agents }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: network-results }
+spec: { account: contract, template: thousandeyes-network-results }
