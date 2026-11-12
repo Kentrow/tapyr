@@ -61,7 +61,7 @@ Types (the set `scripts/check-commits.sh` accepts): `build`, `chore`, `ci`, `doc
 ## Pull requests
 
 - Fill in the template: what changes and why, how you tested it, the checklist. Write down only the checks you actually ran, with the command or a link to the run (a workflow can run on your fork through `workflow_dispatch`), and tick only what is true: reviewers rely on it and do not redo every check.
-- The CI runs the commit check, lint, tests, a release snapshot (the binaries of every platform and both images), the web UI, a smoke test, the integration tests and the alert rules. All must pass.
+- The CI runs the commit check, lint, tests, a build for every release platform, a release snapshot (the binaries of every platform and both images), the web UI, a smoke test, the integration tests and the alert rules. All must pass. On a pull request that changes only documentation, the jobs that build and test the code are skipped, and the release snapshot runs only when the packaging, the images, the dependencies or the release tooling change ([`scripts/ci-changes.sh`](scripts/ci-changes.sh)).
 - A maintainer reviews the change against the specs; expect questions on limits, labels and naming, which are hard to change later.
 - Keep the pull request focused. Rebase on `main` rather than merging it into your branch.
 
