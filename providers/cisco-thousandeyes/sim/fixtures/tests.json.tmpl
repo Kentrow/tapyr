@@ -1,0 +1,10 @@
+{{- /* GET /tests: 3 agent-to-server (one disabled), 1 agent-to-agent, 1 http-server */ -}}
+{"tests": [
+{{- range $i, $t := items "tests" }}{{ if $i }},{{ end }}
+{{- $type := "agent-to-server" }}{{ if eq $i 2 }}{{ $type = "agent-to-agent" }}{{ else if eq $i 3 }}{{ $type = "http-server" }}{{ end }}
+  {"testId": "{{ add 281000 $i }}", "testName": "Test {{ add $i 1 }}", "type": "{{ $type }}", "interval": {{ if eq $i 1 }}120{{ else }}300{{ end }},
+   "enabled": {{ if eq $i 4 }}false{{ else }}true{{ end }}, "alertsEnabled": true, "liveShare": false, "savedEvent": false,
+   "createdBy": "user@example.com", "createdDate": "2026-01-15T09:00:00Z", "modifiedBy": "user@example.com", "modifiedDate": "2026-10-01T09:00:00Z",
+   "_links": {"self": {"href": "https://api.thousandeyes.com/v7/tests/{{ add 281000 $i }}"}}}
+{{- end }}
+], "_links": {"self": {"href": "https://api.thousandeyes.com/v7/tests"}}}

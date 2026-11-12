@@ -284,7 +284,7 @@ func TestCLI(t *testing.T) {
 			name:       "sim of an unknown provider",
 			args:       []string{"sim", "--provider", "nope"},
 			wantCode:   exitFailure,
-			wantStderr: []string{`unknown provider "nope" (providers with a simulator: aruba-central-classic, example-sim,`},
+			wantStderr: []string{`unknown provider "nope" (providers with a simulator: aruba-central-classic, cisco-thousandeyes, example-sim,`},
 		},
 		{
 			name:       "sim requires a provider",

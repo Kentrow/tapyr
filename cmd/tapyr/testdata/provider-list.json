@@ -156,6 +156,81 @@
       ]
     },
     {
+      "name": "cisco-thousandeyes",
+      "version": "0.1.0",
+      "displayName": "Cisco ThousandEyes",
+      "description": "Cisco ThousandEyes API v7 (tests, agents, network results)",
+      "docs": "https://developer.cisco.com/docs/thousandeyes/",
+      "categories": [
+        "internet-measurement",
+        "network"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "simulator",
+        "notes": "Built from the rate limit documentation of API v7 and the official SDKs (thousandeyes-sdk-python 7.0.110, the paths and fields of their generated docs); not run against a real ThousandEyes account yet"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/cisco-thousandeyes/README.md",
+      "simulator": true,
+      "auth": "bearer",
+      "templates": [
+        {
+          "name": "thousandeyes-agents",
+          "path": "/agents",
+          "defaultInterval": "15m",
+          "metrics": [
+            "thousandeyes_agent_info",
+            "thousandeyes_agent_up"
+          ]
+        },
+        {
+          "name": "thousandeyes-network-results",
+          "path": "/test-results/{testId}/network",
+          "defaultInterval": "5m",
+          "metrics": [
+            "thousandeyes_network_health_score",
+            "thousandeyes_network_jitter_seconds",
+            "thousandeyes_network_latency_max_seconds",
+            "thousandeyes_network_latency_min_seconds",
+            "thousandeyes_network_latency_seconds",
+            "thousandeyes_network_loss_ratio",
+            "thousandeyes_network_results_truncated"
+          ]
+        },
+        {
+          "name": "thousandeyes-tests",
+          "path": "/tests",
+          "defaultInterval": "1h",
+          "metrics": [
+            "thousandeyes_test_enabled",
+            "thousandeyes_test_info",
+            "thousandeyes_test_interval_seconds"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "organization",
+          "kind": "quota",
+          "value": "auto (240 until learned) per minute",
+          "scope": [
+            "account"
+          ],
+          "description": "240 requests a minute per organization, the minute starting at the first request of a batch; X-Organization-Rate-Limit-Limit, -Remaining and -Reset (the epoch of the next rollover) on every response, 429 when exceeded (developer.cisco.com/docs/thousandeyes/rate-limits). The documented example shows a limit of 20: the max is learned from the limit header. The reset header keeps the window on the one of the API (spec 04, Header sync).",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developer.cisco.com/docs/thousandeyes/rate-limits/",
+            "date": "2026-11"
+          }
+        }
+      ]
+    },
+    {
       "name": "example-sim",
       "version": "0.1.0",
       "displayName": "Example simulator",

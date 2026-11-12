@@ -1,0 +1,29 @@
+# Example configuration for a ThousandEyes account group. The organization
+# limit of 240 requests a minute is far from binding: the defaults spend
+# about one request a minute per 5 network tests, 10 a minute with 50.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: thousandeyes }
+spec:
+  provider: cisco-thousandeyes
+  # The account group to read; without it, the default one of the token's
+  # user: params: { accountGroupId: "1234" }
+  params: {}
+  secrets:
+    # The API bearer token of a user with read access to the tests and agents.
+    apiToken: { env: TAPYR_THOUSANDEYES_API_TOKEN }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: thousandeyes-tests }
+spec: { account: thousandeyes, template: thousandeyes-tests }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: thousandeyes-agents }
+spec: { account: thousandeyes, template: thousandeyes-agents }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: thousandeyes-network-results }
+spec: { account: thousandeyes, template: thousandeyes-network-results }

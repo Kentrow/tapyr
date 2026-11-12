@@ -6,10 +6,10 @@ This is a pool of ideas, not a commitment, and contributions are welcome: read [
 
 ## Network and SD-WAN (first use case)
 
+Juniper Mist and Cisco ThousandEyes, ideas of this page, are built-in packages since v0.3.0: [`juniper-mist`](../providers/juniper-mist/README.md) and [`cisco-thousandeyes`](../providers/cisco-thousandeyes/README.md).
+
 | Provider | Metrics of interest | Limit pattern | Notes |
 |---|---|---|---|
-| Juniper Mist | Wi-Fi, switches, SLE (user experience) | 5000 calls/hour per token, reset at the top of the hour | Natural companion to Aruba and Meraki |
-| Cisco ThousandEyes | Path latency, loss, availability, app tests | 240 req/min per organization, window starts with the first request; separate per-endpoint limits (instant tests, template deploy); rich `X-Organization-Rate-Limit-*` headers | Needs windows starting at the first request; per-endpoint limits (`appliesTo`) and header sync exist |
 | Ubiquiti UniFi Site Manager | Sites, devices, ISP metrics | Verify | Large homelab and SMB audience |
 | VeloCloud Orchestrator | SD-WAN links, QoE, failovers | Verify | |
 | Peplink InControl2, Cradlepoint NetCloud | 4G/5G routers, signal, data usage | Verify | Same family as Teltonika |
@@ -60,21 +60,20 @@ This is a pool of ideas, not a commitment, and contributions are welcome: read [
 
 ## Engine gaps
 
-Most of the APIs above fit the configuration model as it is: rate, concurrency, calendar and rolling quota windows, scopes, header sync and `Retry-After` ([`04-budget-engine.md`](spec/04-budget-engine.md)). Five mechanisms are missing. Each one is a generic, configurable feature, designed in its own issue before any package needs it:
+Most of the APIs above fit the configuration model as it is: rate, concurrency, calendar and rolling quota windows, scopes, header sync and `Retry-After` ([`04-budget-engine.md`](spec/04-budget-engine.md)). Four mechanisms are missing. Each one is a generic, configurable feature, designed in its own issue before any package needs it:
 
 | Gap | Today | Needed by |
 |---|---|---|
 | Request cost | A quota counts one unit per request | GitHub GraphQL (points per query, returned in the response), RIPE Atlas (credits per measurement), AWS Cost Explorer (every request is billed), Shodan (query credits) |
 | Quota windows aligned on any duration | A fixed window is a calendar period (minute, hour, day, week, month) | Strava (15 minutes, reset at :00, :15, :30 and :45) |
 | Quota sync from expressions | The limit, the remaining and the reset come from one header each | Strava (two windows packed in one header), APIs that report their quota in the body |
-| Windows starting at the first request | Fixed windows are aligned on the clock | ThousandEyes (the minute starts with the first request) |
 | Rate limiting signaled other than by a status | `errors.rateLimited` matches HTTP statuses | VirusTotal v2 (204 without a body), APIs answering 200 with an error object |
+
+Windows that start at the first request (ThousandEyes) are not a gap when the API sends a reset header: every response sets the end of the window to the provider's ([`04-budget-engine.md`](spec/04-budget-engine.md#header-sync), Header sync). They would be one for an API that sends none.
 
 ## Sources
 
 - Strava rate limits: https://developers.strava.com/docs/rate-limits/
 - VirusTotal consumption quotas: https://docs.virustotal.com/docs/consumption-quotas-handled
-- ThousandEyes rate limits: https://developer.cisco.com/docs/thousandeyes/rate-limits/
-- Juniper Mist limit (as documented by IP Fabric): https://docs.ipfabric.io/main/IP_Fabric_Settings/Discovery_and_Snapshots/Discovery_Settings/Vendors_API/juniper_mist/
 - Enphase developer plans: https://developer-v4.enphase.com/developer-plans
 - SolarEdge daily limit (as documented by Home Assistant): https://www.home-assistant.io/integrations/solaredge

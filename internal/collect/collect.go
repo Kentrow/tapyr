@@ -322,6 +322,9 @@ func (r *run) paramValues(params []runtime.Param) (url.Values, error) {
 		switch {
 		case p.Expr != nil:
 			v, err := p.Expr.Eval(act)
+			if err == nil && v == types.NullValue {
+				continue // null omits the parameter (an optional param)
+			}
 			var s string
 			if err == nil {
 				s, err = mapping.ToLabel(v)

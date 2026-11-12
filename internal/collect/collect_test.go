@@ -133,6 +133,9 @@ func TestRunSingleRequest(t *testing.T) {
 		{Name: "verbose", Literal: "true"},
 		{Name: "key", Secret: secret.New("s3cr3t")},
 		{Name: "since", Expr: compile(t, mapping.ContextRequest, "string(int(now) - 300)", mapping.OutputString)},
+		// null omits the parameter (an optional account param, for example).
+		{Name: "aid", Expr: compile(t, mapping.ContextRequest, "dyn(null)", mapping.OutputString)},
+		{Name: "empty", Expr: compile(t, mapping.ContextRequest, "''", mapping.OutputString)},
 	}
 	a, err := auth.New(&config.Auth{Type: config.AuthBearer, Bearer: &config.BearerAuth{Token: config.Value{Secret: "k"}}},
 		auth.Secrets{"k": secret.New("tok")})
@@ -155,6 +158,12 @@ func TestRunSingleRequest(t *testing.T) {
 	q := got.URL.Query()
 	if q.Get("verbose") != "true" || q.Get("key") != "s3cr3t" || q.Get("since") != strconv.FormatInt(start.Unix()-300, 10) {
 		t.Errorf("query = %v", q)
+	}
+	if _, sent := q["aid"]; sent {
+		t.Errorf("a null value was sent: %v", q)
+	}
+	if v, sent := q["empty"]; !sent || v[0] != "" {
+		t.Errorf("an empty value was not sent as such: %v", q)
 	}
 	if got.Header.Get("Authorization") != "Bearer tok" || got.Header.Get("Accept") != "application/json" {
 		t.Errorf("headers = %v", got.Header)

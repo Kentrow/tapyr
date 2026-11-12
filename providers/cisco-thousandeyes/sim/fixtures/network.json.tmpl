@@ -1,0 +1,17 @@
+{{- /* GET /test-results/{testId}/network: the latest round of every agent */ -}}
+{{- $round := sub (unix $.now) (mod (unix $.now) 300) -}}
+{"test": {"testId": "{{ $.vars.testId }}", "testName": "Test", "type": "agent-to-server"},
+ "results": [
+{{- range $i, $a := items "agents" }}{{ if $i }},{{ end }}
+{{- $k := printf "%s-%d" $.vars.testId $i }}
+  {"date": {{ json (ts "2006-01-02T15:04:05Z" $.now) }}, "roundId": {{ $round }}, "startTime": {{ $round }}, "endTime": {{ add $round 300 }},
+   "agent": {"agentId": "{{ add 3000 $i }}", "agentName": "Agent {{ add $i 1 }}", "countryId": "FR", "location": "Area {{ add $i 1 }}"},
+   "server": "www.example.com:443", "serverIp": "192.0.2.80",
+   "avgLatency": {{ printf "%.1f" (walk $a (printf "avg-%s" $k) 8 90 "15m") }},
+   "minLatency": {{ printf "%.1f" (walk $a (printf "min-%s" $k) 4 8 "15m") }},
+   "maxLatency": {{ printf "%.1f" (walk $a (printf "max-%s" $k) 90 160 "15m") }},
+   "jitter": {{ printf "%.2f" (walk $a (printf "jit-%s" $k) 0 12 "15m") }},
+   "loss": {{ printf "%.1f" (walk $a (printf "loss-%s" $k) 0 3 "15m") }},
+   "healthScore": {{ printf "%.2f" (walk $a (printf "hs-%s" $k) 0.6 1 "15m") }}}
+{{- end }}
+], "_links": {"self": {"href": "https://api.thousandeyes.com/v7/test-results/{{ $.vars.testId }}/network"}}}

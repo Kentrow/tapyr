@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `cisco-thousandeyes`, a provider package for the Cisco ThousandEyes API v7: the network results of the tests (latency, loss, jitter, health score, per test and agent, stamped with their round), the tests and the agents, within the limit of 240 requests a minute per organization. Validated against its simulator only.
+- A request query value whose expression returns `null` omits the parameter, for optional account params (an empty string is still sent).
 - Processing rules per output ([ADR 0012](docs/adr/0012-output-processing.md)): `spec.processing` keeps or drops samples (`keep`, `drop` on joined label values, `__name__` for the metric name) and labels (`labelkeep`, `labeldrop`) for one output only, with the semantics of Prometheus `metric_relabel_configs`. Staleness and deduplication follow the series the output receives. Filtered samples are counted in `tapyr_output_samples_filtered_total`; samples made identical by the rules are dropped and counted as `duplicate`.
 - Replan on projection: between two `replanInterval`, Tapyr checks at most once a minute that the current plan still fits every quota, and replans at once when it would exhaust one before its reset, for example when another client suddenly spends the same quota (`settings.budget.replanOnProjection`, on by default). Plan computations are counted by reason in `tapyr_plan_recomputations_total`.
 - `quota-jump`, a scenario of the `example-sim` simulator: another client suddenly spends the daily quota, twice.

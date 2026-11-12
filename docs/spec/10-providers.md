@@ -9,6 +9,7 @@ The built-in provider packages. Each section was checked against the vendor docu
 | `meraki-dashboard` | Cloud, per-org rate limits, Link pagination | DevNet sandbox (e2e) + simulator (docs + public OpenAPI spec) | Validates scoped rate limits and discovery chains |
 | `aruba-central-classic` | Cloud, daily quota, rotating refresh tokens | Real account, read-only (November 2026) + simulator | Validates quota windows, header sync, auth plugin |
 | `juniper-mist` | Cloud, hourly quota per token, regional clouds | Simulator only (docs + public OpenAPI spec) | Validates header auth with a format, page pagination, hourly windows |
+| `cisco-thousandeyes` | Cloud, per-minute quota per organization starting at the first request | Simulator only (docs + official SDKs) | Validates windows followed through the reset header, source timestamps per round, optional query params |
 
 ---
 
@@ -112,6 +113,24 @@ Juniper Mist cloud REST API. Checked in November 2026 against the Mist documenta
   - `mist-sites` (`GET /api/v1/orgs/{orgId}/stats/sites`: device and client counts per site);
   - `mist-alarms` (`GET /api/v1/orgs/{orgId}/alarms/count?distinct=severity&duration=1d`).
 - **Deliverables**: provider package, synthetic simulator enforcing the hourly quota, scenarios, dashboard, contract test. No e2e test (no access).
+
+## cisco-thousandeyes
+
+Cisco ThousandEyes API v7. Checked in November 2026 against the [rate limit documentation](https://developer.cisco.com/docs/thousandeyes/rate-limits/) and the official SDKs ([thousandeyes-sdk-python](https://github.com/thousandeyes/thousandeyes-sdk-python) 7.0.110).
+
+- **Auth**: bearer token of a user (`Authorization: Bearer <token>`); the account group is the optional account param `accountGroupId` (the `aid` query parameter, omitted when unset: the default account group of the user).
+- **Base URL**: `https://api.thousandeyes.com/v7` (account param `baseURL`).
+- **Rate limits**:
+  - 240 requests a minute per organization, "one minute from the first request in a batch"; instant tests (24 a minute) and template deployments (10 a minute) have limits of their own, unused by the package;
+  - `X-Organization-Rate-Limit-Limit`, `-Remaining` and `-Reset` (the epoch of the next rollover) on every response; `429` when exceeded, no `Retry-After`; the documented example shows a limit of 20;
+  - declared as `kind: quota`, `period: minute`, `max: auto` (`initialMax: 240`), `scope: { by: [account] }`, with the three `sync` headers: the reset header keeps the window on the one of the API (`04-budget-engine.md`, Header sync).
+- **Pagination**: `_links.next` in the body; without a time window, the latest round of every agent fits one page, which the package reads (and reports a next page in `thousandeyes_network_results_truncated`).
+- **Budget strategy**: one request per network test and run; about 10 requests a minute for 50 tests at the default 5 minutes.
+- **Templates** (metrics in the [package README](../../providers/cisco-thousandeyes/README.md)):
+  - `thousandeyes-tests` (inventory, `GET /tests`);
+  - `thousandeyes-agents` (`GET /agents`);
+  - `thousandeyes-network-results` (`GET /test-results/{testId}/network`, one instance per enabled `agent-to-server` or `agent-to-agent` test, samples stamped with their round).
+- **Deliverables**: provider package, synthetic simulator enforcing the organization limit with its headers, scenarios, dashboard, contract test. No e2e test (no access).
 
 ## Provider package checklist (definition of done)
 

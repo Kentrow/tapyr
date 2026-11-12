@@ -149,6 +149,7 @@ After each response, the engine reads the `sync` headers of every applicable quo
   - **external consumption** (other tools using the same quota): `external = max(0, C_obs - c)`, exposed as `tapyr_budget_external_usage`,
   - Tapyr's remaining budget: `remaining = min(U - c, r_obs)`. Tapyr never exceeds its share and never exceeds what is actually left.
 - **Reset**: if a reset header is declared, it overrides the computed window end.
+- **Windows that start at the first request** (ThousandEyes: one minute "from the first request in a batch") need no window option: with a reset header, every response sets the end of the window to the provider's, so the engine rolls when the provider does and its next window, opened by the next request, matches the provider's; the remaining header keeps the count exact in between. Without a reset header, the engine rolls on the clock while the window of the provider still runs, and a burst sent right after, before any response, can exceed it: declare the reset header for such providers (`TestFirstRequestWindows` covers both).
 
 Headers are matched case-insensitively. Missing headers are ignored silently.
 
