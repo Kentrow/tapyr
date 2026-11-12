@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-12
+
 ### Added
 
 - `cisco-thousandeyes`, a provider package for the Cisco ThousandEyes API v7: the network results of the tests (latency, loss, jitter, health score, per test and agent, stamped with their round), the tests and the agents, within the limit of 240 requests a minute per organization. Validated against its simulator only.
@@ -110,7 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kentrow/tapyr/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/kentrow/tapyr/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/kentrow/tapyr/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/kentrow/tapyr/compare/v0.1.1...v0.1.2

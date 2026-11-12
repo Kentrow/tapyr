@@ -108,7 +108,7 @@ The first samples arrive within a minute. [`examples/compose/README.md`](example
 Releases ship static binaries for Linux, macOS and Windows (amd64, arm64), and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root):
 
 ```sh
-docker run --rm ghcr.io/kentrow/tapyr:0.2.1 version
+docker run --rm ghcr.io/kentrow/tapyr:0.3.0 version
 ```
 
 The binaries are on the [releases page](https://github.com/kentrow/tapyr/releases) with their SBOM. The checksums and the image are signed with cosign in keyless mode: [`docs/install.md`](docs/install.md) shows how to verify them, run the image, deploy with [systemd](examples/systemd/README.md) or on [Kubernetes](examples/kubernetes/README.md), and build from source.

@@ -98,7 +98,7 @@ Releases follow [Semantic Versioning](https://semver.org/). Before 1.0, a minor 
 2. Run `tapyr validate` and `tapyr plan` of the new version on your configuration.
 3. Replace the binary or the image tag, keep the state store, restart.
 
-Pin the image to a version (`ghcr.io/kentrow/tapyr:0.2.1`, or `0.2` for the patches of a minor version) rather than `latest`, and [verify its signature](install.md#verify-the-signatures).
+Pin the image to a version (`ghcr.io/kentrow/tapyr:0.3.0`, or `0.3` for the patches of a minor version) rather than `latest`, and [verify its signature](install.md#verify-the-signatures).
 
 ## Capacity
 

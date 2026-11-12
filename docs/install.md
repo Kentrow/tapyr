@@ -7,7 +7,7 @@ Tapyr is a single static binary with the web UI embedded. Releases ship it for L
 Download the archive of your platform and `checksums.txt` from the [releases page](https://github.com/kentrow/tapyr/releases), check it, then put `tapyr` in your `PATH`. On Linux:
 
 ```sh
-VERSION=0.2.1
+VERSION=0.3.0
 ARCH=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
 curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/tapyr_${VERSION}_linux_${ARCH}.tar.gz
 curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/checksums.txt
@@ -36,7 +36,7 @@ The binary is not notarized by Apple: the cask removes its quarantine attribute 
 From v0.2.1, every release has `.deb` and `.rpm` packages for amd64 and arm64: the binary in `/usr/bin`, the [hardened systemd unit](../examples/systemd/README.md) and an example in `/etc/tapyr`. They are static, without dependencies, and covered by the checksums, their signature and the provenance below.
 
 ```sh
-VERSION=0.2.1
+VERSION=0.3.0
 ARCH=$(dpkg --print-architecture)    # or: uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/'
 curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/tapyr_${VERSION}_linux_${ARCH}.deb    # or .rpm
 curl -LO https://github.com/kentrow/tapyr/releases/download/v$VERSION/checksums.txt
@@ -55,7 +55,7 @@ docker run -d --name tapyr \
   -v "$PWD/config:/etc/tapyr:ro" \
   -v tapyr-data:/home/nonroot/data \
   -p 9790:9790 \
-  ghcr.io/kentrow/tapyr:0.2.1
+  ghcr.io/kentrow/tapyr:0.3.0
 ```
 
 - The image runs `tapyr run --config /etc/tapyr` as the `nonroot` user (uid 65532), on `gcr.io/distroless/static-debian12`.
