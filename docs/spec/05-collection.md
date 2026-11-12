@@ -69,7 +69,7 @@ Reserved for flows that cannot be expressed declaratively. Registered by name in
 ## Request building
 
 - `path` is a template with `{var}` placeholders resolved from variables (discovery vars, account params, target params). Values are URL-path-escaped.
-- `query` values are Values: literal strings, CEL expressions (`{ expr: "..." }`) or secret references (`{ secret: name }`, redacted everywhere).
+- `query` values are Values: literal strings, CEL expressions (`{ expr: "..." }`) or secret references (`{ secret: name }`, redacted everywhere). An expression that returns `null` omits the parameter, for an optional account param: `{ expr: "default(account.params.accountGroupId, dyn(null))" }`; an empty string is sent as such.
 - `headers` merge provider defaults, template, then job (job wins).
 - `body` (for POST-based query APIs such as GraphQL) is supported: JSON with CEL-evaluated values. Tapyr remains read-only: POST is allowed only for queries, declared explicitly with `readOnly: true` in the template, and never retried unless `idempotent: true`.
 
