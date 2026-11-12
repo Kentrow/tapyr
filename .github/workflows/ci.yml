@@ -15,7 +15,40 @@ concurrency:
   cancel-in-progress: true
 
 # Actions are pinned by commit; Dependabot keeps them up to date.
+#
+# On a pull request, the jobs that build and test the code are skipped when
+# only documentation changed, and the release snapshot runs only when a file
+# it depends on changed (scripts/ci-changes.sh). Pushes to main and the
+# weekly run do everything. The conditions are `!cancelled()` and `!= 'true'`
+# so that a failure of the classification runs the jobs instead of skipping
+# them (a skipped job passes a required check).
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      docs_only: ${{ steps.classify.outputs.docs_only }}
+      release: ${{ steps.classify.outputs.release }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify the changed files
+        id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -o pipefail
+          if [ "$EVENT" = pull_request ]; then
+            git diff --name-only "origin/${BASE_REF}...${HEAD_SHA}" | ./scripts/ci-changes.sh | tee -a "$GITHUB_OUTPUT"
+          else
+            printf 'docs_only=false\nrelease=true\n' | tee -a "$GITHUB_OUTPUT"
+          fi
+
   commits:
     name: Conventional Commits
     if: github.event_name == 'pull_request'
@@ -56,8 +89,14 @@ jobs:
       - name: Lint the built-in provider packages
         run: go run ./cmd/tapyr provider lint --catalog providers
 
-  test:
-    name: Test
+  # The tests run in parallel jobs, the same as `make cover` together: every
+  # package but cmd/tapyr, and cmd/tapyr in shards (its 24-hour acceptance
+  # tests take minutes each). "Test" is the required check: it passes when
+  # every test job passed, or was skipped because only documentation changed.
+  test-packages:
+    name: Test (packages)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -71,16 +110,103 @@ jobs:
         run: make tidy-check
       - name: Check JSON Schemas are up to date
         run: make schema-check
-      - name: Unit tests (race detector)
-        run: make cover
+      - name: Unit tests (race detector), every package but cmd/tapyr
+        run: |
+          go test -race -count=1 -covermode=atomic -coverprofile=coverage.out $(go list ./... | grep -v '/cmd/tapyr$')
+          go tool cover -func=coverage.out | tail -1
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: coverage
+          name: coverage-packages
           path: coverage.out
           retention-days: 7
 
+  test-cmd:
+    name: Test (cmd/tapyr, ${{ matrix.shard }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # A new test lands in a shard by its name: TestTwentyFourHours* in
+        # "24h", any other in "others".
+        include:
+          - shard: 24h Aruba plan
+            run: ^TestTwentyFourHoursArubaPlan$
+            skip: ^$
+          - shard: 24h
+            run: ^TestTwentyFourHours
+            skip: ^TestTwentyFourHoursArubaPlan$
+          - shard: others
+            run: .
+            skip: ^TestTwentyFourHours
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: Tests of cmd/tapyr (race detector)
+        env:
+          RUN: ${{ matrix.run }}
+          SKIP: ${{ matrix.skip }}
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out -run "$RUN" -skip "$SKIP" ./cmd/tapyr
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: coverage-cmd-${{ strategy.job-index }}
+          path: coverage.out
+          retention-days: 7
+
+  test:
+    name: Test
+    needs: [changes, test-packages, test-cmd]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every test job passed or was skipped
+        env:
+          RESULTS: changes=${{ needs.changes.result }} packages=${{ needs.test-packages.result }} cmd=${{ needs.test-cmd.result }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "${r#*=}" in
+            success | skipped) ;;
+            *) echo "::error::${r%%=*} ended with ${r#*=}"; exit 1 ;;
+            esac
+          done
+
+  cross-compile:
+    name: Cross-compile (every release platform)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      # The platforms of .goreleaser.yaml, without the UI (the placeholder
+      # of ui/dist is embedded): on pull requests, the release snapshot only
+      # runs when a release file changed.
+      - name: go build for every platform
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            echo "$target"
+            GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -o /dev/null ./...
+          done
+
   fuzz:
     name: Fuzz (${{ matrix.target }})
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -110,6 +236,8 @@ jobs:
 
   vulnerabilities:
     name: Vulnerabilities
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -141,6 +269,8 @@ jobs:
 
   release-snapshot:
     name: Release snapshot (every platform, images)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.release != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -178,6 +308,8 @@ jobs:
 
   ui:
     name: Web UI
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -201,6 +333,8 @@ jobs:
 
   smoke:
     name: Smoke test
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -216,6 +350,8 @@ jobs:
 
   helm:
     name: Helm chart
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -235,6 +371,8 @@ jobs:
 
   integration:
     name: Integration (VictoriaMetrics, OpenTelemetry Collector, Prometheus)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -249,6 +387,8 @@ jobs:
 
   alerts:
     name: Alert rules
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
