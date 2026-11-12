@@ -179,11 +179,19 @@ jobs:
           done
 
   cross-compile:
-    name: Cross-compile (every release platform)
+    name: Cross-compile (${{ matrix.target }})
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # The platforms of .goreleaser.yaml, without the UI (the placeholder of
+    # ui/dist is embedded): on pull requests, the release snapshot only runs
+    # when a release file changed. One job per platform: the Go cache holds
+    # the native build only, so each platform compiles from scratch.
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64, windows/arm64]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -191,17 +199,11 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      # The platforms of .goreleaser.yaml, without the UI (the placeholder
-      # of ui/dist is embedded): on pull requests, the release snapshot only
-      # runs when a release file changed.
-      - name: go build for every platform
+      - name: go build
         env:
           CGO_ENABLED: "0"
-        run: |
-          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
-            echo "$target"
-            GOOS=${target%/*} GOARCH=${target#*/} go build -trimpath -o /dev/null ./...
-          done
+          TARGET: ${{ matrix.target }}
+        run: GOOS=${TARGET%/*} GOARCH=${TARGET#*/} go build -trimpath -o /dev/null ./...
 
   fuzz:
     name: Fuzz (${{ matrix.target }})
