@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite" // pure Go SQLite driver, no CGO
@@ -84,7 +87,15 @@ var schema = []string{
 // SQLite is a Store backed by an embedded SQLite database.
 type SQLite struct {
 	db *sql.DB
+
+	// ledgerMu serializes SaveLedger; saved holds the entries of the last
+	// successful save, so that the next one writes only what changed.
+	ledgerMu sync.Mutex
+	saved    map[ledgerKey]LedgerEntry
 }
+
+// ledgerKey identifies a ledger entry (a limit and a scope key).
+type ledgerKey struct{ limit, scope string }
 
 var _ Store = (*SQLite)(nil)
 
@@ -230,47 +241,107 @@ func (s *SQLite) LoadLedger(ctx context.Context) ([]LedgerEntry, error) {
 	return out, minutes.Err()
 }
 
-// SaveLedger implements Store.
+// SaveLedger implements Store. It writes only what changed since its last
+// successful save: an entry whose fields changed, and the minutes added,
+// changed or gone. Every 5 seconds, most entries are unchanged and a
+// window moves by one minute; rewriting every minute of a daily window
+// (up to 1440 rows per scope) at every flush wore the disk for nothing.
+// The first save of a process writes every entry in full, replacing the
+// minutes a previous process left.
 func (s *SQLite) SaveLedger(ctx context.Context, entries []LedgerEntry) error {
+	s.ledgerMu.Lock()
+	defer s.ledgerMu.Unlock()
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("writing the ledger: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	stmts := map[string]*sql.Stmt{}
+	exec := func(query string, args ...any) error {
+		st, ok := stmts[query]
+		if !ok {
+			if st, err = tx.PrepareContext(ctx, query); err != nil {
+				return err
+			}
+			stmts[query] = st
+		}
+		_, err := st.ExecContext(ctx, args...)
+		return err
+	}
+	defer func() {
+		for _, st := range stmts {
+			_ = st.Close()
+		}
+	}()
+	next := make(map[ledgerKey]LedgerEntry, len(entries))
 	for _, e := range entries {
-		accounts, err := json.Marshal(e.Accounts)
-		if err != nil {
-			return err
+		key := ledgerKey{e.Limit, e.Scope}
+		prev, known := s.saved[key]
+		if !known || !sameLedgerRow(prev, e) {
+			accounts, err := json.Marshal(e.Accounts)
+			if err != nil {
+				return err
+			}
+			observed := 0
+			if e.Observed {
+				observed = 1
+			}
+			if err := exec(`INSERT INTO ledger (limit_id, scope, window_start, used, observed,
+				observed_remaining, observed_max, used_at_observation, exhausted_until, accounts, updated_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				ON CONFLICT (limit_id, scope) DO UPDATE SET window_start = excluded.window_start, used = excluded.used,
+				observed = excluded.observed, observed_remaining = excluded.observed_remaining,
+				observed_max = excluded.observed_max, used_at_observation = excluded.used_at_observation,
+				exhausted_until = excluded.exhausted_until, accounts = excluded.accounts, updated_at = excluded.updated_at`,
+				e.Limit, e.Scope, millis(e.WindowStart), e.Used, observed, e.ObservedRemaining, e.ObservedMax,
+				e.UsedAtObservation, millis(e.ExhaustedUntil), string(accounts), millis(e.UpdatedAt)); err != nil {
+				return fmt.Errorf("writing the ledger: %w", err)
+			}
 		}
-		observed := 0
-		if e.Observed {
-			observed = 1
+		if !known {
+			if err := exec(`DELETE FROM ledger_minutes WHERE limit_id = ? AND scope = ?`, e.Limit, e.Scope); err != nil {
+				return fmt.Errorf("writing the ledger minutes: %w", err)
+			}
 		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO ledger (limit_id, scope, window_start, used, observed,
-			observed_remaining, observed_max, used_at_observation, exhausted_until, accounts, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT (limit_id, scope) DO UPDATE SET window_start = excluded.window_start, used = excluded.used,
-			observed = excluded.observed, observed_remaining = excluded.observed_remaining,
-			observed_max = excluded.observed_max, used_at_observation = excluded.used_at_observation,
-			exhausted_until = excluded.exhausted_until, accounts = excluded.accounts, updated_at = excluded.updated_at`,
-			e.Limit, e.Scope, millis(e.WindowStart), e.Used, observed, e.ObservedRemaining, e.ObservedMax,
-			e.UsedAtObservation, millis(e.ExhaustedUntil), string(accounts), millis(e.UpdatedAt)); err != nil {
-			return fmt.Errorf("writing the ledger: %w", err)
+		for minute := range prev.Minutes {
+			if _, ok := e.Minutes[minute]; !ok {
+				if err := exec(`DELETE FROM ledger_minutes WHERE limit_id = ? AND scope = ? AND minute = ?`, e.Limit, e.Scope, minute); err != nil {
+					return fmt.Errorf("writing the ledger minutes: %w", err)
+				}
+			}
 		}
-		if _, err := tx.ExecContext(ctx, `DELETE FROM ledger_minutes WHERE limit_id = ? AND scope = ?`, e.Limit, e.Scope); err != nil {
-			return fmt.Errorf("writing the ledger minutes: %w", err)
-		}
-		for minute, count := range e.Minutes {
-			if _, err := tx.ExecContext(ctx, `INSERT INTO ledger_minutes (limit_id, scope, minute, count) VALUES (?, ?, ?, ?)`,
+		for _, minute := range slices.Sorted(maps.Keys(e.Minutes)) {
+			count := e.Minutes[minute]
+			if old, ok := prev.Minutes[minute]; ok && old == count {
+				continue
+			}
+			if err := exec(`INSERT INTO ledger_minutes (limit_id, scope, minute, count) VALUES (?, ?, ?, ?)
+				ON CONFLICT (limit_id, scope, minute) DO UPDATE SET count = excluded.count`,
 				e.Limit, e.Scope, minute, count); err != nil {
 				return fmt.Errorf("writing the ledger minutes: %w", err)
 			}
 		}
+		// A copy: the caller may change its maps and slices in place.
+		e.Accounts = slices.Clone(e.Accounts)
+		e.Minutes = maps.Clone(e.Minutes)
+		next[key] = e
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("writing the ledger: %w", err)
 	}
+	// Entries absent from this save keep their rows, as before; they are
+	// written in full if they come back.
+	s.saved = next
 	return nil
+}
+
+// sameLedgerRow reports whether two entries have the same row in the
+// ledger table (their minutes aside).
+func sameLedgerRow(a, b LedgerEntry) bool {
+	return a.WindowStart.Equal(b.WindowStart) && a.Used == b.Used && a.Observed == b.Observed &&
+		a.ObservedRemaining == b.ObservedRemaining && a.ObservedMax == b.ObservedMax &&
+		a.UsedAtObservation == b.UsedAtObservation && a.ExhaustedUntil.Equal(b.ExhaustedUntil) &&
+		a.UpdatedAt.Equal(b.UpdatedAt) && slices.Equal(a.Accounts, b.Accounts)
 }
 
 // AddRun implements Store.

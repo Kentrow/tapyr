@@ -168,6 +168,7 @@ When a response matches `errors.rateLimited`:
 - Rolling windows persist per-minute buckets for their duration.
 - On startup, current-window counters are loaded. Expired windows are discarded.
 - Flush cadence: every 5 seconds and on shutdown. The engine tolerates losing the last seconds (header sync corrects).
+- A flush writes only what changed since the previous successful one: the counters that moved and the minute buckets added, changed or gone (a daily window holds up to 1440 of them, and one or two change between flushes). The first flush of a process writes every entry in full, replacing the buckets a previous process left; a failed flush is written again in full by the next.
 
 ## Planner
 
