@@ -283,3 +283,86 @@ func TestSchemaVersion(t *testing.T) {
 		t.Errorf("OpenSQLite() = %v", err)
 	}
 }
+
+// TestLedgerWritesChanges checks that SaveLedger writes only what changed
+// since its last save, and stays exact: the first save of a process
+// replaces what a previous process left, minutes changed in place are seen,
+// and a failed save is written again in full.
+func TestLedgerWritesChanges(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "tapyr.db")
+	at := time.Date(2026, 11, 2, 0, 0, 0, 0, time.UTC)
+	load := func(s *SQLite) []LedgerEntry {
+		t.Helper()
+		got, err := s.LoadLedger(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return got
+	}
+
+	// A previous process left minutes 1 to 3.
+	prev := open(t, path)
+	stale := []LedgerEntry{{Limit: "p/daily", Scope: "account=a", Used: 6, Minutes: map[int64]int64{1: 1, 2: 2, 3: 3}, UpdatedAt: at}}
+	if err := prev.SaveLedger(ctx, stale); err != nil {
+		t.Fatal(err)
+	}
+	if err := prev.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The first save of the next process replaces them.
+	s := open(t, path)
+	defer s.Close()
+	minutes := map[int64]int64{3: 5, 4: 1}
+	entries := []LedgerEntry{{Limit: "p/daily", Scope: "account=a", Used: 6, Minutes: minutes, UpdatedAt: at}}
+	if err := s.SaveLedger(ctx, entries); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(entries, load(s)); diff != "" {
+		t.Errorf("after the first save (-want +got):\n%s", diff)
+	}
+
+	// Minutes changed in place, as the engine may hand the same map again.
+	minutes[4] = 2
+	minutes[5] = 1
+	delete(minutes, 3)
+	entries[0].Used = 3
+	if err := s.SaveLedger(ctx, entries); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(entries, load(s)); diff != "" {
+		t.Errorf("after changes in place (-want +got):\n%s", diff)
+	}
+
+	// An unchanged entry is not written again: a row removed behind the
+	// store's back stays removed.
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM ledger_minutes WHERE minute = 5`); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.SaveLedger(ctx, entries); err != nil {
+		t.Fatal(err)
+	}
+	if got := load(s); len(got) != 1 || got[0].Minutes[5] != 0 {
+		t.Errorf("an unchanged entry was written again: %+v", got)
+	}
+	minutes[5] = 1 // put the store back in line with the database for the rest of the test
+	if _, err := s.db.ExecContext(ctx, `INSERT INTO ledger_minutes (limit_id, scope, minute, count) VALUES ('p/daily', 'account=a', 5, 1)`); err != nil {
+		t.Fatal(err)
+	}
+
+	// A failed save leaves nothing behind in the store's memory: the next
+	// one writes the same changes.
+	canceled, cancel := context.WithCancel(ctx)
+	cancel()
+	changed := []LedgerEntry{{Limit: "p/daily", Scope: "account=a", Used: 9, Minutes: map[int64]int64{6: 9}, UpdatedAt: at.Add(time.Minute)}}
+	if err := s.SaveLedger(canceled, changed); err == nil {
+		t.Fatal("a save with a canceled context succeeded")
+	}
+	if err := s.SaveLedger(ctx, changed); err != nil {
+		t.Fatal(err)
+	}
+	if diff := cmp.Diff(changed, load(s)); diff != "" {
+		t.Errorf("after a failed save (-want +got):\n%s", diff)
+	}
+}
