@@ -117,6 +117,8 @@ The UI is built in CI and in `make build`; a binary built without UI assets serv
 6. **Outputs**: queue fill, send rate, failures, last success.
 7. **Live debug** (only when enabled): pick a job instance, see the last raw response (pretty JSON, collapsible) side by side with the samples produced. Refresh on new run (SSE).
 
+Every page shows, at the foot of the navigation, the version of the running Tapyr (`Tapyr v0.3.0`; a binary built without a version, such as `go build` in a clone, shows `Tapyr dev` and its short revision), with the full version, the revision and the Go version in its tooltip. It is read from `GET /api/v1/status` when the UI loads and again when the event stream reconnects, so an upgrade shows after the restart.
+
 ### Non-functional
 
 - Responsive down to tablet width; usable on a phone for the overview.

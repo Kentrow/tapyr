@@ -127,3 +127,19 @@ export function outputHealth(o: Output): Health {
   if (o.last_error && (!o.last_success || (o.last_error_at ?? "") > o.last_success)) return "failing";
   return o.last_success ? "ok" : "unknown";
 }
+
+// A dev build reports buildinfo.DevVersion, or, built with go build in a
+// clone, a Go pseudo-version (0.3.1-0.20261113104325-995f2e2f21c0) with
+// "+dirty" for a modified tree.
+const isDevVersion = (v: string) => v === "0.0.0-dev" || /-0\.\d{14}-[0-9a-f]{12}/.test(v) || v.endsWith("+dirty");
+
+// versionLabel names the running Tapyr for the sidebar: the release
+// ("Tapyr v0.3.0"), or a dev build named by its short revision ("Tapyr dev
+// 995f2e2-dirty"), on one line of the sidebar, with the
+// full version, revision and Go version in the title.
+export function versionLabel(s: { version: string; revision: string; go_version: string }): { text: string; title: string } {
+  const short = s.revision.replace(/^([0-9a-f]{7})[0-9a-f]+/, "$1");
+  const text = isDevVersion(s.version) ? ["Tapyr dev", short].filter(Boolean).join(" ") : `Tapyr v${s.version}`;
+  const title = [`Tapyr ${s.version}`, s.revision && `revision ${s.revision}`, `built with ${s.go_version}`].filter(Boolean).join(", ");
+  return { text, title };
+}

@@ -1,8 +1,35 @@
 import { describe, expect, it } from "vitest";
-import { count, duration, healthClass, outputHealth, plural, since, toYAML } from "./format";
+import { count, duration, healthClass, outputHealth, plural, since, toYAML, versionLabel } from "./format";
 import type { Output } from "./types";
 
 describe("format", () => {
+  it("labels the running version", () => {
+    expect(versionLabel({ version: "0.3.0", revision: "3b0e90b", go_version: "go1.27.4" })).toEqual({
+      text: "Tapyr v0.3.0",
+      title: "Tapyr 0.3.0, revision 3b0e90b, built with go1.27.4",
+    });
+    expect(versionLabel({ version: "0.4.0-rc.1", revision: "8c95410", go_version: "go1.27.4" }).text).toBe("Tapyr v0.4.0-rc.1");
+    // A binary built without a version (go build, make build): a dev build, named by its revision.
+    expect(versionLabel({ version: "0.0.0-dev", revision: "995f2e2-dirty", go_version: "go1.27.4" })).toEqual({
+      text: "Tapyr dev 995f2e2-dirty",
+      title: "Tapyr 0.0.0-dev, revision 995f2e2-dirty, built with go1.27.4",
+    });
+    expect(versionLabel({ version: "0.0.0-dev", revision: "", go_version: "go1.27.4" })).toEqual({
+      text: "Tapyr dev",
+      title: "Tapyr 0.0.0-dev, built with go1.27.4",
+    });
+    // go build in a clone: a Go pseudo-version and the full commit.
+    expect(
+      versionLabel({
+        version: "0.3.1-0.20261113104325-995f2e2f21c0+dirty",
+        revision: "995f2e2f21c092118908381e79e6397475a4e734-dirty",
+        go_version: "go1.27.4",
+      }),
+    ).toEqual({
+      text: "Tapyr dev 995f2e2-dirty",
+      title: "Tapyr 0.3.1-0.20261113104325-995f2e2f21c0+dirty, revision 995f2e2f21c092118908381e79e6397475a4e734-dirty, built with go1.27.4",
+    });
+  });
   it("formats durations compactly", () => {
     expect(duration(45)).toBe("45s");
     expect(duration(300)).toBe("5m");

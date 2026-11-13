@@ -91,6 +91,7 @@ h3 { font-size: 1rem; font-weight: 650; }
 .nav svg { width: 18px; height: 18px; flex: none; }
 .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 14px 8px 0; border-top: 1.5px solid var(--line); color: var(--ink-2); font-size: 0.8rem; text-align: center; }
 .sidebar-foot .row { justify-content: center; gap: 10px; }
+.sidebar-foot .version { font-family: var(--mono); font-size: 0.72rem; white-space: nowrap; }
 .main { padding: 28px 32px 48px; min-width: 0; }
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
 .page-head p { margin: 4px 0 0; color: var(--ink-2); }
