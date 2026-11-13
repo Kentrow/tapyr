@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Planner: a quota window shorter than the replan interval (`replanInterval`, 15 minutes by default), such as a one-minute window, is planned over a full window. Planned over what was left of it, a minute window exhausted for a few seconds, by a 429 or by another client, left no budget: every job was stretched to its maximum (12 times) and the plan reported infeasible until the next replan, 15 minutes later. On the public demo, ThousandEyes collected almost nothing. The `cisco-thousandeyes` package has an `org-burst` scenario showing it.
 - Simulator: the `externalConsumption` of a scenario is charged to the window it falls in. It was charged all at once at the next request, into the current window, so a short window received everything consumed since the previous request: under its `quota-tight` scenario, the `cisco-thousandeyes` simulator answered 429 to the first request after a few quiet minutes (25 calls of the other integration in a window of 20).
 - Simulator: the `latency` of a scenario delays a response after the limits counted the request, as the processing time of a server, and the request holds its concurrency slot meanwhile. Counted after the delay, requests sent at the pace of a rate limit reached it bunched together: the `teltonika-rutos` simulator answered about 50 unexpected 429 a day to Tapyr under its `quota-tight` scenario.
 

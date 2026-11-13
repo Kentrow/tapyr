@@ -280,7 +280,10 @@ func (g *generation) checkProjection(ctx context.Context, now time.Time) {
 
 // options are the options of an online plan at now.
 func (g *generation) options(now time.Time) planner.Options {
-	return planner.Options{MaxStretch: g.graph.Settings.Budget.MaxStretch, Online: true, Now: now}
+	return planner.Options{
+		MaxStretch: g.graph.Settings.Budget.MaxStretch, Online: true, Now: now,
+		ReplanInterval: g.graph.Settings.Budget.ReplanInterval.Std(),
+	}
 }
 
 // replan applies an online plan to the scheduler and returns it, or nil when

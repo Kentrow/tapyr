@@ -18,6 +18,16 @@ func daily(id string, usable, reserve int64) budget.PlanScope {
 	}
 }
 
+// minute is a quota scope of one-minute windows, 30 seconds before the
+// reset at now.
+func minute(id string, usable, reserve int64) budget.PlanScope {
+	start := now.Add(-30 * time.Second)
+	return budget.PlanScope{
+		ID: id, Limit: "p/" + id, Key: "account=a", Kind: config.LimitQuota, Usable: usable, Reserve: reserve, Remaining: usable,
+		WindowStart: start, WindowEnd: start.Add(time.Minute), WindowLength: time.Minute,
+	}
+}
+
 func job(name string, p config.Priority, desired time.Duration, pages float64, scopes ...budget.PlanScope) Job {
 	return Job{Name: name, Provider: "p", Account: "a", Priority: p, Desired: desired, PagesPerRun: pages, Fanout: 1, Scopes: scopes}
 }
@@ -136,6 +146,48 @@ func TestPlan(t *testing.T) {
 			}()},
 			opts:    Options{MaxStretch: 12, Online: true, Now: now},
 			wantEff: map[string]time.Duration{"devices": 432 * time.Second}, wantFeasible: true,
+		},
+		{
+			name: "online plans a window shorter than the replan interval over a full window",
+			// A minute window exhausted 30 seconds before its reset (a 429):
+			// planned on its remaining 30 seconds and no budget, every job
+			// would be stretched until the next replan, 15 minutes later.
+			jobs: func() []Job {
+				s := minute("organization", 20, 2)
+				s.Used, s.Remaining = 18, 0
+				return []Job{
+					job("agents", config.PriorityNormal, 15*time.Minute, 1, s),
+					job("results", config.PriorityNormal, 5*time.Minute, 5, s),
+					job("tests", config.PriorityLow, time.Hour, 1, s),
+				}
+			}(),
+			opts:         Options{MaxStretch: 12, Online: true, Now: now, ReplanInterval: 15 * time.Minute},
+			wantEff:      map[string]time.Duration{"agents": 15 * time.Minute, "results": 5 * time.Minute, "tests": time.Hour},
+			wantFeasible: true,
+		},
+		{
+			name: "a window planned in full ignores the state of the current one",
+			// Another client spent the whole current minute: a full minute of
+			// 18 is planned, and 30 calls a minute are stretched to fit it.
+			jobs: func() []Job {
+				s := minute("organization", 20, 2)
+				s.Used, s.Remaining, s.External = 2, 0, 18
+				return []Job{job("results", config.PriorityLow, time.Minute, 30, s)}
+			}(),
+			opts:         Options{MaxStretch: 12, Online: true, Now: now, ReplanInterval: 15 * time.Minute},
+			wantEff:      map[string]time.Duration{"results": 100 * time.Second},
+			wantFeasible: true,
+		},
+		{
+			name: "online keeps the remaining budget of a window longer than the replan interval",
+			// As "online uses the remaining budget and time": 12 hours left.
+			jobs: []Job{func() Job {
+				s := daily("daily", 5000, 500)
+				s.Used, s.Remaining = 4000, 1000
+				return job("devices", config.PriorityLow, 5*time.Minute, 10, s)
+			}()},
+			opts:    Options{MaxStretch: 12, Online: true, Now: now, ReplanInterval: 15 * time.Minute},
+			wantEff: map[string]time.Duration{"devices": 864 * time.Second}, wantFeasible: true,
 		},
 		{
 			name: "rate feasibility",
