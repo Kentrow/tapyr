@@ -1,0 +1,25 @@
+{{- /* GET /v1/hosts: 2 consoles a page, the cursor in the body (page-2) */ -}}
+{{- $start := 0 }}{{ if eq (index $.query "nextToken") "page-2" }}{{ $start = 2 }}{{ end -}}
+{{- $all := items "hosts" -}}
+{"data": [
+{{- range $i, $h := $all }}{{ if and (ge $i $start) (lt $i (add $start 2)) }}{{ if gt $i $start }},{{ end }}
+{{- $state := flap $h "state" "30m" "connected:0.97" "disconnected:0.03" }}
+{{- $model := pick $h "model" "UCGMAX" "UDMPRO" "UDMSE" }}
+  {"id": "{{ printf "SIM%060d" (add $h.index 1) }}:{{ num $h "sysid" 100000000 999999999 }}",
+   "hardwareId": "00000000-0000-4000-8000-0000000000{{ printf "%02d" $h.index }}", "type": "console",
+   "ipAddress": "203.0.113.{{ add $h.index 10 }}", "owner": true, "isBlocked": false,
+   "registrationTime": "2025-01-15T09:00:00Z",
+   "lastConnectionStateChange": {{ json (ts "2006-01-02T15:04:05Z" (ago (printf "%dh" (num $h "since" 2 200)))) }},
+   "latestBackupTime": {{ json (ts "2006-01-02T15:04:05Z" (ago (printf "%dm" (num $h "backup" 30 1400)))) }},
+   "userData": {"email": "owner@example.com", "fullName": "Example Owner", "role": "owner", "status": "ACTIVE",
+                "controllers": ["network", "protect"], "apps": ["users"]},
+   "reportedState": {"name": "Console {{ add $h.index 1 }}", "hostname": "console-{{ add $h.index 1 }}",
+     "state": "{{ $state }}", "version": {{ json (pick $h "version" "4.3.6" "4.4.9" "5.0.16") }}, "releaseChannel": "release",
+     "deviceState": {{ json (pick $h "deviceState" "setup" "updateAvailable") }},
+     "hardware": {"shortname": "{{ $model }}", "name": "UniFi console {{ $model }}"},
+     "ip": "192.0.2.{{ add $h.index 1 }}", "mac": {{ json (mac $h) }}, "timezone": "Europe/Paris",
+     "location": {"lat": 0, "long": 0, "radius": 0, "text": ""}}}
+{{- end }}{{ end }}
+],
+{{- if lt (add $start 2) (len $all) }} "nextToken": "page-2",{{ end }}
+ "httpStatusCode": 200, "traceId": "00000000000000000000000000000001"}

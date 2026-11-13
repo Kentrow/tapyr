@@ -1,0 +1,39 @@
+{{- /* GET /v1/devices: the devices grouped by console, 2 consoles a page, the cursor in the body (page-2) */ -}}
+{{- $start := 0 }}{{ if eq (index $.query "nextToken") "page-2" }}{{ $start = 2 }}{{ end -}}
+{{- $all := items "hosts" -}}
+{"data": [
+{{- range $i, $h := $all }}{{ if and (ge $i $start) (lt $i (add $start 2)) }}{{ if gt $i $start }},{{ end }}
+  {"hostId": "{{ printf "SIM%060d" (add $h.index 1) }}:{{ num $h "sysid" 100000000 999999999 }}",
+   "hostName": "console-{{ add $h.index 1 }}", "updatedAt": {{ json (ts "2006-01-02T15:04:05Z" (ago "1m")) }},
+   "devices": [
+{{- range $s := children "sites" $h }}
+{{- range $j, $d := children "devices" $s }}{{ if $j }},{{ end }}
+{{- /* n 0 the gateway (the console), 1-2 switches, 3-5 access points */ -}}
+{{- $st := flap $d "status" "15m" "online:0.95" "offline:0.05" }}
+{{- $fw := pick $d "fw" "upToDate" "upToDate" "upToDate" "updateAvailable" }}
+{{- $mac := printf "%s" (mac $d) }}
+    {{- if eq $d.n 0 }}
+    {"id": "SIMDEV{{ printf "%06d" $d.index }}", "mac": {{ json $mac }}, "name": "Gateway {{ add $s.index 1 }}",
+     "model": "UniFi console", "shortname": {{ json (pick $h "model" "UCGMAX" "UDMPRO" "UDMSE") }}, "ip": {{ json (ipv4 $d) }},
+     "productLine": "network", "status": "{{ $st }}", "version": "4.3.6", "firmwareStatus": "{{ $fw }}",
+     "updateAvailable": {{ if eq $fw "updateAvailable" }}"4.4.1"{{ else }}""{{ end }}, "isConsole": true, "isManaged": true,
+    {{- else if lt $d.n 3 }}
+    {"id": "SIMDEV{{ printf "%06d" $d.index }}", "mac": {{ json $mac }}, "name": "Switch {{ add $s.index 1 }}-{{ $d.n }}",
+     "model": {{ json (pick $d "model" "USW Lite 8 PoE" "USW Pro Max 24 PoE") }}, "shortname": {{ json (pick $d "model" "USL8LP" "USPM24P") }},
+     "ip": {{ json (ipv4 $d) }}, "productLine": "network", "status": "{{ $st }}", "version": "7.1.26", "firmwareStatus": "{{ $fw }}",
+     "updateAvailable": "", "isConsole": false, "isManaged": true,
+    {{- else }}
+    {"id": "SIMDEV{{ printf "%06d" $d.index }}", "mac": {{ json $mac }}, "name": "AP {{ add $s.index 1 }}-{{ sub $d.n 2 }}",
+     "model": {{ json (pick $d "model" "U7 Lite" "U7 Pro") }}, "shortname": {{ json (pick $d "model" "G7LT" "U7PRO") }},
+     "ip": {{ json (ipv4 $d) }}, "productLine": "network", "status": "{{ $st }}", "version": "8.0.39", "firmwareStatus": "{{ $fw }}",
+     "updateAvailable": "", "isConsole": false, "isManaged": true,
+    {{- end }}
+     "startupTime": {{ json (ts "2006-01-02T15:04:05Z" (ago (printf "%dh" (num $d "boot" 1 900)))) }},
+     "adoptionTime": "2025-01-15T09:30:00Z", "note": "",
+     "uidb": {"guid": "00000000-0000-4000-8000-000000000000", "id": "00000000-0000-4000-8000-000000000000"}}
+{{- end }}{{ end }}
+   ]}
+{{- end }}{{ end }}
+],
+{{- if lt (add $start 2) (len $all) }} "nextToken": "page-2",{{ end }}
+ "httpStatusCode": 200, "traceId": "00000000000000000000000000000003"}

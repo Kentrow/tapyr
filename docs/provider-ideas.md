@@ -6,11 +6,10 @@ This is a pool of ideas, not a commitment, and contributions are welcome: read [
 
 ## Network and SD-WAN (first use case)
 
-Juniper Mist and Cisco ThousandEyes, ideas of this page, are built-in packages since v0.3.0: [`juniper-mist`](../providers/juniper-mist/README.md) and [`cisco-thousandeyes`](../providers/cisco-thousandeyes/README.md).
+Juniper Mist and Cisco ThousandEyes, ideas of this page, are built-in packages since v0.3.0: [`juniper-mist`](../providers/juniper-mist/README.md) and [`cisco-thousandeyes`](../providers/cisco-thousandeyes/README.md). UniFi Site Manager is one too: [`unifi-site-manager`](../providers/unifi-site-manager/README.md).
 
 | Provider | Metrics of interest | Limit pattern | Notes |
 |---|---|---|---|
-| Ubiquiti UniFi Site Manager | Sites, devices, ISP metrics | Verify | Large homelab and SMB audience |
 | VeloCloud Orchestrator | SD-WAN links, QoE, failovers | Verify | |
 | Peplink InControl2, Cradlepoint NetCloud | 4G/5G routers, signal, data usage | Verify | Same family as Teltonika |
 | EfficientIP SOLIDserver, Infoblox | DHCP scope usage, subnet saturation, DNS health | Verify (often on-prem, per-appliance) | High-value, rarely exposed metrics |

@@ -746,6 +746,119 @@
           }
         }
       ]
+    },
+    {
+      "name": "unifi-site-manager",
+      "version": "0.1.0",
+      "displayName": "UniFi Site Manager",
+      "description": "UniFi Site Manager API v1 (the consoles, sites, devices and ISP metrics of every console of a UI account)",
+      "docs": "https://developer.ui.com/site-manager/v1.0.0/gettingstarted",
+      "categories": [
+        "network",
+        "internet-measurement"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "real-platform",
+        "date": "2026-11-13",
+        "platformVersion": "Site Manager API 1.0.0",
+        "notes": "A real UI account with one console and two WAN interfaces, read-only (an API key with the Site Manager scope only): the hosts, sites, devices and 5-minute ISP metrics templates with tapyr run, and the units checked against the UniFi interface. The hourly ISP metrics endpoint was called, not run as a job; pagination over several pages is simulator-only (one console). Built from the official OpenAPI description and the Getting Started page"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/unifi-site-manager/README.md",
+      "simulator": true,
+      "auth": "header",
+      "templates": [
+        {
+          "name": "unifi-devices",
+          "path": "/v1/devices",
+          "defaultInterval": "5m",
+          "metrics": [
+            "unifi_device_boot_timestamp_seconds",
+            "unifi_device_info",
+            "unifi_device_up",
+            "unifi_device_update_available"
+          ]
+        },
+        {
+          "name": "unifi-hosts",
+          "path": "/v1/hosts",
+          "defaultInterval": "15m",
+          "metrics": [
+            "unifi_host_blocked",
+            "unifi_host_connected",
+            "unifi_host_info",
+            "unifi_host_last_backup_timestamp_seconds",
+            "unifi_host_state_change_timestamp_seconds"
+          ]
+        },
+        {
+          "name": "unifi-isp-metrics",
+          "path": "/v1/isp-metrics/5m",
+          "defaultInterval": "5m",
+          "metrics": [
+            "unifi_isp_expected_download_bits_per_second",
+            "unifi_isp_expected_upload_bits_per_second",
+            "unifi_isp_latency_avg_seconds",
+            "unifi_isp_latency_max_seconds",
+            "unifi_isp_packet_loss_ratio",
+            "unifi_isp_uptime_ratio"
+          ]
+        },
+        {
+          "name": "unifi-isp-metrics-hourly",
+          "path": "/v1/isp-metrics/1h",
+          "defaultInterval": "1h",
+          "metrics": [
+            "unifi_isp_expected_download_bits_per_second",
+            "unifi_isp_expected_upload_bits_per_second",
+            "unifi_isp_latency_avg_seconds",
+            "unifi_isp_latency_max_seconds",
+            "unifi_isp_packet_loss_ratio",
+            "unifi_isp_uptime_ratio"
+          ]
+        },
+        {
+          "name": "unifi-sites",
+          "path": "/v1/sites",
+          "defaultInterval": "5m",
+          "metrics": [
+            "unifi_site_clients",
+            "unifi_site_critical_notifications",
+            "unifi_site_devices",
+            "unifi_site_devices_offline",
+            "unifi_site_devices_pending_update",
+            "unifi_site_guest_clients",
+            "unifi_site_info",
+            "unifi_site_internet_issues",
+            "unifi_site_internet_uptime_ratio",
+            "unifi_site_wan_info",
+            "unifi_site_wan_up",
+            "unifi_site_wan_uptime_ratio",
+            "unifi_site_wifi_tx_retry_ratio"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "rate",
+          "kind": "rate",
+          "value": "10000/m, burst 167",
+          "scope": [
+            "credential"
+          ],
+          "description": "10,000 requests a minute for the v1 stable release (Getting Started, Rate Limiting; 100 a minute for Early Access endpoints, which no template uses), 429 with Retry-After in seconds when exceeded. The scope is not documented: assumed per API key. No quota header is sent (checked against a real account, 2026-11-13). The connector (/v1/connector, 100 requests a minute per console) is not used.",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developer.ui.com/site-manager/v1.0.0/gettingstarted",
+            "date": "2026-11"
+          }
+        }
+      ]
     }
   ]
 }

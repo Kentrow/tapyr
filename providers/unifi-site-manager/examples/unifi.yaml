@@ -1,0 +1,41 @@
+# Example configuration for the consoles of a UI account. The rate limit of
+# 10,000 requests a minute is far from binding: with up to 100 consoles a
+# page, the defaults spend about 1 request a minute (4 every 5 minutes, and
+# one every 15 minutes for the consoles).
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: unifi }
+spec:
+  provider: unifi-site-manager
+  params: {}
+  secrets:
+    # An API key of the UI account (unifi.ui.com, Settings > API Keys), with
+    # the Site Manager scope only.
+    apiKey: { env: TAPYR_UNIFI_API_KEY }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: unifi-hosts }
+spec: { account: unifi, template: unifi-hosts }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: unifi-sites }
+spec: { account: unifi, template: unifi-sites }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: unifi-devices }
+spec: { account: unifi, template: unifi-devices }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: unifi-isp-metrics }
+spec: { account: unifi, template: unifi-isp-metrics }
+# The hourly windows (kept 30 days by UniFi) are a separate template, for a
+# long history at a low resolution:
+# ---
+# apiVersion: tapyr/v1alpha1
+# kind: Job
+# metadata: { name: unifi-isp-metrics-hourly }
+# spec: { account: unifi, template: unifi-isp-metrics-hourly }

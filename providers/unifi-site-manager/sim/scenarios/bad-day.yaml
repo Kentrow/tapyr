@@ -1,0 +1,18 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: bad-day
+  description: >-
+    Slow responses, then intermittent 502 from the cloud on the ISP metrics,
+    then a short outage of the API.
+spec:
+  steps:
+    - at: 1h
+      for: 1h
+      latency: { p50: 800ms, p99: 5s }
+    - at: 2h
+      for: 30m
+      errors: { routes: ["/v1/isp-metrics/**"], status: 502, ratio: 0.3 }
+    - at: 4h
+      for: 10m
+      outage: true

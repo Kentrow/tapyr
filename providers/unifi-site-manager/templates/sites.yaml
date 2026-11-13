@@ -1,0 +1,126 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: unifi-sites
+spec:
+  provider: unifi-site-manager
+  # The sites of the UniFi Network application of every console, with their
+  # statistics (device and client counts, WAN state). The statistics vary
+  # with the UniFi Network version: every field is optional.
+  defaultInterval: 5m
+  defaultPriority: normal
+  request:
+    path: /v1/sites
+  estimate:
+    pagesPerRun: 1
+  extract:
+    # One item per site (kind site), then one per WAN interface of a site
+    # (kind wan, from statistics.wans), each metric reading its own kind.
+    items: >-
+      default(response.body.data, []).map(s, {'kind': 'site', 'id': s.siteId, 'host': s.hostId,
+        'meta': default(s.meta, {}), 'st': default(s.statistics, {})})
+      + default(response.body.data, []).map(s, default(default(s.statistics, {}).wans, {}).map(w,
+        {'kind': 'wan', 'id': s.siteId, 'wan': w.lower(), 'v': s.statistics.wans[w]})).flatten()
+    metrics:
+      - name: unifi_site_devices
+        help: Devices of the site by kind
+        value: item.st.counts.gatewayDevice
+        labels: { site_id: item.id, kind: "'gateway'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.gatewayDevice)"
+      - name: unifi_site_devices
+        help: Devices of the site by kind
+        value: item.st.counts.wifiDevice
+        labels: { site_id: item.id, kind: "'wifi'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.wifiDevice)"
+      - name: unifi_site_devices
+        help: Devices of the site by kind
+        value: item.st.counts.wiredDevice
+        labels: { site_id: item.id, kind: "'wired'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.wiredDevice)"
+      - name: unifi_site_devices_offline
+        help: Offline devices of the site by kind
+        value: item.st.counts.offlineGatewayDevice
+        labels: { site_id: item.id, kind: "'gateway'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.offlineGatewayDevice)"
+      - name: unifi_site_devices_offline
+        help: Offline devices of the site by kind
+        value: item.st.counts.offlineWifiDevice
+        labels: { site_id: item.id, kind: "'wifi'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.offlineWifiDevice)"
+      - name: unifi_site_devices_offline
+        help: Offline devices of the site by kind
+        value: item.st.counts.offlineWiredDevice
+        labels: { site_id: item.id, kind: "'wired'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.offlineWiredDevice)"
+      - name: unifi_site_devices_pending_update
+        help: Devices of the site with a firmware update pending
+        value: item.st.counts.pendingUpdateDevice
+        labels: { site_id: item.id }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.pendingUpdateDevice)"
+      - name: unifi_site_clients
+        help: Clients connected to the site by kind (guests are counted apart)
+        value: item.st.counts.wifiClient
+        labels: { site_id: item.id, kind: "'wifi'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.wifiClient)"
+      - name: unifi_site_clients
+        help: Clients connected to the site by kind (guests are counted apart)
+        value: item.st.counts.wiredClient
+        labels: { site_id: item.id, kind: "'wired'" }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.wiredClient)"
+      - name: unifi_site_guest_clients
+        help: Guest clients connected to the site
+        value: item.st.counts.guestClient
+        labels: { site_id: item.id }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.guestClient)"
+      - name: unifi_site_critical_notifications
+        help: Critical notifications of the site
+        value: item.st.counts.criticalNotification
+        labels: { site_id: item.id }
+        skipIf: "item.kind != 'site' || !has(item.st.counts) || !has(item.st.counts.criticalNotification)"
+      - name: unifi_site_internet_issues
+        help: Internet issues currently reported for the site
+        value: "size(default(item.st.internetIssues, []))"
+        labels: { site_id: item.id }
+        skipIf: "item.kind != 'site' || !has(item.st.internetIssues)"
+      - name: unifi_site_internet_uptime_ratio
+        help: Share of the time the site had a working internet connection (the window of UniFi)
+        unit: ratio
+        value: "toFloat(item.st.percentages.wanUptime) / 100.0"
+        labels: { site_id: item.id }
+        skipIf: "item.kind != 'site' || !has(item.st.percentages) || !has(item.st.percentages.wanUptime)"
+      - name: unifi_site_wifi_tx_retry_ratio
+        help: Share of the Wi-Fi frames sent again by the access points of the site
+        unit: ratio
+        value: "toFloat(item.st.percentages.txRetry) / 100.0"
+        labels: { site_id: item.id }
+        skipIf: "item.kind != 'site' || !has(item.st.percentages) || !has(item.st.percentages.txRetry)"
+      - name: unifi_site_wan_up
+        help: WAN port of the site gateway up (1 up, 0 down)
+        value: item.v.portUp
+        labels: { site_id: item.id, wan: item.wan }
+        skipIf: "item.kind != 'wan' || !has(item.v.portUp)"
+      - name: unifi_site_wan_uptime_ratio
+        help: Share of the time the WAN interface was up (the window of UniFi)
+        unit: ratio
+        value: "toFloat(item.v.wanUptime) / 100.0"
+        labels: { site_id: item.id, wan: item.wan }
+        skipIf: "item.kind != 'wan' || !has(item.v.wanUptime)"
+    info:
+      # No gateway MAC, external address or free-text description.
+      - name: unifi_site_info
+        help: Descriptive attributes of a site
+        labels:
+          site_id: item.id
+          host_id: item.host
+          name: "default(item.meta.desc, '')"
+          timezone: "default(item.meta.timezone, '')"
+          gateway_model: "has(item.st.gateway) ? default(item.st.gateway.shortname, '') : ''"
+        skipIf: "item.kind != 'site'"
+      - name: unifi_site_wan_info
+        help: Internet provider of a WAN interface of a site
+        labels:
+          site_id: item.id
+          wan: item.wan
+          isp_name: "has(item.v.ispInfo) ? default(item.v.ispInfo.name, '') : ''"
+          isp_asn: "has(item.v.ispInfo) ? default(item.v.ispInfo.asn, '') : ''"
+        skipIf: "item.kind != 'wan'"

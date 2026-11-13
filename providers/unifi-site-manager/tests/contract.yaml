@@ -1,0 +1,35 @@
+# Contract test of unifi-site-manager: every template once against the
+# synthetic account of the simulator ($SIM_URL). The lists span two pages
+# (2 consoles a page), so the cursor pagination is exercised.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: contract }
+spec:
+  provider: unifi-site-manager
+  params: { baseURL: "$SIM_URL" }
+  secrets: { apiKey: { env: UNIFI_API_KEY } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: hosts }
+spec: { account: contract, template: unifi-hosts }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: sites }
+spec: { account: contract, template: unifi-sites }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: devices }
+spec: { account: contract, template: unifi-devices }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: isp-metrics }
+spec: { account: contract, template: unifi-isp-metrics }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: isp-metrics-hourly }
+spec: { account: contract, template: unifi-isp-metrics-hourly }

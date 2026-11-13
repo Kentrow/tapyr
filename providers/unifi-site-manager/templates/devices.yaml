@@ -1,0 +1,50 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: unifi-devices
+spec:
+  provider: unifi-site-manager
+  # The UniFi devices of the consoles where the account is owner or super
+  # admin, grouped by console: one item per device.
+  defaultInterval: 5m
+  defaultPriority: normal
+  request:
+    path: /v1/devices
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: >-
+      default(response.body.data, []).map(h, default(h.devices, []).map(d,
+        {'host': h.hostId, 'd': d})).flatten()
+    metrics:
+      - name: unifi_device_up
+        help: Device online (1 online, 0 offline or any other state)
+        value: "item.d.status == 'online'"
+        labels: { device_id: item.d.id, host_id: item.host }
+        skipIf: "!has(item.d.status)"
+      - name: unifi_device_update_available
+        help: A firmware update is available for the device (1 available)
+        value: "item.d.firmwareStatus == 'updateAvailable'"
+        labels: { device_id: item.d.id, host_id: item.host }
+        skipIf: "!has(item.d.firmwareStatus) || item.d.firmwareStatus == null"
+      - name: unifi_device_boot_timestamp_seconds
+        help: Last startup of the device
+        unit: seconds
+        value: "double(int(parseTimestamp(item.d.startupTime)))"
+        labels: { device_id: item.d.id, host_id: item.host }
+        skipIf: "default(item.d.startupTime, '') == ''"
+    info:
+      # No IP address nor note (free text); the identifier of a device is its
+      # MAC address, as the API names it.
+      - name: unifi_device_info
+        help: Descriptive attributes of a device
+        labels:
+          device_id: item.d.id
+          host_id: item.host
+          name: "default(item.d.name, '')"
+          model: "default(item.d.model, '')"
+          shortname: "default(item.d.shortname, '')"
+          product_line: "default(item.d.productLine, '')"
+          version: "default(item.d.version, '')"
+          firmware_status: "default(item.d.firmwareStatus, '')"
+          console: "default(item.d.isConsole, false)"

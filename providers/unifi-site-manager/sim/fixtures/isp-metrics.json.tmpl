@@ -1,0 +1,29 @@
+{{- /* GET /v1/isp-metrics/{type}: the windows of every site published within the range the templates
+   request (5m: the last hour, published 30 minutes late, so 6 windows; 1h: the last 4 hours, published
+   3 hours late, so 2 windows). The fixture ignores beginTimestamp. */ -}}
+{{- $step := 300 }}{{ $lag := 1800 }}{{ $count := 6 }}
+{{- if eq $.vars.type "1h" }}{{ $step = 3600 }}{{ $lag = 10800 }}{{ $count = 2 }}{{ end -}}
+{{- $now := unix $.now -}}
+{"data": [
+{{- range $i, $s := items "sites" }}{{ if $i }},{{ end }}
+{{- $wans := num $s "wans" 1 2 }}
+  {"metricType": "{{ $.vars.type }}", "hostId": "{{ printf "SIM%060d" (add $s.parent.index 1) }}:{{ num $s.parent "sysid" 100000000 999999999 }}",
+   "siteId": "{{ printf "%024x" (add (mul $s.index 7919) 4096) }}",
+   "periods": [
+{{- range $k := seq $count }}{{ if $k }},{{ end }}
+{{- $back := add (add $lag (mul (sub (sub $count 1) $k) $step)) (mod $now $step) }}
+{{- $t := ago (printf "%ds" $back) }}{{ $w := unix $t }}
+    {"metricTime": {{ json (ts "2006-01-02T15:04:05Z" $t) }}, "version": "10.0.162",
+     "data": {"wan": {"avgLatency": {{ num $s (printf "lat-%d" $w) 8 30 }}, "maxLatency": {{ num $s (printf "max-%d" $w) 30 80 }},
+                      "packetLoss": {{ num $s (printf "loss-%d" $w) 0 1 }}, "uptime": 100, "downtime": 0,
+                      "download_kbps": {{ mul (num $s "down" 3 20) 100000 }}, "upload_kbps": {{ mul (num $s "up" 1 10) 100000 }},
+                      "ispAsn": "64496", "ispName": "Example ISP"}
+     {{- if eq $wans 2 }},
+              "wan2": {"avgLatency": {{ num $s (printf "lat2-%d" $w) 30 90 }}, "maxLatency": {{ num $s (printf "max2-%d" $w) 90 180 }},
+                       "packetLoss": {{ num $s (printf "loss2-%d" $w) 0 4 }}, "uptime": {{ num $s (printf "up2-%d" $w) 97 100 }}, "downtime": 0,
+                       "download_kbps": 500000, "upload_kbps": 100000, "ispAsn": "64511", "ispName": "Example Mobile"}
+     {{- end }}}}
+{{- end }}
+   ]}
+{{- end }}
+], "httpStatusCode": 200, "traceId": "00000000000000000000000000000004"}

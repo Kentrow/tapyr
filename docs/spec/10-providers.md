@@ -10,6 +10,7 @@ The built-in provider packages. Each section was checked against the vendor docu
 | `aruba-central-classic` | Cloud, daily quota, rotating refresh tokens | Real account, read-only (November 2026) + simulator | Validates quota windows, header sync, auth plugin |
 | `juniper-mist` | Cloud, hourly quota per token, regional clouds | Simulator only (docs + public OpenAPI spec) | Validates header auth with a format, page pagination, hourly windows |
 | `cisco-thousandeyes` | Cloud, per-minute quota per organization starting at the first request | Simulator only (docs + official SDKs) | Validates windows followed through the reset header, source timestamps per round, optional query params |
+| `unifi-site-manager` | Cloud, one API key for every console of a UI account, rate limit per key | Real account, read-only (November 2026) + simulator | Validates cursor pagination in the body, windows published late with source timestamps, several item kinds from one response |
 
 ---
 
@@ -131,6 +132,26 @@ Cisco ThousandEyes API v7. Checked in November 2026 against the [rate limit docu
   - `thousandeyes-agents` (`GET /agents`);
   - `thousandeyes-network-results` (`GET /test-results/{testId}/network`, one instance per enabled `agent-to-server` or `agent-to-agent` test, samples stamped with their round).
 - **Deliverables**: provider package, synthetic simulator enforcing the organization limit with its headers, scenarios, dashboard, contract test. No e2e test (no access).
+
+## unifi-site-manager
+
+UniFi Site Manager API v1. Checked in November 2026 against the [Getting Started page](https://developer.ui.com/site-manager/v1.0.0/gettingstarted), the [OpenAPI description](https://developer.ui.com/site-manager/v1.0.0/openapi.json) (Site Manager API 1.0.0) and the responses of a real account (read-only).
+
+- **Auth**: an API key of the UI account in the `X-API-Key` header (unifi.ui.com, Settings > API Keys, the Site Manager scope only); the key sees every console the account owns or administers.
+- **Base URL**: `https://api.ui.com` (account param `baseURL`).
+- **Rate limits**:
+  - 10,000 requests a minute for the v1 stable release, 100 for Early Access endpoints (unused); `429` with `Retry-After` in seconds when exceeded; no quota header (checked on a real account);
+  - the scope is not documented: declared as `kind: rate`, `rate: 10000/m`, `scope: { by: [credential] }`;
+  - the connector (`/v1/connector/consoles/{id}/...`, 100 requests a minute per console, which also accepts writes) is not used.
+- **Pagination**: an opaque cursor, `pageSize` and `nextToken` in the query, `nextToken` in the body (absent on the last page); on `/v1/devices`, a page counts consoles, each with all its devices. No maximum page size is documented.
+- **Budget strategy**: account-wide lists, no fan-out: 4 requests every 5 minutes and one every 15 minutes for up to 100 consoles.
+- **Templates** (metrics in the [package README](../../providers/unifi-site-manager/README.md)):
+  - `unifi-hosts` (`GET /v1/hosts`);
+  - `unifi-sites` (`GET /v1/sites`, one item per site and per WAN interface);
+  - `unifi-devices` (`GET /v1/devices`);
+  - `unifi-isp-metrics` (`GET /v1/isp-metrics/5m?beginTimestamp=<now - 1h>`, windows published about 30 minutes late, stamped with their start);
+  - `unifi-isp-metrics-hourly` (`GET /v1/isp-metrics/1h`, optional).
+- **Deliverables**: provider package, synthetic simulator (the lists paginate themselves with a body cursor), scenarios, dashboard, contract test. No e2e test.
 
 ## Provider package checklist (definition of done)
 

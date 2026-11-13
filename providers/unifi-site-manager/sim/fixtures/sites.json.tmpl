@@ -1,0 +1,43 @@
+{{- /* GET /v1/sites: the sites of 2 consoles a page, the cursor in the body (page-2) */ -}}
+{{- $start := 0 }}{{ if eq (index $.query "nextToken") "page-2" }}{{ $start = 2 }}{{ end -}}
+{{- $all := items "hosts" -}}
+{"data": [
+{{- range $i, $h := $all }}{{ if and (ge $i $start) (lt $i (add $start 2)) }}{{ if gt $i $start }},{{ end }}
+{{- range $s := children "sites" $h }}
+{{- /* Devices: n 0 the gateway, 1-2 switches, 3-5 access points; their state as in devices.json.tmpl. */ -}}
+{{- $gwOff := 0 }}{{ $wiredOff := 0 }}{{ $wifiOff := 0 }}{{ $pending := 0 }}
+{{- range $d := children "devices" $s }}
+{{- $st := flap $d "status" "15m" "online:0.95" "offline:0.05" }}
+{{- if eq $st "offline" }}{{ if eq $d.n 0 }}{{ $gwOff = add $gwOff 1 }}{{ else if lt $d.n 3 }}{{ $wiredOff = add $wiredOff 1 }}{{ else }}{{ $wifiOff = add $wifiOff 1 }}{{ end }}{{ end }}
+{{- if eq (pick $d "fw" "upToDate" "upToDate" "upToDate" "updateAvailable") "updateAvailable" }}{{ $pending = add $pending 1 }}{{ end }}
+{{- end }}
+{{- $wans := num $s "wans" 1 2 }}
+  {"siteId": "{{ printf "%024x" (add (mul $s.index 7919) 4096) }}",
+   "hostId": "{{ printf "SIM%060d" (add $h.index 1) }}:{{ num $h "sysid" 100000000 999999999 }}",
+   "meta": {"desc": "Site {{ add $s.index 1 }}", "name": "default", "timezone": "Europe/Paris", "gatewayMac": {{ json (mac $s) }}},
+   "statistics": {
+     "counts": {"criticalNotification": {{ num $s "critical" 0 1 }}, "gatewayDevice": 1, "guestClient": {{ printf "%.0f" (walk $s "guests" 0 6 "15m") }},
+       "lanConfiguration": 2, "offlineDevice": {{ add $gwOff (add $wiredOff $wifiOff) }}, "offlineGatewayDevice": {{ $gwOff }},
+       "offlineWifiDevice": {{ $wifiOff }}, "offlineWiredDevice": {{ $wiredOff }}, "pendingUpdateDevice": {{ $pending }},
+       "totalDevice": 6, "wanConfiguration": {{ $wans }}, "wifiClient": {{ printf "%.0f" (walk $s "wifi" 5 60 "5m") }},
+       "wifiConfiguration": 2, "wifiDevice": 3, "wiredClient": {{ printf "%.0f" (walk $s "wired" 3 30 "15m") }}, "wiredDevice": 2},
+     "gateway": {"hardwareId": "00000000-0000-4000-8000-0000000001{{ printf "%02d" $s.index }}", "inspectionState": "off",
+       "ipsMode": "ids", "shortname": {{ json (pick $h "model" "UCGMAX" "UDMPRO" "UDMSE") }}},
+     "internetIssues": [],
+     "ispInfo": {"asn": 64496, "name": "Example ISP", "organization": "Example ISP"},
+     "percentages": {"txRetry": {{ walk $s "txretry" 2 15 "15m" }}, "wanUptime": {{ walk $s "wanuptime" 98 100 "1h" }}},
+     "wans": {
+       "WAN": {"externalIp": "203.0.113.{{ add $s.index 50 }}", "failoverPriority": 1, "portUp": true,
+               "ispInfo": {"asn": 64496, "name": "Example ISP", "organization": "Example ISP"},
+               "wanIssues": [], "wanUptime": {{ walk $s "wan1uptime" 98 100 "1h" }}}
+       {{- if eq $wans 2 }},
+       "WAN2": {"externalIp": "198.51.100.{{ add $s.index 50 }}", "failoverPriority": 2,
+               "portUp": {{ if eq (flap $s "wan2" "1h" "up:0.9" "down:0.1") "up" }}true{{ else }}false{{ end }},
+               "ispInfo": {"asn": 64511, "name": "Example Mobile", "organization": "Example Mobile"},
+               "wanIssues": [], "wanUptime": {{ walk $s "wan2uptime" 90 100 "1h" }}}
+       {{- end }}}},
+   "permission": "admin", "isOwner": true}
+{{- end }}{{ end }}{{ end }}
+],
+{{- if lt (add $start 2) (len $all) }} "nextToken": "page-2",{{ end }}
+ "httpStatusCode": 200, "traceId": "00000000000000000000000000000002"}

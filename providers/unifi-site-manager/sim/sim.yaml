@@ -1,0 +1,32 @@
+apiVersion: tapyr/v1alpha1
+kind: Simulation
+metadata:
+  name: unifi-site-manager
+spec:
+  # tapyr sim --all serves this simulator at --listen-base plus this offset.
+  portOffset: 7
+  # A synthetic UI account: 3 consoles, each with one site of the UniFi
+  # Network application and 6 devices (a gateway, 2 switches, 3 access
+  # points). Shapes follow the OpenAPI description (Site Manager API 1.0.0)
+  # and real responses (2026-11-13).
+  inventory:
+    seed: 42
+    sets:
+      - { name: hosts, count: 3 }
+      - { name: sites, parent: hosts, count: 1 }
+      - { name: devices, parent: sites, count: 6 }
+  auth:
+    accept:
+      header: [sim-unifi-key]
+  # The cursor is in the body (nextToken), which the cursor pagination of
+  # the simulator does not serve (it sends X-Next-Cursor): the fixtures of
+  # the lists paginate themselves, 2 consoles a page.
+  routes:
+    - path: /v1/hosts
+      response: { template: fixtures/hosts.json.tmpl }
+    - path: /v1/sites
+      response: { template: fixtures/sites.json.tmpl }
+    - path: /v1/devices
+      response: { template: fixtures/devices.json.tmpl }
+    - path: /v1/isp-metrics/{type}
+      response: { template: fixtures/isp-metrics.json.tmpl }
