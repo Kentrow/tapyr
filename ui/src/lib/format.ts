@@ -1,7 +1,7 @@
 // Formatting helpers. Durations and counts use compact units; times are
 // shown relative to now, with the absolute time in a title.
 
-import type { Health, Output } from "./types";
+import type { Budget, Health, Output } from "./types";
 
 export function duration(seconds: number | undefined): string {
   if (seconds === undefined || !Number.isFinite(seconds)) return "-";
@@ -142,4 +142,15 @@ export function versionLabel(s: { version: string; revision: string; go_version:
   const text = isDevVersion(s.version) ? ["Tapyr dev", short].filter(Boolean).join(" ") : `Tapyr v${s.version}`;
   const title = [`Tapyr ${s.version}`, s.revision && `revision ${s.revision}`, `built with ${s.go_version}`].filter(Boolean).join(", ");
   return { text, title };
+}
+
+// scopeAccounts names the accounts whose requests count in the scope of a
+// limit ("campus", "fleet-a and fleet-b", "fleet-a, fleet-b and 2 more"),
+// or the scope itself when the API names none.
+export function scopeAccounts(b: Pick<Budget, "scope" | "accounts">): string {
+  const a = b.accounts ?? [];
+  if (a.length === 0) return b.scope;
+  if (a.length === 1) return a[0] ?? b.scope;
+  if (a.length <= 3) return `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`;
+  return `${a.slice(0, 2).join(", ")} and ${a.length - 2} more`;
 }

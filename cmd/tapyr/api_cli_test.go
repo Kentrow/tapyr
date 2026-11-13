@@ -180,6 +180,10 @@ spec:
 	}
 	timelines := 0
 	for _, b := range budgets.Items {
+		// The only account of the provider is in every scope.
+		if len(b.Accounts) != 1 || b.Accounts[0] != "fleet" {
+			t.Errorf("budget %s/%s %s: accounts %q, want [fleet]", b.Provider, b.Limit, b.Scope, b.Accounts)
+		}
 		if b.Kind != "quota" {
 			continue
 		}

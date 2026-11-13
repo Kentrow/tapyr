@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
 import { QuotaTimeline } from "../components/QuotaTimeline";
-import { absolute, count, duration, since } from "../lib/format";
+import { absolute, count, duration, plural, scopeAccounts, since } from "../lib/format";
 import { useJSON, useList, useNow } from "../lib/live";
 import { useRoute } from "../lib/router";
 import type { Budget, Timeline } from "../lib/types";
@@ -48,7 +48,10 @@ function BudgetCard({ budget: b, focused }: { budget: Budget; focused: boolean }
         </h3>
         <BudgetState budget={b} />
       </div>
-      <div className="muted small mono" style={{ marginBottom: 10 }}>{b.scope}</div>
+      <div className="muted small" style={{ marginBottom: 10 }}>
+        <span className="mono">{b.scope}</span>
+        {(b.accounts ?? []).length > 0 && !b.scope.split(",").some((d) => d.startsWith("account=")) && <>, {plural(b.accounts.length, "account")}: {scopeAccounts(b)}</>}
+      </div>
       {b.kind === "quota" ? <QuotaBody budget={b} /> : b.kind === "rate" ? <RateBody budget={b} /> : <ConcurrencyBody budget={b} />}
     </div>
   );

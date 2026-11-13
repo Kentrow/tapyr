@@ -104,6 +104,8 @@ export interface Budget {
   limit: string;
   kind: "quota" | "rate" | "concurrency";
   scope: string;
+  // The accounts whose requests can count in the scope.
+  accounts: string[];
   max?: number;
   usable?: number;
   reserve?: number;

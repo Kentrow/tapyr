@@ -131,6 +131,11 @@ type Budget struct {
 	// Kind is quota, rate or concurrency.
 	Kind  string `json:"kind"`
 	Scope string `json:"scope"`
+	// Accounts are the accounts whose requests can count in the scope: the
+	// one or those its account, target or credential dimension names, every
+	// account of the provider for a scope without one (instance, provider,
+	// discovery variables).
+	Accounts []string `json:"accounts"`
 	// Quota limits.
 	Max                  *int64     `json:"max,omitempty"`
 	Usable               *int64     `json:"usable,omitempty"`

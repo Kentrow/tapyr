@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { count, duration, outputHealth, percent, plural, since } from "../lib/format";
+import { count, duration, outputHealth, percent, plural, scopeAccounts, since } from "../lib/format";
 import { useJSON, useList, useLive, type LiveEvent } from "../lib/live";
 import { href } from "../lib/router";
 import type { Account, Budget, Job, Output, Provider, Status } from "../lib/types";
@@ -181,14 +181,14 @@ function ProviderCard({ provider: p, accounts, jobs, quotas }: { provider: Provi
           {quotas.map((q) => (
             <a key={q.limit + q.scope} className="quota" href={href(["budgets"], { limit: `${q.provider}/${q.limit}`, scope: q.scope })}>
               <div className="row" style={{ justifyContent: "space-between" }}>
-                <span className="label">{q.limit} quota, {count(leftOf(q))} left of {count(q.max)}</span>
+                <span className="label">{q.limit} quota of {scopeAccounts(q)}</span>
                 {q.exhaustion_eta_seconds !== undefined && <Badge state="failing">runs out in {duration(q.exhaustion_eta_seconds)}</Badge>}
               </div>
               <Meter total={q.max ?? 0} label={`${leftOf(q)} left of ${q.max}`} parts={[
                 { value: q.used ?? 0, color: "var(--cyan-2)", label: `Tapyr ${count(q.used)}` },
                 { value: q.external_usage ?? 0, color: "var(--sun)", label: `others ${count(q.external_usage)}` },
               ]} />
-              <div className="small muted">resets {since(q.window_end)}</div>
+              <div className="small muted">{count(leftOf(q))} left of {count(q.max)}, resets {since(q.window_end)}</div>
             </a>
           ))}
         </div>
