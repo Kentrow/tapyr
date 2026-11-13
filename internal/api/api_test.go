@@ -53,11 +53,12 @@ func (fake) Providers(context.Context) []Provider {
 
 func (fake) Accounts(context.Context) []Account {
 	return []Account{
-		{Name: "acme", Provider: "meraki", Labels: map[string]string{"tenant": "acme"}, Targets: []Target{}, Circuit: "closed", Auth: AuthStatus{Type: "header"}},
+		{Name: "acme", Provider: "meraki", Labels: map[string]string{"tenant": "acme"}, Targets: []Target{}, Circuit: "closed", Auth: AuthStatus{Type: "header"}, Health: "ok", HealthReasons: []string{}},
 		{
 			Name: "fleet", Provider: "rutos", Labels: map[string]string{},
 			Targets: []Target{{Name: "south", Labels: map[string]string{"site": "south"}, Circuit: "open"}},
 			Auth:    AuthStatus{Type: "session_login", TokenExpiry: ptr(at)},
+			Health:  "failing", HealthReasons: []string{"circuit open for target south"},
 		},
 	}
 }

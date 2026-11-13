@@ -11,11 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The web UI shows the version of the running Tapyr at the foot of the navigation, on every page, with the revision and the Go version in its tooltip (it used to be in the subtitle of the Overview page only).
 - `unifi-site-manager`, a provider package for the UniFi Site Manager API v1, the cloud API of Ubiquiti: with one API key, the consoles, sites (device and client counts, WAN state), devices and ISP metrics (latency, packet loss, uptime and expected speeds per WAN interface, in 5-minute or hourly windows stamped with their start) of every console of a UI account, within the limit of 10,000 requests a minute. Validated against a real account.
+- Account health in the status API and the web UI: `GET /api/v1/accounts` gives every account a `health` (`ok`, `degraded`, `failing` or `unknown`) from the last runs of its jobs, its credentials and its circuits, and `health_reasons` saying why it is not ok (the redacted errors of its jobs, such as the `401` of a rejected key, a re-bootstrap required, open circuits). The Overview lists the accounts that are not ok with their reasons; the Graph colors the account nodes with their health and shows the reasons in the detail panel.
 - `GET /api/v1/budgets` names the `accounts` whose requests count in every scope, so that a scope keyed by a credential hash (`credential=f0e5...`) or a target says which accounts share it. The quota bars of the Overview are named by these accounts (`daily quota of campus-a`, `monthly quota of fleet-north and fleet-south`), where two accounts of a provider used to show two identical titles, and the Budgets page names them under the scope.
 
 ### Changed
 
 - The budget ledger is persisted incrementally: every 5 seconds, Tapyr writes the counters and minute buckets that changed, where it used to rewrite every minute of every quota window (up to 1440 rows per scope of a daily quota). Far fewer writes to the state store, which matters on small disks (SD cards, small VPS). The format of the state store does not change.
+- The health of a provider aggregates the health of its accounts: one account failing out of several makes the provider `degraded`, where it used to make it `failing`.
+- A run skipped by the budget, an overlap or an open circuit, or a partial one, makes its job `degraded` instead of `failing`: nothing failed, but not everything was collected.
 
 ### Fixed
 

@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -53,6 +54,21 @@ kind: Job
 metadata: { name: devices }
 spec: { account: fleet, template: example-sim-devices, interval: 2m, outputs: [prom] }
 ---
+# A second account whose key the simulator rejects: it fails, and its
+# provider is only degraded since the other account works.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: broken }
+spec:
+  provider: example-sim
+  params: { baseURL: "http://%s/api/v1" }
+  secrets: { apiKey: { env: TAPYR_BROKEN_API_KEY } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: broken-devices }
+spec: { account: broken, template: example-sim-devices, interval: 2m }
+---
 apiVersion: tapyr/v1alpha1
 kind: Output
 metadata: { name: prom }
@@ -68,11 +84,11 @@ spec:
   state: { path: %q }
   collection: { jitter: 0%% }
   log: { format: text }
-`, simAddr, filepath.Join(dir, "tapyr.db"))
+`, simAddr, simAddr, filepath.Join(dir, "tapyr.db"))
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	vars := map[string]string{"TAPYR_FLEET_API_KEY": "sim-api-key", "TAPYR_UI_USER": "admin", "TAPYR_UI_PASSWORD": "ui-password"}
+	vars := map[string]string{"TAPYR_FLEET_API_KEY": "sim-api-key", "TAPYR_BROKEN_API_KEY": "wrong-key", "TAPYR_UI_USER": "admin", "TAPYR_UI_PASSWORD": "ui-password"}
 	var inFlight, instances atomic.Int64
 	addr, stop := backgroundHooks(t, vars, &env{
 		clock:       clk,
@@ -143,8 +159,27 @@ spec:
 		!status.Ready || !status.LastReload.Success || len(status.ConfigHash) != 64 || status.Instances < 4 {
 		t.Errorf("status = %+v (%v)", status, err)
 	}
-	check("GET /api/v1/providers", "/api/v1/providers", 200)
-	check("GET /api/v1/accounts", "/api/v1/accounts", 200)
+	var providers api.List[api.Provider]
+	if err := json.Unmarshal(check("GET /api/v1/providers", "/api/v1/providers", 200), &providers); err != nil ||
+		len(providers.Items) != 1 || providers.Items[0].Health != "degraded" {
+		t.Errorf("providers = %+v (%v), want example-sim degraded", providers.Items, err)
+	}
+	var accounts api.List[api.Account]
+	if err := json.Unmarshal(check("GET /api/v1/accounts", "/api/v1/accounts", 200), &accounts); err != nil {
+		t.Fatal(err)
+	}
+	health := map[string]api.Account{}
+	for _, a := range accounts.Items {
+		health[a.Name] = a
+	}
+	if a := health["fleet"]; a.Health != "ok" || len(a.HealthReasons) != 0 {
+		t.Errorf("fleet: health %s %q, want ok", a.Health, a.HealthReasons)
+	}
+	if a := health["broken"]; a.Health != "failing" || len(a.HealthReasons) == 0 ||
+		!strings.HasPrefix(a.HealthReasons[0], "broken-devices: ") || !strings.Contains(a.HealthReasons[0], "401") ||
+		strings.Contains(strings.Join(a.HealthReasons, " "), "wrong-key") {
+		t.Errorf("broken: health %s %q, want failing with the 401 of broken-devices", a.Health, a.HealthReasons)
+	}
 	check("GET /api/v1/accounts/{name}", "/api/v1/accounts/fleet", 200)
 	check("GET /api/v1/accounts/{name}", "/api/v1/accounts/nope", 404)
 	var jobs api.List[api.Job]
@@ -201,6 +236,11 @@ spec:
 	var graph api.Graph
 	if err := json.Unmarshal(check("GET /api/v1/graph", "/api/v1/graph", 200), &graph); err != nil || len(graph.Nodes) < 6 || len(graph.Edges) < 5 {
 		t.Errorf("graph = %+v", graph)
+	}
+	for _, n := range graph.Nodes {
+		if want := map[string]string{"account/fleet": "ok", "account/broken": "failing", "provider/example-sim": "degraded"}[n.ID]; want != "" && n.Health != want {
+			t.Errorf("graph node %s: health %s, want %s", n.ID, n.Health, want)
+		}
 	}
 	check("GET /api/v1/outputs", "/api/v1/outputs", 200)
 	check("GET /api/v1/debug/jobs/{name}/last", "/api/v1/debug/jobs/devices/last", 404) // debug disabled

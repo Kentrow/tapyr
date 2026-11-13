@@ -256,6 +256,8 @@ pre.code .s { color: var(--code-string); } pre.code .n { color: var(--code-numbe
 .tnode-box.unknown { border-left-color: var(--line); }
 .tnode-box.selected { outline: 3px solid var(--cyan); }
 .panel { position: absolute; right: 16px; top: 16px; width: 320px; max-width: calc(100% - 32px); z-index: 5; }
+.panel .reasons { margin: 10px 0 0; padding-left: 18px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+.panel .reasons li { overflow-wrap: anywhere; }
 
 .json { font-family: var(--mono); font-size: 0.82rem; line-height: 1.55; }
 .json details { margin-left: 14px; }
@@ -273,7 +275,7 @@ pre.code .s { color: var(--code-string); } pre.code .n { color: var(--code-numbe
 .cell .label { font-size: .82rem; color: var(--ink-2); font-weight: 600; }
 .cell .value { font-size: 1.35rem; font-weight: 750; letter-spacing: -.02em; display: flex; align-items: center; gap: 8px; }
 .cell .value svg { width: 22px; height: 22px; flex: none; }
-.cell .hint { font-size: .85rem; color: var(--ink-2); }
+.cell .hint { font-size: .85rem; color: var(--ink-2); overflow-wrap: anywhere; }
 .cell.bad .value { color: var(--red); } .cell.warn .value { color: var(--sun-ink); }
 .cell.bad { border-color: color-mix(in srgb, var(--red) 45%, var(--line)); background: color-mix(in srgb, var(--red) 5%, var(--surface)); }
 .cells.attention { margin: 0 0 24px; }

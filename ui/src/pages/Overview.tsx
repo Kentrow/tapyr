@@ -31,6 +31,7 @@ export function Overview() {
   const okJobs = jobs.data.filter((j) => jobState(j) === "ok").length;
   const failing = jobs.data.filter((j) => jobState(j) === "bad");
   const reauth = accounts.data.filter((a) => a.auth.reauth_required);
+  const unhealthy = unhealthyAccounts(accounts.data);
   return (
     <>
       <PageHead title="Overview" sub={`Tapyr ${s.version}, up ${duration(s.uptime_seconds)}, configuration ${s.config_hash.slice(0, 8)} loaded ${since(s.last_reload.at)}.`} />
@@ -46,7 +47,7 @@ export function Overview() {
           hint={s.plan_feasible ? "every critical job on schedule" : "a quota would run out before its reset"} href={href(["plan"])} />
       </div>
 
-      {(!s.ready || !s.last_reload.success || reauth.length > 0) && (
+      {(!s.ready || !s.last_reload.success || reauth.length > 0 || unhealthy.length > 0) && (
         <div className="cells attention">
           {!s.ready && (
             <div className="cell warn">
@@ -67,6 +68,13 @@ export function Overview() {
               <span className="label">{a.provider}</span>
               <span className="value"><Icon name="alert" />Re-bootstrap required</span>
               <span className="hint">Account {a.name}: its credentials can no longer be renewed. Generate new ones and reload.</span>
+            </div>
+          ))}
+          {unhealthy.map((a) => (
+            <div className={`cell ${a.health === "failing" ? "bad" : "warn"}`} key={`health-${a.name}`}>
+              <span className="label">{a.provider} / {a.name}</span>
+              <span className="value"><Icon name="alert" />Account {a.health}</span>
+              <span className="hint mono">{a.reasons.join("; ")}</span>
             </div>
           ))}
         </div>
@@ -133,6 +141,23 @@ export function Overview() {
       </section>
     </>
   );
+}
+
+// unhealthyAccounts are the accounts that need a look, failing first, with
+// their reasons. A re-bootstrap has its own cell: the reasons that name it
+// are left out, and the account too when no other reason is left.
+export function unhealthyAccounts(accounts: Account[]): { name: string; provider: string; health: Account["health"]; reasons: string[] }[] {
+  const rank = (h: string) => (h === "failing" ? 0 : 1);
+  return accounts
+    .filter((a) => a.health === "failing" || a.health === "degraded")
+    .map((a) => ({
+      name: a.name,
+      provider: a.provider,
+      health: a.health,
+      reasons: a.auth.reauth_required ? (a.health_reasons ?? []).filter((r) => !r.includes("re-bootstrap")) : a.health_reasons ?? [],
+    }))
+    .filter((a) => a.reasons.length > 0)
+    .sort((a, b) => rank(a.health) - rank(b.health) || a.name.localeCompare(b.name));
 }
 
 // quotaHint names a quota and when it resets, and, when it would run out

@@ -297,7 +297,7 @@ components:
     Account:
       type: object
       additionalProperties: false
-      required: [name, provider, labels, targets, auth]
+      required: [name, provider, labels, targets, auth, health, health_reasons]
       properties:
         name: { type: string }
         provider: { type: string }
@@ -321,6 +321,11 @@ components:
             type: { type: string }
             token_expiry: { $ref: "#/components/schemas/Time" }
             reauth_required: { type: boolean }
+        health: { $ref: "#/components/schemas/Health" }
+        health_reasons:
+          type: array
+          description: Why the account is not ok (redacted job errors, a re-bootstrap required, open circuits); empty when ok
+          items: { type: string }
     RunSummary:
       type: object
       required: [run_id, instance, result, started_at, ended_at]

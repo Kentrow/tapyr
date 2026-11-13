@@ -49,6 +49,10 @@ export interface Account {
   targets: Target[];
   circuit?: string;
   auth: { type: string; token_expiry?: string; reauth_required: boolean };
+  health: Health;
+  // Why the account is not ok (redacted job errors, a re-bootstrap required,
+  // open circuits); empty when ok.
+  health_reasons: string[];
 }
 
 export interface RunSummary {
