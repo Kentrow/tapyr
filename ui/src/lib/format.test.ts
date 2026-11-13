@@ -1,8 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { count, duration, healthClass, outputHealth, plural, since, toYAML, versionLabel } from "./format";
+import { count, duration, healthClass, outputHealth, plural, scopeAccounts, since, toYAML, versionLabel } from "./format";
 import type { Output } from "./types";
 
 describe("format", () => {
+  it("names the accounts of a scope", () => {
+    expect(scopeAccounts({ scope: "account=campus", accounts: ["campus"] })).toBe("campus");
+    expect(scopeAccounts({ scope: "credential=ab12", accounts: ["fleet-a", "fleet-b"] })).toBe("fleet-a and fleet-b");
+    expect(scopeAccounts({ scope: "instance", accounts: ["a", "b", "c"] })).toBe("a, b and c");
+    expect(scopeAccounts({ scope: "instance", accounts: ["a", "b", "c", "d"] })).toBe("a, b and 2 more");
+    expect(scopeAccounts({ scope: "credential=ab12", accounts: [] })).toBe("credential=ab12");
+  });
   it("labels the running version", () => {
     expect(versionLabel({ version: "0.3.0", revision: "3b0e90b", go_version: "go1.27.4" })).toEqual({
       text: "Tapyr v0.3.0",

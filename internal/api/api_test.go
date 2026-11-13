@@ -108,12 +108,12 @@ func (fake) Runs(_ context.Context, name, instance string, limit int) ([]Run, er
 func (fake) Budgets(context.Context) []Budget {
 	return []Budget{
 		{
-			Provider: "meraki", Limit: "daily", Kind: "quota", Scope: "account=acme", Max: ptr[int64](1000), Usable: ptr[int64](1000),
+			Provider: "meraki", Limit: "daily", Kind: "quota", Scope: "account=acme", Accounts: []string{"acme"}, Max: ptr[int64](1000), Usable: ptr[int64](1000),
 			Reserve: ptr[int64](100), Used: ptr[int64](10), Remaining: ptr[int64](990), ExternalUsage: ptr[int64](0),
 			ReserveRemaining: ptr[int64](100), WindowStart: ptr(at), WindowEnd: ptr(at.Add(time.Hour)), ExhaustionETASeconds: ptr(30.0),
 		},
-		{Provider: "meraki", Limit: "rate", Kind: "rate", Scope: "account=acme", RatePerSecond: ptr(10.0), Burst: ptr(10.0), Tokens: ptr(9.5)},
-		{Provider: "meraki", Limit: "conc", Kind: "concurrency", Scope: "instance", Max: ptr[int64](4), InUse: ptr[int64](1), PenaltyUntil: ptr(at)},
+		{Provider: "meraki", Limit: "rate", Kind: "rate", Scope: "account=acme", Accounts: []string{"acme"}, RatePerSecond: ptr(10.0), Burst: ptr(10.0), Tokens: ptr(9.5)},
+		{Provider: "meraki", Limit: "conc", Kind: "concurrency", Scope: "instance", Accounts: []string{"acme"}, Max: ptr[int64](4), InUse: ptr[int64](1), PenaltyUntil: ptr(at)},
 	}
 }
 

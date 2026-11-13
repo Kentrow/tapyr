@@ -17,6 +17,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -215,6 +216,14 @@ spec:
 	}
 	timelines := 0
 	for _, b := range budgets.Items {
+		// An account scope names its account; the instance scope both.
+		want := []string{"broken", "fleet"}
+		if name, ok := strings.CutPrefix(b.Scope, "account="); ok {
+			want = []string{name}
+		}
+		if !slices.Equal(b.Accounts, want) {
+			t.Errorf("budget %s/%s %s: accounts %q, want %q", b.Provider, b.Limit, b.Scope, b.Accounts, want)
+		}
 		if b.Kind != "quota" {
 			continue
 		}

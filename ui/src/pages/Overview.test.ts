@@ -3,7 +3,7 @@ import { quotaHint, unhealthyAccounts } from "./Overview";
 import type { Account, Budget } from "../lib/types";
 
 const now = Date.parse("2026-11-03T12:00:00Z");
-const quota: Budget = { provider: "meraki", limit: "daily", kind: "quota", scope: "account", window_end: "2026-11-03T18:00:00Z" };
+const quota: Budget = { provider: "meraki", limit: "daily", kind: "quota", scope: "account", accounts: [], window_end: "2026-11-03T18:00:00Z" };
 
 describe("tightest quota hint", () => {
   it("says when the quota resets", () => {

@@ -79,7 +79,7 @@ Read-only, JSON, versioned under `/api/v1`. It is the **only** interface the UI 
 | `GET /api/v1/jobs` / `{name}` | Effective config (after defaults and template expansion), desired and effective intervals, instances, last run summary, next run |
 | `GET /api/v1/jobs/{name}/instances` | Fan-out instances with their variables and last result |
 | `GET /api/v1/jobs/{name}/runs?instance=` | Recent runs with statistics and redacted errors |
-| `GET /api/v1/budgets` | Every limit and scope key: kind, max, used, remaining (internal and observed), external usage, reserve, window bounds, projection |
+| `GET /api/v1/budgets` | Every limit and scope key: kind, max, used, remaining (internal and observed), external usage, reserve, window bounds, projection, and the accounts whose requests count in the scope (named by its account, target or credential dimension; every account of the provider for a scope without one) |
 | `GET /api/v1/budgets/{limit}/timeline?scope=` | `{limit}` is `provider/limit`, URL-encoded (`meraki-dashboard%2Fdaily`). Consumption time series for the current and previous window (per-minute buckets from the ledger) |
 | `GET /api/v1/plan` | The current plan (same data as `tapyr plan`) |
 | `GET /api/v1/graph` | Nodes and edges: provider, account, target, job, job instance groups, output |
@@ -120,7 +120,7 @@ The UI is built in CI and in `make build`; a binary built without UI assets serv
 
 ### Pages
 
-1. **Overview**: health summary, plan feasibility banner, providers and accounts cards with status, quota gauges (used / projected / limit per window), recent errors.
+1. **Overview**: health summary, plan feasibility banner, providers and accounts cards with status, quota gauges (used / projected / limit per window, named by the accounts of their scope), recent errors.
 2. **Graph**: provider -> account -> (targets) -> inventory jobs -> metric jobs -> outputs. Node color by health. Click a node to open its detail panel. Fan-out shown as grouped nodes with instance counts.
 3. **Job detail**: effective config (YAML view), desired vs effective interval with stretch reason, instances table, recent runs (result, duration, requests, pages, retries, samples), errors.
 4. **Budgets**: one card per limit and scope: timeline of consumption over the window with projection line, reserve, external usage, window reset time. Rate limits show wait time and 429s.

@@ -418,15 +418,17 @@ func (s statusSource) Runs(ctx context.Context, name, instance string, limit int
 }
 
 func (s statusSource) Budgets(context.Context) []api.Budget {
-	g := s.c.current()
-	if g == nil {
+	snap, ok := s.snapshot()
+	if !ok {
 		return nil
 	}
+	g := snap.g
+	jobs := append(slices.Clone(g.graph.Jobs), snap.instances...)
 	now := s.c.clock.Now()
 	var out []api.Budget
 	for _, q := range g.engine.Quotas() {
 		b := api.Budget{
-			Provider: q.Provider, Limit: q.Limit, Kind: string(config.LimitQuota), Scope: q.Scope,
+			Provider: q.Provider, Limit: q.Limit, Kind: string(config.LimitQuota), Scope: q.Scope, Accounts: scopeAccounts(q.Provider, q.Scope, jobs),
 			Max: ptr(q.Max), Usable: ptr(q.Usable), Reserve: ptr(q.Reserve), Used: ptr(q.Used), Remaining: ptr(q.Remaining),
 			ExternalUsage: ptr(q.ExternalUsage), ReserveRemaining: ptr(min(q.Reserve, max(0, q.Usable-q.Used))),
 			WindowStart: ptr(q.WindowStart.UTC()), WindowEnd: ptr(q.WindowEnd.UTC()), Rolling: q.Rolling, LimitMismatch: q.Mismatch,
@@ -440,7 +442,7 @@ func (s statusSource) Budgets(context.Context) []api.Budget {
 		out = append(out, b)
 	}
 	for _, l := range g.engine.Limits() {
-		b := api.Budget{Provider: l.Provider, Limit: l.Limit, Kind: string(l.Kind), Scope: l.Scope}
+		b := api.Budget{Provider: l.Provider, Limit: l.Limit, Kind: string(l.Kind), Scope: l.Scope, Accounts: scopeAccounts(l.Provider, l.Scope, jobs)}
 		if l.Kind == config.LimitRate {
 			b.RatePerSecond, b.Burst, b.Tokens = ptr(l.Rate), ptr(l.Burst), ptr(l.Tokens)
 		} else {

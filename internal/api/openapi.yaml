@@ -386,12 +386,16 @@ components:
     Budget:
       type: object
       additionalProperties: false
-      required: [provider, limit, kind, scope]
+      required: [provider, limit, kind, scope, accounts]
       properties:
         provider: { type: string }
         limit: { type: string }
         kind: { type: string, enum: [quota, rate, concurrency] }
         scope: { type: string }
+        accounts:
+          type: array
+          description: The accounts whose requests can count in the scope (every account of the provider for a scope without an account, target or credential dimension)
+          items: { type: string }
         max: { type: integer }
         usable: { type: integer }
         reserve: { type: integer }
