@@ -102,7 +102,7 @@ A step applies from `at` until `at + for`, or until the end when `for` is omitte
 - `externalConsumption` makes another client consume a quota at a steady hourly rate.
 - `errors` gives a status to a ratio of the requests to matching routes.
 - `fixtures` replaces the fixture of routes during the step (`fixtures: { "/orgs/{orgId}/networks": "fixtures/networks-after.json" }`), to simulate inventory changes.
-- `latency: { p50: 800ms, p99: 5s }` delays responses following a log-normal distribution with these quantiles (seeded), in simulated time.
+- `latency: { p50: 800ms, p99: 5s }` delays responses following a log-normal distribution with these quantiles (seeded), in simulated time. The delay is the processing time of the server: a request is counted by the limits when it arrives, then answered after the delay, holding its concurrency slot; a refusal (429) answers at once. Counted after the delay, requests sent at the pace of a rate limit would reach it bunched together and get 429 the client could not foresee.
 - `outage: true` closes connections without a response (the client sees a network error) while the step is active; a step without `for` lasts until the end.
 - `tokenExpiry: true` invalidates, when the step starts, every token issued before it (the next request gets `authFailed`).
 

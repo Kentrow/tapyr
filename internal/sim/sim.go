@@ -592,35 +592,45 @@ func (s *Server) serve(w http.ResponseWriter, req *http.Request) {
 		drop(w)
 		return
 	}
-	if delay > 0 {
-		if err := s.clock.Sleep(req.Context(), delay); err != nil {
-			return
-		}
+	// The latency of the scenario is the processing time of the server: a
+	// request is counted by the limits when it arrives, then answered after
+	// the delay, holding its concurrency slot. Counted after the delay,
+	// requests sent at the pace of the limit would reach the limits bunched
+	// together and get 429 the client could not foresee. A refusal answers
+	// at once, as a rate limiter in front of the server does.
+	wait := func() bool {
+		return delay <= 0 || s.clock.Sleep(req.Context(), delay) == nil
 	}
 	if s.issuer.handles(req) {
-		s.issuer.serve(w, req)
+		s.issuer.serve(w, req, wait)
 		return
 	}
 	if s.plugin != nil {
 		if endpoint, identity, handled, ok := s.plugin.TokenRequest(req); handled {
-			s.servePluginToken(w, req, endpoint, identity, ok)
+			s.servePluginToken(w, req, endpoint, identity, ok, wait)
 			return
 		}
 	}
 	rel, ok := strings.CutPrefix(req.URL.Path, s.basePath)
 	if !ok || (rel != "" && !strings.HasPrefix(rel, "/")) {
-		writeError(w, http.StatusNotFound, "not found")
+		if wait() {
+			writeError(w, http.StatusNotFound, "not found")
+		}
 		return
 	}
 	r, vars := s.match(req.Method, rel)
 	if r == nil {
-		writeError(w, http.StatusNotFound, "not found")
+		if wait() {
+			writeError(w, http.StatusNotFound, "not found")
+		}
 		return
 	}
 	s.applyScenario() // before the credentials: tokenExpiry
 	identity, ok := s.accept(req)
 	if !ok {
-		writeError(w, s.authFail, "invalid credentials")
+		if wait() {
+			writeError(w, s.authFail, "invalid credentials")
+		}
 		return
 	}
 	d := budget.Descriptor{
@@ -637,6 +647,9 @@ func (s *Server) serve(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer release()
+	if !wait() {
+		return
+	}
 	s.count(func(st *Stats) { st.Routes[r.method+" "+r.path]++ })
 	if status := s.injectedError(r, s.clock.Now()); status != 0 {
 		s.count(func(st *Stats) { st.Injected++ })
@@ -705,9 +718,11 @@ func newPluginSimulator(pa *config.PluginAuth, spec *config.SimulationSpec, opts
 
 // servePluginToken answers a token request of an auth plugin, as an auth
 // request of the provider limits.
-func (s *Server) servePluginToken(w http.ResponseWriter, req *http.Request, endpoint, identity string, ok bool) {
+func (s *Server) servePluginToken(w http.ResponseWriter, req *http.Request, endpoint, identity string, ok bool, wait func() bool) {
 	if !ok {
-		writeError(w, s.authFail, "invalid client credentials")
+		if wait() {
+			writeError(w, s.authFail, "invalid client credentials")
+		}
 		return
 	}
 	s.applyScenario()
@@ -725,6 +740,9 @@ func (s *Server) servePluginToken(w http.ResponseWriter, req *http.Request, endp
 		return
 	}
 	defer release()
+	if !wait() {
+		return
+	}
 	s.count(func(st *Stats) { st.Routes[req.Method+" "+endpoint]++; st.Served++ })
 	headers := map[string]string{}
 	s.quotaHeaders(d, headers)

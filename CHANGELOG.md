@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The web UI shows the version of the running Tapyr at the foot of the navigation, on every page, with the revision and the Go version in its tooltip (it used to be in the subtitle of the Overview page only).
 - `unifi-site-manager`, a provider package for the UniFi Site Manager API v1, the cloud API of Ubiquiti: with one API key, the consoles, sites (device and client counts, WAN state), devices and ISP metrics (latency, packet loss, uptime and expected speeds per WAN interface, in 5-minute or hourly windows stamped with their start) of every console of a UI account, within the limit of 10,000 requests a minute. Validated against a real account.
 
+### Fixed
+
+- Simulator: the `latency` of a scenario delays a response after the limits counted the request, as the processing time of a server, and the request holds its concurrency slot meanwhile. Counted after the delay, requests sent at the pace of a rate limit reached it bunched together: the `teltonika-rutos` simulator answered about 50 unexpected 429 a day to Tapyr under its `quota-tight` scenario.
+
 ## [0.3.0] - 2026-11-12
 
 ### Added
