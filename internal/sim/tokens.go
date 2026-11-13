@@ -105,13 +105,16 @@ func (is *issuer) handles(req *http.Request) bool {
 		(is.logout != "" && req.URL.Path == is.logout && req.Method == is.logoutM))
 }
 
-// serveLogout closes the session of the token the request carries.
-func (is *issuer) serveLogout(w http.ResponseWriter, req *http.Request) {
+// serveLogout closes the session of the token the request carries. wait
+// applies the latency of the scenario (see Server.serve).
+func (is *issuer) serveLogout(w http.ResponseWriter, req *http.Request, wait func() bool) {
 	s := is.s
 	token := is.tokenOf(req)
 	identity, ok := is.valid(token)
 	if !ok {
-		writeError(w, s.authFail, "invalid credentials")
+		if wait() {
+			writeError(w, s.authFail, "invalid credentials")
+		}
 		return
 	}
 	endpoint := strings.TrimPrefix(is.logout, s.basePath)
@@ -126,6 +129,9 @@ func (is *issuer) serveLogout(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer release()
+	if !wait() {
+		return
+	}
 	is.mu.Lock()
 	delete(is.tokens, token)
 	is.mu.Unlock()
@@ -165,15 +171,19 @@ func (is *issuer) open() int64 {
 	return n
 }
 
-func (is *issuer) serve(w http.ResponseWriter, req *http.Request) {
+// serve answers a token or login request. wait applies the latency of the
+// scenario after the limits counted the request (see Server.serve).
+func (is *issuer) serve(w http.ResponseWriter, req *http.Request, wait func() bool) {
 	s := is.s
 	if is.logout != "" && req.URL.Path == is.logout && req.Method == is.logoutM {
-		is.serveLogout(w, req)
+		is.serveLogout(w, req, wait)
 		return
 	}
 	identity, ok := is.authenticate(req)
 	if !ok {
-		writeError(w, s.authFail, "invalid credentials")
+		if wait() {
+			writeError(w, s.authFail, "invalid credentials")
+		}
 		return
 	}
 	s.applyScenario()
@@ -190,6 +200,9 @@ func (is *issuer) serve(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	defer release()
+	if !wait() {
+		return
+	}
 	s.count(func(st *Stats) { st.Routes[req.Method+" "+is.endpoint]++ })
 	token := is.issue(identity)
 	secs := int64(is.lifetime / time.Second)

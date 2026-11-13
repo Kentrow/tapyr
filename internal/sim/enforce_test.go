@@ -327,6 +327,56 @@ func TestFaultActions(t *testing.T) {
 	}
 }
 
+// TestLatencyAfterLimits checks that a request is counted by the limits
+// when it arrives, before the latency of the scenario (the processing time
+// of the server). A client pacing its requests at the limit must not get a
+// 429 because slow requests were counted late, together with the next
+// ones: the RutOS simulator answered 429 to Tapyr under its quota-tight
+// scenario (latency p50 1.5 s, p99 8 s) while Tapyr kept to 2 a second.
+func TestLatencyAfterLimits(t *testing.T) {
+	clk := clock.NewFake(midnight)
+	pkgs, err := provider.Builtin(loader(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// One second of latency for the requests that arrive within [1h, 1h+1s).
+	sc := &config.Scenario{Metadata: config.ObjectMeta{Name: "slow"}, Spec: config.ScenarioSpec{Steps: []config.ScenarioStep{
+		{At: config.Duration(time.Hour), For: config.Duration(time.Second), Latency: &config.ScenarioLatency{
+			P50: config.Duration(time.Second), P99: config.Duration(time.Second),
+		}},
+	}}}
+	s, err := New(provider.Find(pkgs, "example-sim"), Options{Clock: clk, Scenario: sc})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Within the limits of example-sim (10 a second, burst 10, 4 concurrent
+	// requests), 4 requests sent during the latency step: their responses
+	// wait one simulated second.
+	clk.Advance(time.Hour + 900*time.Millisecond)
+	slow := make(chan int, 4)
+	for range 4 {
+		go func() { slow <- call(s, "/api/v1/sites").Code }()
+	}
+	for clk.Waiters() < 4 {
+		time.Sleep(time.Millisecond)
+	}
+	// One second later they are answered, and the bucket of a client that
+	// spent 4 tokens a second ago is full again: 10 more requests, without
+	// latency (the step is over).
+	clk.Advance(time.Second)
+	codes := map[int]int{}
+	for range 4 {
+		codes[<-slow]++
+	}
+	for range 10 {
+		codes[call(s, "/api/v1/sites").Code]++
+	}
+	if codes[http.StatusOK] != 14 {
+		t.Errorf("codes = %v, want 14 times 200: the slow requests were counted after their latency", codes)
+	}
+}
+
 func TestTokenExpiry(t *testing.T) {
 	clk := clock.NewFake(midnight)
 	p := pkg(t, `{ type: session_login, sessionLogin: { request: { path: /login, body: { user: admin, pass: s3cr3t } },
