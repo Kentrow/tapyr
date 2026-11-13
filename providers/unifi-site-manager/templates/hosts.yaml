@@ -1,0 +1,50 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: unifi-hosts
+spec:
+  provider: unifi-site-manager
+  # The consoles (hosts) of the account. reportedState, sent by the console,
+  # varies with the UniFi OS version: every field is optional.
+  defaultInterval: 15m
+  defaultPriority: normal
+  request:
+    path: /v1/hosts
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: "default(response.body.data, [])"
+    metrics:
+      - name: unifi_host_connected
+        help: Console connected to the UniFi cloud (1 connected, 0 otherwise)
+        value: "item.reportedState.state == 'connected'"
+        labels: { host_id: item.id }
+        skipIf: "!has(item.reportedState) || item.reportedState == null || !has(item.reportedState.state)"
+      - name: unifi_host_blocked
+        help: Console blocked by UniFi (1 blocked)
+        value: "default(item.isBlocked, false)"
+        labels: { host_id: item.id }
+      - name: unifi_host_state_change_timestamp_seconds
+        help: Last change of the connection state of the console to the cloud
+        unit: seconds
+        value: "double(int(parseTimestamp(item.lastConnectionStateChange)))"
+        labels: { host_id: item.id }
+        skipIf: "default(item.lastConnectionStateChange, '') == ''"
+      - name: unifi_host_last_backup_timestamp_seconds
+        help: Last cloud backup of the console
+        unit: seconds
+        value: "double(int(parseTimestamp(item.latestBackupTime)))"
+        labels: { host_id: item.id }
+        skipIf: "default(item.latestBackupTime, '') == ''"
+    info:
+      # No address, MAC, serial, location or owner: those are in the
+      # response and stay out of the labels.
+      - name: unifi_host_info
+        help: Descriptive attributes of a console
+        labels:
+          host_id: item.id
+          type: "default(item.type, '')"
+          name: "has(item.reportedState) && item.reportedState != null ? default(item.reportedState.name, '') : ''"
+          model: "has(item.reportedState) && item.reportedState != null && has(item.reportedState.hardware) ? default(item.reportedState.hardware.shortname, '') : ''"
+          version: "has(item.reportedState) && item.reportedState != null ? default(item.reportedState.version, '') : ''"
+          release_channel: "has(item.reportedState) && item.reportedState != null ? default(item.reportedState.releaseChannel, '') : ''"

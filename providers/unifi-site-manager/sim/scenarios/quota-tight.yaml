@@ -1,0 +1,13 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: quota-tight
+  description: >-
+    The Site Manager API has no quota: its rate limit of 10,000 requests a
+    minute per key is the constraint. Other integrations of the UI account
+    spend most of it: a quarter of the requests get 429,
+    and Tapyr penalizes the key and retries within its budget.
+spec:
+  steps:
+    - at: 0s
+      errors: { routes: ["/v1/**"], status: 429, ratio: 0.25 }

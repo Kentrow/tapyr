@@ -38,7 +38,7 @@ func TestSimAll(t *testing.T) {
 	want := map[string]string{
 		"0.0.0.0:9101": "aruba-central-classic", "0.0.0.0:9102": "example-sim", "0.0.0.0:9103": "meraki-dashboard",
 		"0.0.0.0:9104": "teltonika-rms", "0.0.0.0:9105": "teltonika-rutos", "0.0.0.0:9106": "juniper-mist",
-		"0.0.0.0:9107": "cisco-thousandeyes",
+		"0.0.0.0:9107": "cisco-thousandeyes", "0.0.0.0:9108": "unifi-site-manager",
 	}
 	deadline := time.Now().Add(10 * time.Second)
 	for {

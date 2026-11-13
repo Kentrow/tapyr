@@ -1,0 +1,74 @@
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: unifi-isp-metrics
+spec:
+  provider: unifi-site-manager
+  # ISP metrics of every site, by WAN interface, in 5m windows stamped
+  # with their start (metricTime). The windows are published about 30 minutes late: the run reads the last
+  # hour, and the windows already sent are deduplicated. downtime is not
+  # mapped: its unit is not documented.
+  defaultInterval: 5m
+  defaultPriority: normal
+  request:
+    path: /v1/isp-metrics/5m
+    query:
+      # Whole seconds: RFC 3339 without a fraction.
+      beginTimestamp: { expr: "string(fromUnix(int(now) - 3600))" }
+  pagination:
+    type: none
+  estimate:
+    pagesPerRun: 1
+  extract:
+    # One item per site, window and WAN interface (wan, wan2...).
+    items: >-
+      default(response.body.data, []).map(s, default(s.periods, []).map(p,
+        default(p.data, {}).map(w, {'site': s.siteId, 'time': p.metricTime, 'wan': w, 'v': p.data[w]})))
+      .flatten().flatten()
+    metrics:
+      - name: unifi_isp_latency_avg_seconds
+        help: Average latency to the internet over the window
+        unit: seconds
+        value: "toFloat(item.v.avgLatency) / 1000.0"
+        labels: { site_id: item.site, wan: item.wan, period: "'5m'" }
+        timestamp: parseTimestamp(item.time)
+        skipIf: "!has(item.v.avgLatency) || item.v.avgLatency == null"
+      - name: unifi_isp_latency_max_seconds
+        help: Maximum latency to the internet over the window
+        unit: seconds
+        value: "toFloat(item.v.maxLatency) / 1000.0"
+        labels: { site_id: item.site, wan: item.wan, period: "'5m'" }
+        timestamp: parseTimestamp(item.time)
+        skipIf: "!has(item.v.maxLatency) || item.v.maxLatency == null"
+      # An integer percentage in the API.
+      - name: unifi_isp_packet_loss_ratio
+        help: Share of the packets lost over the window
+        unit: ratio
+        value: "toFloat(item.v.packetLoss) / 100.0"
+        labels: { site_id: item.site, wan: item.wan, period: "'5m'" }
+        timestamp: parseTimestamp(item.time)
+        skipIf: "!has(item.v.packetLoss) || item.v.packetLoss == null"
+      - name: unifi_isp_uptime_ratio
+        help: Share of the window the WAN interface was up
+        unit: ratio
+        value: "toFloat(item.v.uptime) / 100.0"
+        labels: { site_id: item.site, wan: item.wan, period: "'5m'" }
+        timestamp: parseTimestamp(item.time)
+        skipIf: "!has(item.v.uptime) || item.v.uptime == null"
+      # download_kbps and upload_kbps are the expected ISP speeds configured
+      # on the WAN interface in UniFi Network, not the traffic nor a speed
+      # test (checked against a real account, 2026-11-13).
+      - name: unifi_isp_expected_download_bits_per_second
+        help: Expected download speed of the internet connection, as configured on the WAN interface
+        unit: bits_per_second
+        value: "toFloat(item.v.download_kbps) * 1000.0"
+        labels: { site_id: item.site, wan: item.wan, period: "'5m'" }
+        timestamp: parseTimestamp(item.time)
+        skipIf: "!has(item.v.download_kbps) || item.v.download_kbps == null"
+      - name: unifi_isp_expected_upload_bits_per_second
+        help: Expected upload speed of the internet connection, as configured on the WAN interface
+        unit: bits_per_second
+        value: "toFloat(item.v.upload_kbps) * 1000.0"
+        labels: { site_id: item.site, wan: item.wan, period: "'5m'" }
+        timestamp: parseTimestamp(item.time)
+        skipIf: "!has(item.v.upload_kbps) || item.v.upload_kbps == null"

@@ -15,6 +15,7 @@ A provider package holds everything Tapyr knows about an API: the `Provider` (ba
 | [`meraki-dashboard`](../providers/meraki-dashboard/README.md) | Cisco Meraki Dashboard API v1 | Official | Real platform (Dashboard API v1, 2026-11-07) and simulator |
 | [`teltonika-rms`](../providers/teltonika-rms/README.md) | Teltonika Remote Management System (RMS) cloud API | Official | Real platform (RMS API v3-BETA, 2026-11) and simulator |
 | [`teltonika-rutos`](../providers/teltonika-rutos/README.md) | Local REST API of Teltonika routers running RutOS 07.06 or later | Official | Real platform (RutOS 07.24.5, 2026-11) and simulator |
+| [`unifi-site-manager`](../providers/unifi-site-manager/README.md) | UniFi Site Manager API v1 (the consoles, sites, devices and ISP metrics of every console of a UI account) | Official | Real platform (Site Manager API 1.0.0, 2026-11-13) and simulator |
 
 <!-- end provider table -->
 

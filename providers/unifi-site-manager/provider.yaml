@@ -1,0 +1,76 @@
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata:
+  name: unifi-site-manager
+  version: 0.1.0
+  description: UniFi Site Manager API v1 (the consoles, sites, devices and ISP metrics of every console of a UI account)
+  docs: https://developer.ui.com/site-manager/v1.0.0/gettingstarted
+  displayName: UniFi Site Manager
+  categories: [network, internet-measurement]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: real-platform
+    date: 2026-11-13
+    platformVersion: Site Manager API 1.0.0
+    notes: >-
+      A real UI account with one console and two WAN interfaces, read-only
+      (an API key with the Site Manager scope only): the hosts, sites,
+      devices and 5-minute ISP metrics templates with tapyr run, and the
+      units checked against the UniFi interface. The hourly ISP metrics
+      endpoint was called, not run as a job; pagination over several pages
+      is simulator-only (one console). Built from the official OpenAPI
+      description and the Getting Started page
+spec:
+  baseURL: '{{ .params.baseURL | default "https://api.ui.com" | trimSuffix "/" }}'
+  params:
+    - name: baseURL
+      description: API host (default https://api.ui.com)
+  secrets:
+    - name: apiKey
+      required: true
+      description: >-
+        API key of the UI account (unifi.ui.com, Settings > API Keys), with
+        the Site Manager scope only
+  auth:
+    type: header
+    header:
+      name: X-API-Key
+      value: { secret: apiKey }
+  defaults:
+    headers:
+      Accept: application/json
+    timeout: 30s
+  # Lists are pages selected by an opaque cursor: pageSize and nextToken in
+  # the query, nextToken in the body, absent on the last page. On
+  # /v1/devices, a page counts hosts (each with all its devices). No maximum
+  # page size is documented.
+  pagination:
+    type: cursor
+    cursor:
+      cursor: "default(response.body.nextToken, '')"
+      param: nextToken
+      pageSizeParam: pageSize
+      pageSize: 100
+  limits:
+    - name: rate
+      description: >-
+        10,000 requests a minute for the v1 stable release (Getting Started,
+        Rate Limiting; 100 a minute for Early Access endpoints, which no
+        template uses), 429 with Retry-After in seconds when exceeded. The
+        scope is not documented: assumed per API key. No quota header is sent
+        (checked against a real account, 2026-11-13). The connector
+        (/v1/connector, 100 requests a minute per console) is not used.
+      source:
+        kind: vendor-docs
+        url: https://developer.ui.com/site-manager/v1.0.0/gettingstarted
+        date: 2026-11
+      kind: rate
+      rate: 10000/m
+      scope: { by: [credential] }
+  errors:
+    rateLimited:
+      statuses: [429]
+      retryAfterHeader: Retry-After
+    authFailed:
+      statuses: [401]
