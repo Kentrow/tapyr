@@ -99,25 +99,29 @@ func (s statusSource) Providers(ctx context.Context) []api.Provider {
 	if !ok {
 		return nil
 	}
-	health := s.jobHealth(ctx, snap)
+	_, runs := s.lastRuns(ctx, snap)
+	return s.providers(snap, s.accounts(snap, runs))
+}
+
+// providers lists the providers that have accounts. The health of a
+// provider aggregates the health of its accounts: one account failing out
+// of several degrades it, every account failing fails it.
+func (s statusSource) providers(snap *snapshot, accounts []api.Account) []api.Provider {
 	var out []api.Provider
 	for _, p := range snap.g.cfg.Providers {
 		name := string(p.Metadata.Name)
-		ap := api.Provider{Name: name, Version: p.Metadata.Version, Description: p.Metadata.Description, Health: "unknown"}
-		for _, a := range snap.g.cfg.Accounts {
-			if string(a.Spec.Provider) == name {
+		ap := api.Provider{Name: name, Version: p.Metadata.Version, Description: p.Metadata.Description}
+		var health []string
+		for _, a := range accounts {
+			if a.Provider == name {
 				ap.Accounts++
+				health = append(health, a.Health)
 			}
 		}
+		ap.Health = aggregateHealth(health...)
 		for _, j := range snap.g.graph.Jobs {
 			if j.Provider == name {
 				ap.Jobs++
-				ap.Health = worse(ap.Health, health[j.Name])
-			}
-		}
-		for _, cs := range s.c.selfState().Circuits {
-			if cs.Provider == name && cs.State == budget.CircuitOpen {
-				ap.Health = worse(ap.Health, "degraded")
 			}
 		}
 		if ap.Accounts > 0 {
@@ -128,36 +132,26 @@ func (s statusSource) Providers(ctx context.Context) []api.Provider {
 	return out
 }
 
-// worse returns the worse of two health values.
-func worse(a, b string) string {
-	rank := map[string]int{"": 0, "unknown": 0, "ok": 1, "degraded": 2, "failing": 3}
-	if rank[b] > rank[a] {
-		return b
-	}
-	return a
-}
-
-// jobHealth is the health of every job from the last run of its instances:
-// ok when all succeeded, failing when all failed, degraded otherwise.
-func (s statusSource) jobHealth(ctx context.Context, snap *snapshot) map[string]string {
-	out := map[string]string{}
+// lastRuns reads the last run of every job instance once: the health of
+// every job (the aggregate of its instances) and the last runs of every
+// account.
+func (s statusSource) lastRuns(ctx context.Context, snap *snapshot) (map[string]string, map[string][]lastRun) {
+	perJob := map[string][]string{}
+	accounts := map[string][]lastRun{}
 	for _, j := range snap.instances {
 		runs, err := s.c.store.Runs(ctx, j.Name, j.Instance, 1)
-		h := "unknown"
-		if err == nil && len(runs) > 0 {
-			h = "failing"
-			if runs[0].Result == "success" {
-				h = "ok"
-			}
+		if err != nil || len(runs) == 0 {
+			perJob[j.Name] = append(perJob[j.Name], healthUnknown)
+			continue
 		}
-		switch prev, seen := out[j.Name]; {
-		case !seen || prev == "unknown":
-			out[j.Name] = h
-		case prev != h && h != "unknown":
-			out[j.Name] = "degraded"
-		}
+		perJob[j.Name] = append(perJob[j.Name], runHealth(runs[0].Result))
+		accounts[j.Account] = append(accounts[j.Account], lastRun{Job: j.Name, Result: runs[0].Result, Error: runs[0].Error})
 	}
-	return out
+	jobs := make(map[string]string, len(perJob))
+	for name, h := range perJob {
+		jobs[name] = aggregateHealth(h...)
+	}
+	return jobs, accounts
 }
 
 func circuitName(state int) string {
@@ -170,11 +164,18 @@ func circuitName(state int) string {
 	return "closed"
 }
 
-func (s statusSource) Accounts(context.Context) []api.Account {
+func (s statusSource) Accounts(ctx context.Context) []api.Account {
 	snap, ok := s.snapshot()
 	if !ok {
 		return nil
 	}
+	_, runs := s.lastRuns(ctx, snap)
+	return s.accounts(snap, runs)
+}
+
+// accounts describes every account, with its health from the last runs of
+// its jobs, its credentials and its circuits.
+func (s statusSource) accounts(snap *snapshot, runs map[string][]lastRun) []api.Account {
 	expiry := map[string]time.Time{}
 	reauth := map[string]bool{}
 	for _, t := range tokenGauges(s.c.tokens.Sessions()) {
@@ -197,14 +198,17 @@ func (s statusSource) Accounts(context.Context) []api.Account {
 			aa.Auth.TokenExpiry = ptr(t.UTC())
 		}
 		aa.Auth.ReauthRequired = reauth[provider+"/"+name]
+		in := accountInput{Runs: runs[name], Reauth: aa.Auth.ReauthRequired}
 		if len(a.Spec.Targets) == 0 {
 			aa.Circuit = circuitName(snap.g.engine.CircuitState(name, ""))
+			in.Circuits = append(in.Circuits, circuit{State: aa.Circuit})
 		}
 		for _, t := range a.Spec.Targets {
-			aa.Targets = append(aa.Targets, api.Target{
-				Name: string(t.Name), Labels: nonNilMap(t.Labels), Circuit: circuitName(snap.g.engine.CircuitState(name, string(t.Name))),
-			})
+			c := circuitName(snap.g.engine.CircuitState(name, string(t.Name)))
+			aa.Targets = append(aa.Targets, api.Target{Name: string(t.Name), Labels: nonNilMap(t.Labels), Circuit: c})
+			in.Circuits = append(in.Circuits, circuit{Target: string(t.Name), State: c})
 		}
+		aa.Health, aa.HealthReasons = accountHealth(in)
 		out = append(out, aa)
 	}
 	slices.SortFunc(out, func(a, b api.Account) int { return strings.Compare(a.Name, b.Name) })
@@ -516,22 +520,19 @@ func (s statusSource) Graph(ctx context.Context) api.Graph {
 	if !ok {
 		return gr
 	}
-	health := s.jobHealth(ctx, snap)
+	health, runs := s.lastRuns(ctx, snap)
+	accounts := s.accounts(snap, runs)
 	node := func(kind, name, label, h string, instances int) string {
 		id := kind + "/" + name
 		gr.Nodes = append(gr.Nodes, api.Node{ID: id, Kind: kind, Label: label, Health: cmp.Or(h, "unknown"), Instances: instances})
 		return id
 	}
 	edge := func(from, to string) { gr.Edges = append(gr.Edges, api.Edge{From: from, To: to}) }
-	for _, p := range s.Providers(ctx) {
+	for _, p := range s.providers(snap, accounts) {
 		node("provider", p.Name, p.Name, p.Health, 0)
 	}
-	for _, a := range s.Accounts(ctx) {
-		h := "ok"
-		if a.Circuit == "open" {
-			h = "degraded"
-		}
-		id := node("account", a.Name, a.Name, h, 0)
+	for _, a := range accounts {
+		id := node("account", a.Name, a.Name, a.Health, 0)
 		edge("provider/"+a.Provider, id)
 		for _, t := range a.Targets {
 			th := "ok"

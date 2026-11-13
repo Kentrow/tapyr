@@ -38,8 +38,9 @@ type Provider struct {
 	Description string `json:"description,omitempty"`
 	Accounts    int    `json:"accounts"`
 	Jobs        int    `json:"jobs"`
-	// Health is ok, degraded (a circuit open or a job failing) or unknown
-	// (no run yet).
+	// Health aggregates the health of its accounts: ok or failing when
+	// every account is, degraded when they differ (one account failing out
+	// of several), unknown before any run.
 	Health string `json:"health"`
 }
 
@@ -52,6 +53,12 @@ type Account struct {
 	// Circuit is closed, half_open or open (accounts without targets).
 	Circuit string     `json:"circuit,omitempty"`
 	Auth    AuthStatus `json:"auth"`
+	// Health is ok, degraded, failing or unknown (no run yet), from the last
+	// runs of its jobs, its credentials and its circuits.
+	Health string `json:"health"`
+	// HealthReasons say why the account is not ok (the redacted errors of
+	// its jobs, a re-bootstrap required, an open circuit); empty when ok.
+	HealthReasons []string `json:"health_reasons"`
 }
 
 // Target is one target of a multi-target account.
