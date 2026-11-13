@@ -1,7 +1,10 @@
+import { useEffect, useState } from "react";
 import { Brand } from "./components/Logo";
 import { Icon, type IconName } from "./components/Icon";
 import { LivePill, ThemeButton } from "./components/ui";
 import { NotFound } from "./pages/NotFound";
+import { fetchJSON } from "./lib/api";
+import { versionLabel } from "./lib/format";
 import { useLive } from "./lib/live";
 import { useRoute } from "./lib/router";
 import { Budgets } from "./pages/Budgets";
@@ -11,6 +14,7 @@ import { JobDetail, Jobs } from "./pages/Jobs";
 import { Outputs } from "./pages/Outputs";
 import { Overview } from "./pages/Overview";
 import { Plan } from "./pages/Plan";
+import type { Status } from "./lib/types";
 
 const pages: { path: string; label: string; icon: IconName }[] = [
   { path: "", label: "Overview", icon: "overview" },
@@ -44,6 +48,7 @@ export function App() {
             <ThemeButton />
           </div>
           <span className="ro">Read-only: configuration lives in files.</span>
+          <Version connected={connected} />
         </div>
       </aside>
       <main className="main">
@@ -57,5 +62,26 @@ export function App() {
         {!pages.some((p) => p.path === first) && <NotFound />}
       </main>
     </div>
+  );
+}
+
+// Version names the running Tapyr on every page. It is read once, and again
+// when the event stream reconnects: a restart, an upgrade included, drops
+// the stream.
+function Version({ connected }: { connected: boolean }) {
+  const [status, setStatus] = useState<Status>();
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchJSON<Status>("/status", ctrl.signal).then(setStatus, () => {
+      // aborted or failed: keep the last version shown
+    });
+    return () => ctrl.abort();
+  }, [connected]);
+  if (!status) return null;
+  const v = versionLabel(status);
+  return (
+    <span className="version" title={v.title}>
+      {v.text}
+    </span>
   );
 }
