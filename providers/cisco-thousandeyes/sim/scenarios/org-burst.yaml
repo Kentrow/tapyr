@@ -1,0 +1,25 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: org-burst
+  description: >-
+    The organization limit at 20 requests a minute, another integration of
+    the organization spending 5 of them, and bursting through the whole
+    minute three times (at 29, 59 and 89 minutes): the requests of Tapyr in
+    those minutes are answered 429, and its jobs keep their intervals once
+    the minute has reset.
+spec:
+  steps:
+    - at: 0s
+      limits:
+        organization: { max: 20 }
+      externalConsumption: { limit: organization, ratePerHour: 300 }
+    - at: 29m
+      for: 10s
+      externalConsumption: { limit: organization, ratePerHour: 7200 }
+    - at: 59m
+      for: 10s
+      externalConsumption: { limit: organization, ratePerHour: 7200 }
+    - at: 89m
+      for: 10s
+      externalConsumption: { limit: organization, ratePerHour: 7200 }

@@ -45,6 +45,11 @@ type Options struct {
 	// current windows; offline plans a full window.
 	Online bool
 	Now    time.Time
+	// ReplanInterval is the period of the online replans: a fixed window
+	// shorter than it is planned over a full window, since a plan lasts
+	// through several of them. Zero plans every window over its remaining
+	// time.
+	ReplanInterval time.Duration
 }
 
 // JobPlan is the plan of one job.
@@ -238,7 +243,17 @@ func Evaluate(jobs []Job, intervals map[string]time.Duration, opts Options) []Sc
 
 func newScopePlan(ps budget.PlanScope, opts Options) ScopePlan {
 	p := ScopePlan{ID: ps.ID, Limit: ps.Limit, Key: ps.Key, Reserve: float64(ps.Reserve), Feasible: true}
-	if opts.Online {
+	switch {
+	case opts.Online && !ps.Rolling && ps.WindowLength < opts.ReplanInterval:
+		// The window is shorter than the replan interval: the plan paces
+		// several of them, and what is left of the current one says nothing
+		// of the next (a minute window exhausted by a 429, or by another
+		// client bursting, would stretch every job for a whole replan
+		// interval). Plan a full window, as offline; the engine still
+		// refuses what the current window cannot take, until its reset.
+		p.Budget = float64(ps.Usable - ps.Reserve)
+		p.Period = ps.WindowLength
+	case opts.Online:
 		p.Budget = math.Max(0, float64(ps.Remaining-ps.Reserve))
 		p.Period = ps.WindowLength
 		if !ps.Rolling {
@@ -253,7 +268,7 @@ func newScopePlan(ps budget.PlanScope, opts Options) ScopePlan {
 				p.Budget = math.Max(0, p.Budget-float64(ps.External)*p.Period.Seconds()/elapsed.Seconds())
 			}
 		}
-	} else {
+	default:
 		p.Budget = float64(ps.Usable - ps.Reserve)
 		p.Period = ps.WindowLength
 	}

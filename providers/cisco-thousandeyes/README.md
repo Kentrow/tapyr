@@ -54,6 +54,7 @@ Known gaps of the simulator: its windows are aligned on the clock (not on the fi
 |---|---|
 | `default` | No fault |
 | `quota-tight` | The limit at 20 requests a minute (the documented example), another integration spending 5 of them |
+| `org-burst` | As `quota-tight`, and the other integration bursts through the whole minute at 29, 59 and 89 minutes: Tapyr's requests of those minutes get 429, its jobs keep their intervals |
 | `bad-day` | From 1h, slow responses (p50 700 ms, p99 4 s) for an hour; from 2h, 30% of the test results requests fail with 502 for 30 minutes; at 4h, a 10-minute outage |
 
 ## Dashboard

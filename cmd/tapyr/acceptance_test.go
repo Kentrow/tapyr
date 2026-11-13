@@ -18,7 +18,7 @@ import (
 )
 
 // TestTwentyFourHoursProjectionReplan checks the projection trigger end to
-// end: with a replanInterval longer than the day, only the projection check
+// end: with a replanInterval of a day, only the projection check
 // can react when another client suddenly spends the quota (the quota-jump
 // scenario of example-sim). The first jump replans at once and stretches the
 // low-priority job. The second spans two checks: the first half replans to a
@@ -71,7 +71,7 @@ spec:
   server: { listen: "127.0.0.1:0" }
   state: { path: %q }
   collection: { jitter: 0%% }
-  budget: { replanInterval: 25h, replanOnProjection: %t }
+  budget: { replanInterval: 24h, replanOnProjection: %t }
   log: { format: text }
 `, simAddr, filepath.Join(dir, "tapyr.db"), enabled)
 	if err := os.WriteFile(filepath.Join(dir, "config.yaml"), []byte(config), 0o600); err != nil {
