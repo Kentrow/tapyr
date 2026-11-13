@@ -106,6 +106,35 @@ func (e *Engine) Consume(provider, limitName string, n int64) {
 	}
 }
 
+// QuotaWindowStart returns the start of the current window of a quota
+// limit: the latest of its scopes for a fixed window, the start of the
+// period for a rolling one; zero before any request. The simulator charges
+// the external consumption of a scenario from there: what was consumed
+// before belongs to windows that have reset since.
+func (e *Engine) QuotaWindowStart(provider, limitName string) time.Time {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	now := e.clock.Now()
+	var start time.Time
+	for _, s := range e.states {
+		if s.l.provider != provider || s.l.name != limitName || s.l.kind != config.LimitQuota {
+			continue
+		}
+		var ws time.Time
+		switch {
+		case s.l.fixed != nil:
+			e.roll(s, now)
+			ws = s.windowStart
+		case s.rolling != nil:
+			ws = now.Add(-time.Duration(s.rolling.minutes) * time.Minute)
+		}
+		if ws.After(start) {
+			start = ws
+		}
+	}
+	return start
+}
+
 // QuotaOf returns the state of a quota limit for the scope of a request.
 func (e *Engine) QuotaOf(d Descriptor, limitName string) (QuotaState, bool) {
 	e.mu.Lock()

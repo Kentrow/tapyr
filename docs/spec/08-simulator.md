@@ -99,7 +99,7 @@ Built-in scenarios for every provider: `default`, `quota-tight` (undersized dail
 A step applies from `at` until `at + for`, or until the end when `for` is omitted. `at` is measured from the simulator start, in simulated time. Step actions:
 
 - `limits` overrides the `max` of named quota limits, for example `limits: { daily: { max: 1500 } }`.
-- `externalConsumption` makes another client consume a quota at a steady hourly rate.
+- `externalConsumption` makes another client consume a quota at a steady hourly rate, spread over time: each window receives what was consumed during it, however long ago the previous request came (a minute window gets at most a minute of it).
 - `errors` gives a status to a ratio of the requests to matching routes.
 - `fixtures` replaces the fixture of routes during the step (`fixtures: { "/orgs/{orgId}/networks": "fixtures/networks-after.json" }`), to simulate inventory changes.
 - `latency: { p50: 800ms, p99: 5s }` delays responses following a log-normal distribution with these quantiles (seeded), in simulated time. The delay is the processing time of the server: a request is counted by the limits when it arrives, then answered after the delay, holding its concurrency slot; a refusal (429) answers at once. Counted after the delay, requests sent at the pace of a rate limit would reach it bunched together and get 429 the client could not foresee.

@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Simulator: the `externalConsumption` of a scenario is charged to the window it falls in. It was charged all at once at the next request, into the current window, so a short window received everything consumed since the previous request: under its `quota-tight` scenario, the `cisco-thousandeyes` simulator answered 429 to the first request after a few quiet minutes (25 calls of the other integration in a window of 20).
 - Simulator: the `latency` of a scenario delays a response after the limits counted the request, as the processing time of a server, and the request holds its concurrency slot meanwhile. Counted after the delay, requests sent at the pace of a rate limit reached it bunched together: the `teltonika-rutos` simulator answered about 50 unexpected 429 a day to Tapyr under its `quota-tight` scenario.
 
 ## [0.3.0] - 2026-11-12

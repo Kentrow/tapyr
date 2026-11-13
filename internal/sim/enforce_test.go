@@ -442,3 +442,37 @@ func TestLatencyQuantiles(t *testing.T) {
 		t.Errorf("%.3f of the draws are below p99", ratio)
 	}
 }
+
+// TestExternalConsumptionWindow is a regression test: the external
+// consumption of a scenario was charged at the next request, all of it into
+// the current window, so a minute window received everything consumed since
+// the previous request. With the ThousandEyes quota-tight scenario (20
+// requests a minute, 5 of them spent by another integration), a request every
+// 5 minutes was answered 429: 25 calls landed in a window of 20.
+func TestExternalConsumptionWindow(t *testing.T) {
+	clk := clock.NewFake(midnight)
+	pkgs, err := provider.Builtin(loader(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pkg := provider.Find(pkgs, "cisco-thousandeyes")
+	s, err := New(pkg, Options{Clock: clk, Scenario: pkg.Scenarios["quota-tight"]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range 6 {
+		// 30 seconds into a minute: 2.5 calls of the other integration in
+		// this window, whatever the time since the previous request.
+		clk.Set(midnight.Add(time.Duration(i)*5*time.Minute + 30*time.Second))
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "http://sim/v7/agents", http.NoBody)
+		req.Header.Set("Authorization", "Bearer sim-thousandeyes-token")
+		rec := httptest.NewRecorder()
+		s.Handler().ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("request %d at %s: %d", i, clk.Now().Sub(midnight), rec.Code)
+		}
+		if got := rec.Header().Get("X-Organization-Rate-Limit-Remaining"); i > 0 && got != "17" {
+			t.Errorf("request %d: remaining %s, want 17 (20, less this request and 2 external calls)", i, got)
+		}
+	}
+}
