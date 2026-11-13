@@ -208,7 +208,11 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: GOOS=${TARGET%/*} GOARCH=${TARGET#*/} go build -trimpath -o /dev/null ./...
 
-  fuzz:
+  # The fuzz targets run in parallel jobs; "Fuzz" gathers them, like "Test",
+  # so that one check name can be required: it passes when every target
+  # passed, or was skipped because only documentation changed (a skipped
+  # matrix job never reports the names of its targets).
+  fuzz-targets:
     name: Fuzz (${{ matrix.target }})
     needs: changes
     if: ${{ !cancelled() && needs.changes.outputs.docs_only != 'true' }}
@@ -238,6 +242,25 @@ jobs:
           name: fuzz-${{ strategy.job-index }}
           path: internal/*/testdata/fuzz/
           retention-days: 30
+
+  fuzz:
+    name: Fuzz
+    needs: [changes, fuzz-targets]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every fuzz target passed or was skipped
+        env:
+          RESULTS: changes=${{ needs.changes.result }} targets=${{ needs.fuzz-targets.result }}
+        run: |
+          echo "$RESULTS"
+          for r in $RESULTS; do
+            case "${r#*=}" in
+            success | skipped) ;;
+            *) echo "::error::${r%%=*} ended with ${r#*=}"; exit 1 ;;
+            esac
+          done
 
   vulnerabilities:
     name: Vulnerabilities
