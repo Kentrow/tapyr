@@ -440,10 +440,19 @@ func (s *Server) applyScenario() {
 		if end := start.Add(st.For.Std()); st.For > 0 && end.Before(to) {
 			to = end
 		}
+		// Only the consumption of the current window counts: the rest went
+		// into windows that have reset since, and charging it now would
+		// exhaust a short window after a quiet spell.
+		window := s.engine.QuotaWindowStart(provider, string(ec.Limit))
+		s.mu.Lock()
+		if from.Before(window) {
+			from = window
+			s.external[string(ec.Limit)] = 0
+		}
 		if !to.After(from) {
+			s.mu.Unlock()
 			continue
 		}
-		s.mu.Lock()
 		s.external[string(ec.Limit)] += ec.RatePerHour * to.Sub(from).Hours()
 		units := int64(s.external[string(ec.Limit)])
 		s.external[string(ec.Limit)] -= float64(units)

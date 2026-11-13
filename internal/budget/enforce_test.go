@@ -71,6 +71,35 @@ func TestRollingConsume(t *testing.T) {
 	}
 }
 
+func TestQuotaWindowStart(t *testing.T) {
+	clk := clock.NewFake(epoch.Add(90 * time.Second))
+	e := newEngine(t, clk, `    - { name: minute, kind: quota, max: 20, window: { period: minute }, scope: { by: [credential] } }
+    - { name: hourly, kind: quota, max: 10, window: { rolling: 1h } }
+    - { name: rate, kind: rate, rate: 2/s }`, "")
+	if got := e.QuotaWindowStart("p", "minute"); !got.IsZero() {
+		t.Fatalf("before any request: %s", got)
+	}
+	release, refused := e.Check(Descriptor{Provider: "p", Credential: "k", Endpoint: "/x"})
+	if refused != nil {
+		t.Fatal(refused)
+	}
+	release()
+	if got := e.QuotaWindowStart("p", "minute"); !got.Equal(epoch.Add(time.Minute)) {
+		t.Errorf("fixed window start = %s, want the start of the minute", got)
+	}
+	// Minutes later, the window has rolled even without a request.
+	clk.Advance(5 * time.Minute)
+	if got := e.QuotaWindowStart("p", "minute"); !got.Equal(epoch.Add(6 * time.Minute)) {
+		t.Errorf("fixed window start after 5 minutes = %s", got)
+	}
+	if got := e.QuotaWindowStart("p", "hourly"); !got.Equal(clk.Now().Add(-time.Hour)) {
+		t.Errorf("rolling window start = %s, want an hour ago", got)
+	}
+	if got := e.QuotaWindowStart("p", "rate"); !got.IsZero() {
+		t.Errorf("a rate limit has no window: %s", got)
+	}
+}
+
 func TestPlanScopes(t *testing.T) {
 	clk := clock.NewFake(epoch)
 	e := newEngine(t, clk, `    - { name: org-rate, kind: rate, rate: 10/s, scope: { by: [account, "var:orgId"] }, appliesTo: { requestsWithVar: orgId } }
