@@ -3,9 +3,9 @@ import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node
 import "@xyflow/react/dist/style.css";
 import { Badge, Failure, Loading, PageHead, Select, StateMark, useColorMode } from "../components/ui";
 import { plural } from "../lib/format";
-import { useJSON } from "../lib/live";
+import { useJSON, useList } from "../lib/live";
 import { href } from "../lib/router";
-import type { Graph as GraphT, GraphNode, Health } from "../lib/types";
+import type { Account, Graph as GraphT, GraphNode, Health } from "../lib/types";
 
 // The graph shows providers, accounts and their targets on the left, the
 // jobs of each account grouped in a box laid out as a grid (there are many
@@ -290,6 +290,7 @@ export function selectionAfter(changes: NodeChange[], current: string | null): s
 export function Graph() {
   const colorMode = useColorMode();
   const graph = useJSON<GraphT>("/graph");
+  const accountList = useList<Account>("/accounts");
   const [selected, setSelected] = useState<string | null>(null);
   const [provider, setProvider] = useState("");
   const [account, setAccount] = useState("");
@@ -327,6 +328,7 @@ export function Graph() {
   const selGroup = selected?.startsWith("group:") || selected?.startsWith("section:") ? data.nodes.find((n) => "group:" + n.id === selected || "section:" + n.id === selected) : undefined;
   const providers = data.nodes.filter((n) => n.kind === "provider");
   const accounts = data.nodes.filter((n) => n.kind === "account");
+  const reasons = sel?.kind === "account" ? accountList.data?.find((a) => a.name === sel.label)?.health_reasons ?? [] : [];
   return (
     <>
       <PageHead title="Graph" sub="Providers, accounts and targets, the jobs of each account, and the outputs. Select a node (click it, or Tab to it and press Enter) for its details; Escape closes them.">
@@ -372,6 +374,11 @@ export function Graph() {
               <dt>Health</dt><dd><Badge state={(sel ?? selGroup)!.health} /></dd>
               {sel?.instances ? (<><dt>Instances</dt><dd>{sel.instances}</dd></>) : null}
             </dl>
+            {reasons.length > 0 && (
+              <ul className="reasons small mono">
+                {reasons.map((r) => <li key={r}>{r}</li>)}
+              </ul>
+            )}
             <p className="small" style={{ marginBottom: 0 }}>
               {sel?.kind === "job" && <a href={href(["jobs", sel.label])}>Job details</a>}
               {(sel?.kind === "account" || sel?.kind === "provider" || selGroup) && <a href={href(["budgets"])}>Budgets</a>}

@@ -75,7 +75,7 @@ Read-only, JSON, versioned under `/api/v1`. It is the **only** interface the UI 
 |---|---|
 | `GET /api/v1/status` | Version, uptime, config hash, last reload result and errors, readiness reasons, plan feasibility |
 | `GET /api/v1/providers` | Providers with package version, accounts count, health summary |
-| `GET /api/v1/accounts` / `{name}` | Accounts (no secrets), targets, labels, circuit state, auth status |
+| `GET /api/v1/accounts` / `{name}` | Accounts (no secrets), targets, labels, circuit state, auth status, health and its reasons |
 | `GET /api/v1/jobs` / `{name}` | Effective config (after defaults and template expansion), desired and effective intervals, instances, last run summary, next run |
 | `GET /api/v1/jobs/{name}/instances` | Fan-out instances with their variables and last result |
 | `GET /api/v1/jobs/{name}/runs?instance=` | Recent runs with statistics and redacted errors |
@@ -88,6 +88,17 @@ Read-only, JSON, versioned under `/api/v1`. It is the **only** interface the UI 
 | `GET /api/v1/events` | Server-Sent Events stream: run finished, plan changed, circuit changed, config reloaded |
 
 Rules: never expose secrets; redact headers as in logs; paginate list endpoints (`?limit=&cursor=`); stable field names (snake_case); ISO 8601 timestamps.
+
+### Health
+
+Every job, account and provider has a health: `ok`, `degraded`, `failing`, or `unknown` before its first run. Parts combine the same way at every level: `ok` or `failing` when every known part is, `degraded` when they differ, `unknown` parts left out.
+
+- **Run**: `success` is ok, `failed` is failing; `partial` and the skipped runs (`skipped_budget`, `skipped_overlap`, `skipped_circuit`) are degraded: nothing failed, but not everything was collected.
+- **Job**: the last runs of its instances.
+- **Account**: the last runs of its job instances, made worse by its credentials (a manual re-bootstrap required fails it) and by its circuits (open for the account or for every target fails it; open for some targets, or half open, degrades it). `health_reasons` says why, when it is not ok: the redacted errors of its jobs (the jobs that share an error share a reason, three reasons at most, then how many more), the re-bootstrap, the open circuits. A rejected key shows as a failing account with the `401` of its jobs.
+- **Provider**: its accounts. One account failing out of several degrades the provider instead of failing it.
+
+The Overview lists the accounts that are not ok with their reasons, and the Graph colors the account nodes with their health and shows the reasons in the detail panel.
 
 ### Implementation notes
 
