@@ -391,7 +391,7 @@ jobs:
           go-version-file: go.mod
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
-          version: "v4.3.1"
+          version: "v4.3.2"
       - name: Lint, manifests and templates
         run: make helm-check
       - name: Install on a kind cluster against a simulator
