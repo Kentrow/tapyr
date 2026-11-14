@@ -97,6 +97,13 @@ type Job struct {
 	// Definition is the effective job definition (template expanded,
 	// defaults applied), in job details only.
 	Definition json.RawMessage `json:"definition,omitempty"`
+
+	// Collected is false for a job whose metrics no output keeps, or a
+	// parent whose inventory no collected job takes (ADR 0013): it is
+	// neither scheduled nor planned.
+	Collected bool `json:"collected"`
+	// NotCollectedReason says why, when Collected is false.
+	NotCollectedReason string `json:"not_collected_reason,omitempty"`
 }
 
 // RunSummary is the outcome of a run.

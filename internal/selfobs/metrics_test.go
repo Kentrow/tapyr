@@ -195,6 +195,8 @@ func TestStateGauges(t *testing.T) {
 		Tokens:   []TokenGauge{{Provider: "aruba", Account: "lab", Expiry: at}, {Provider: "aruba", Account: "lab2", ReauthRequired: true}},
 		Circuits: []CircuitGauge{{Provider: "meraki", Account: "acme", State: 2}},
 		Outputs:  []OutputGauge{{Output: "vm", Queue: 5, LastSuccess: at}, {Output: "prom"}},
+
+		NotCollected: []JobRef{{Provider: "meraki", Account: "acme", Job: "uplinks"}},
 	}
 	m := NewMetrics(buildinfo.Get(), func() State { return state })
 	want := `
@@ -221,6 +223,11 @@ tapyr_budget_remaining_observed{limit="daily",provider="meraki",scope="account=a
 # HELP tapyr_circuit_state Circuit breaker state: 0 closed, 1 half-open, 2 open.
 # TYPE tapyr_circuit_state gauge
 tapyr_circuit_state{account="acme",provider="meraki",target=""} 2
+# HELP tapyr_job_collected 1 when the job is collected, 0 when no output keeps its metrics or no collected job takes its inventory.
+# TYPE tapyr_job_collected gauge
+tapyr_job_collected{account="acme",job="clients",provider="meraki"} 1
+tapyr_job_collected{account="acme",job="devices",provider="meraki"} 1
+tapyr_job_collected{account="acme",job="uplinks",provider="meraki"} 0
 # HELP tapyr_job_effective_interval_seconds Interval applied by the planner.
 # TYPE tapyr_job_effective_interval_seconds gauge
 tapyr_job_effective_interval_seconds{account="acme",job="clients",provider="meraki"} 0
@@ -246,7 +253,7 @@ tapyr_plan_feasible{limit="daily",provider="meraki",scope="account=acme"} 1
 	names := []string{
 		"tapyr_auth_reauth_required", "tapyr_auth_token_expiry_timestamp_seconds", "tapyr_budget_exhaustion_eta_seconds",
 		"tapyr_budget_limit", "tapyr_budget_limit_mismatch", "tapyr_budget_remaining_observed", "tapyr_circuit_state",
-		"tapyr_job_effective_interval_seconds", "tapyr_job_last_success_timestamp_seconds", "tapyr_job_instances",
+		"tapyr_job_collected", "tapyr_job_effective_interval_seconds", "tapyr_job_last_success_timestamp_seconds", "tapyr_job_instances",
 		"tapyr_output_last_success_timestamp_seconds", "tapyr_output_queue_samples", "tapyr_plan_feasible",
 	}
 	if err := testutil.GatherAndCompare(m.reg, strings.NewReader(want), names...); err != nil {

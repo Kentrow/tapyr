@@ -47,6 +47,30 @@ func Compile(rules []config.ProcessingRule) (*Processor, error) {
 	return p, nil
 }
 
+// MayKeep reports whether the rules may keep a sample of a metric, judging
+// by its name alone (ADR 0013): a keep or drop on __name__ alone is
+// decided; one on any other label cannot be before the samples exist, so
+// the sample may be kept and the evaluation stops; labelkeep and labeldrop
+// never drop a sample. A nil Processor keeps everything.
+func (p *Processor) MayKeep(metric string) bool {
+	if p == nil {
+		return true
+	}
+	for i := range p.rules {
+		r := &p.rules[i]
+		if r.action != config.ProcessingKeep && r.action != config.ProcessingDrop {
+			continue
+		}
+		if !slices.Equal(r.source, []string{"__name__"}) {
+			return true
+		}
+		if r.re.MatchString(metric) != (r.action == config.ProcessingKeep) {
+			return false
+		}
+	}
+	return true
+}
+
 // apply returns the series after the rules, and false when a rule drops it.
 // The labels are copied before a change: the input is never modified.
 func (p *Processor) apply(s model.Series) (model.Series, bool) {

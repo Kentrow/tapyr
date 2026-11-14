@@ -70,6 +70,11 @@
           "description": "MaxConcurrentRequests bounds in-flight requests across all providers.",
           "minimum": 1,
           "type": "integer"
+        },
+        "skipUnconsumed": {
+          "default": true,
+          "description": "SkipUnconsumed does not collect the jobs whose metrics no output\nkeeps (the processing rules of every output receiving them drop them\nby name), nor the parents whose inventory no collected job takes: no\nAPI call, no quota spent (ADR 0013). Set it to false to keep every\njob running, for example as an authentication probe or for the live\ndebug.",
+          "type": "boolean"
         }
       },
       "type": "object"

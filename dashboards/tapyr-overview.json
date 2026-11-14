@@ -959,6 +959,17 @@
           "legendFormat": "",
           "instant": true,
           "format": "table"
+        },
+        {
+          "refId": "D",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (provider, account, job) (tapyr_job_collected{provider=~\"$provider\"})",
+          "legendFormat": "",
+          "instant": true,
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -998,6 +1009,43 @@
                 }
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "collected"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "no: no output keeps its metrics or no collected job takes its inventory",
+                        "color": "orange",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "yes",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              }
+            ]
           }
         ]
       },
@@ -1009,7 +1057,7 @@
           }
         ]
       },
-      "description": "The effective interval is longer than the desired one when the planner stretches a job to fit a quota.",
+      "description": "The effective interval is longer than the desired one when the planner stretches a job to fit a quota. A job is not collected (no API call) when no output keeps its metrics or no collected job takes its inventory (ADR 0013); see tapyr plan.",
       "transformations": [
         {
           "id": "merge",
@@ -1024,7 +1072,8 @@
             "renameByName": {
               "Value #A": "desired",
               "Value #B": "effective",
-              "Value #C": "instances"
+              "Value #C": "instances",
+              "Value #D": "collected"
             }
           }
         }

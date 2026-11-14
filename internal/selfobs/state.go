@@ -15,6 +15,9 @@ type State struct {
 	Tokens   []TokenGauge
 	Circuits []CircuitGauge
 	Outputs  []OutputGauge
+
+	// NotCollected are the jobs that are not collected (ADR 0013).
+	NotCollected []JobRef
 }
 
 // QuotaGauge is one quota limit for one scope label.
@@ -50,6 +53,11 @@ type JobGauge struct {
 	Lag       time.Duration
 	Instances int
 	Series    int
+}
+
+// JobRef names a job.
+type JobRef struct {
+	Provider, Account, Job string
 }
 
 // TokenGauge describes the token session of an account.
@@ -102,6 +110,8 @@ var (
 	descJobLag         = desc("tapyr_job_lag_seconds", "Largest delay of an instance behind its schedule.", jobLabels...)
 	descJobInstances   = desc("tapyr_job_instances", "Scheduled instances of the job (fan-out size).", jobLabels...)
 	descJobSeries      = desc("tapyr_job_series", "Series produced by the last successful runs.", jobLabels...)
+	descJobCollected   = desc("tapyr_job_collected",
+		"1 when the job is collected, 0 when no output keeps its metrics or no collected job takes its inventory.", jobLabels...)
 
 	descTokenExpiry = desc("tapyr_auth_token_expiry_timestamp_seconds", "Expiry of the token held for the account.", "provider", "account")
 	descReauth      = desc("tapyr_auth_reauth_required", "1 when the account needs a manual re-bootstrap.", "provider", "account")
@@ -120,7 +130,7 @@ func (c *stateCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{
 		descBudgetLimit, descBudgetUsed, descBudgetRemaining, descBudgetObserved, descBudgetExternal, descBudgetReserve,
 		descBudgetWindowEnd, descBudgetETA, descBudgetMismatch, descPlanFeasible,
-		descJobLastSuccess, descJobDesired, descJobEffective, descJobLag, descJobInstances, descJobSeries,
+		descJobLastSuccess, descJobDesired, descJobEffective, descJobLag, descJobInstances, descJobSeries, descJobCollected,
 		descTokenExpiry, descReauth, descCircuit, descOutputQueue, descOutputLastSuccess,
 	} {
 		ch <- d
@@ -166,6 +176,10 @@ func (c *stateCollector) Collect(ch chan<- prometheus.Metric) {
 		gauge(descJobLag, j.Lag.Seconds(), l...)
 		gauge(descJobInstances, float64(j.Instances), l...)
 		gauge(descJobSeries, float64(j.Series), l...)
+		gauge(descJobCollected, 1, l...)
+	}
+	for _, j := range s.NotCollected {
+		gauge(descJobCollected, 0, j.Provider, j.Account, j.Job)
 	}
 	for _, t := range s.Tokens {
 		if !t.Expiry.IsZero() {
