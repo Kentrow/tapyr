@@ -139,6 +139,7 @@ An output may declare `spec.processing`, an ordered list of rules applied to the
 - Samples removed by `keep` and `drop` are counted in `tapyr_output_samples_filtered_total`.
 - Self-metrics are never processed, on `/metrics/self` or pushed through an output.
 - `tapyr validate` rejects an unknown action, a missing or extra field, an invalid regex or label name, and a rule that would remove `__name__` (`labelkeep` not matching it, `labeldrop` matching it); it warns about a `keep` or `drop` on `__name__` alone that matches no metric of the jobs sent to the output.
+- **Jobs not collected** ([ADR 0013](../adr/0013-unconsumed-jobs.md)): a job none of whose metrics can reach an output, judged by the rules on the metric name, is not collected: no API call, no quota, its series withdrawn as for a removed job. The parent of a fan-out is collected when one of its children is. The rules are evaluated on the name alone: a `keep` or `drop` on `[__name__]` is decided, one on any other label cannot be before the call and keeps the job collected, `labelkeep` and `labeldrop` never drop a sample. Without any output, every job is collected. `settings.collection.skipUnconsumed: false` turns it off; `validate`, `plan` and `run` warn about every job not collected, the status API reports `collected: false`, and `tapyr_job_collected` is 0.
 - Not yet: `replace`, `labelmap`, conditions in CEL, aggregation, an interval per output, sending on change (follow-ups of ADR 0012).
 
 ## Timestamps

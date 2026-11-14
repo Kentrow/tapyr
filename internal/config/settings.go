@@ -107,6 +107,13 @@ type CollectionSettings struct {
 	DefaultTimeout Duration `json:"defaultTimeout,omitempty" jsonschema:"default=30s"`
 	// Jitter spreads scheduled runs, from 0% to 50% of the interval.
 	Jitter *Percent `json:"jitter,omitempty" jsonschema:"default=10%"`
+	// SkipUnconsumed does not collect the jobs whose metrics no output
+	// keeps (the processing rules of every output receiving them drop them
+	// by name), nor the parents whose inventory no collected job takes: no
+	// API call, no quota spent (ADR 0013). Set it to false to keep every
+	// job running, for example as an authentication probe or for the live
+	// debug.
+	SkipUnconsumed *bool `json:"skipUnconsumed,omitempty" jsonschema:"default=true"`
 }
 
 // BudgetSettings configures the budget engine and the planner.

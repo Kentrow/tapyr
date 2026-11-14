@@ -339,7 +339,7 @@ components:
     Job:
       type: object
       additionalProperties: false
-      required: [name, provider, account, role, priority, implicit, desired_interval_seconds, effective_interval_seconds, instances, outputs, labels]
+      required: [name, provider, account, role, priority, implicit, desired_interval_seconds, effective_interval_seconds, instances, collected, outputs, labels]
       properties:
         name: { type: string }
         provider: { type: string }
@@ -353,6 +353,10 @@ components:
         effective_interval_seconds: { type: number }
         stretch_reason: { type: string }
         instances: { type: integer }
+        collected:
+          type: boolean
+          description: False for a job whose metrics no output keeps, or a parent whose inventory no collected job takes (ADR 0013); neither scheduled nor planned
+        not_collected_reason: { type: string, description: Why the job is not collected }
         outputs: { type: array, items: { type: string } }
         labels: { $ref: "#/components/schemas/Labels" }
         last_run: { $ref: "#/components/schemas/RunSummary" }

@@ -34,6 +34,23 @@ type Extract struct {
 	fields map[string]*Program
 }
 
+// MetricNames returns the names of the metrics the extraction can produce
+// (metrics, info and post), sorted and without duplicates; nil for a nil
+// Extract.
+func (x *Extract) MetricNames() []string {
+	if x == nil {
+		return nil
+	}
+	var names []string
+	for _, group := range [][]*metric{x.metrics, x.info, x.post} {
+		for _, m := range group {
+			names = append(names, m.name)
+		}
+	}
+	slices.Sort(names)
+	return slices.Compact(names)
+}
+
 // InventoryItem is an item produced by an inventory job.
 type InventoryItem struct {
 	Key    string

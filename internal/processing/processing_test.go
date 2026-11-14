@@ -160,3 +160,67 @@ func TestSeries(t *testing.T) {
 		t.Error("an invalid regex compiled")
 	}
 }
+
+func TestMayKeep(t *testing.T) {
+	name := []string{"__name__"}
+	for _, tt := range []struct {
+		name  string
+		rules []config.ProcessingRule
+		want  map[string]bool // metric -> may keep
+	}{
+		{"no rules", nil, map[string]bool{"mist_device_up": true}},
+		{
+			"drop by name",
+			[]config.ProcessingRule{{Action: config.ProcessingDrop, SourceLabels: name, Regex: "mist_device_.*"}},
+			map[string]bool{"mist_device_up": false, "mist_site_clients": true},
+		},
+		{
+			"keep by name",
+			[]config.ProcessingRule{{Action: config.ProcessingKeep, SourceLabels: name, Regex: "mist_site_.*"}},
+			map[string]bool{"mist_device_up": false, "mist_site_clients": true},
+		},
+		{
+			"labelkeep and labeldrop never drop a sample",
+			[]config.ProcessingRule{
+				{Action: config.ProcessingLabelDrop, Regex: "site"},
+				{Action: config.ProcessingLabelKeep, Regex: "__name__|mac"},
+			},
+			map[string]bool{"mist_device_up": true},
+		},
+		{
+			// A rule on a label value cannot be decided: the metric may be
+			// kept, even if a later rule on the name would drop it.
+			"a rule on a label value stops the evaluation",
+			[]config.ProcessingRule{
+				{Action: config.ProcessingDrop, SourceLabels: []string{"site"}, Regex: "north"},
+				{Action: config.ProcessingDrop, SourceLabels: name, Regex: ".*"},
+			},
+			map[string]bool{"mist_device_up": true},
+		},
+		{
+			"the name with another label is not decided",
+			[]config.ProcessingRule{{Action: config.ProcessingDrop, SourceLabels: []string{"__name__", "site"}, Regex: "mist_device_up;.*"}},
+			map[string]bool{"mist_device_up": true},
+		},
+		{
+			"a drop by name before a rule on a label value is decided",
+			[]config.ProcessingRule{
+				{Action: config.ProcessingDrop, SourceLabels: name, Regex: "mist_device_.*"},
+				{Action: config.ProcessingKeep, SourceLabels: []string{"site"}, Regex: "north"},
+			},
+			map[string]bool{"mist_device_up": false, "mist_site_clients": true},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			p, err := Compile(tt.rules)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, metric := range slices.Sorted(maps.Keys(tt.want)) {
+				if got := p.MayKeep(metric); got != tt.want[metric] {
+					t.Errorf("MayKeep(%s) = %t, want %t", metric, got, tt.want[metric])
+				}
+			}
+		})
+	}
+}

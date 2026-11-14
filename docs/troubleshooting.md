@@ -24,6 +24,7 @@ configuration is invalid: 1 error
 - **Unknown template or provider.** `tapyr provider list` shows the packages Tapyr knows; user packages need `settings.providerPaths`, and each package README lists its templates.
 - **A secret is not set.** `--check-secrets` checks that every referenced environment variable or file exists and is not empty. Without it, `validate` checks the configuration only, which suits a CI without the secrets.
 - **Nothing is collected and no error.** `configuration is valid: ... 0 accounts, 0 jobs` means the paths contain no document: check `--config` (files must end in `.yaml` or `.yml`, hidden files are skipped).
+- **A job never runs.** `warning: job "..." is not collected: no output keeps its metrics` means the processing rules of every output receiving it drop all its metrics by name, so Tapyr makes no API call for it ([Sending less to an output](outputs.md#sending-less-to-an-output)). Change the rules, route the job to another output, or set `settings.collection.skipUnconsumed: false`.
 
 ## Tapyr does not start
 

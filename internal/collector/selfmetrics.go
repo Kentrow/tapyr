@@ -70,6 +70,9 @@ func (c *Collector) selfState() selfobs.State {
 	slices.SortFunc(st.Jobs, func(a, b selfobs.JobGauge) int {
 		return strings.Compare(a.Provider+"/"+a.Account+"/"+a.Job, b.Provider+"/"+b.Account+"/"+b.Job)
 	})
+	for _, j := range g.graph.NotCollectedJobs() {
+		st.NotCollected = append(st.NotCollected, selfobs.JobRef{Provider: j.Provider, Account: j.Account, Job: j.Name})
+	}
 	for _, k := range slices.SortedFunc(func(yield func([3]string) bool) {
 		for k := range circuits {
 			if !yield(k) {

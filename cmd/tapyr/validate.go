@@ -34,9 +34,11 @@ func newValidateCmd(e *env, flags *globalFlags) *cobra.Command {
 			if err != nil {
 				return &exitError{code: exitFailure, err: err}
 			}
-			if _, err := compileGraph(e, cfg, runtime.Options{Auth: tokens}); err != nil {
+			graph, err := compileGraph(e, cfg, runtime.Options{Auth: tokens})
+			if err != nil {
 				return err
 			}
+			warnNotCollected(e, graph)
 			if checkSecrets {
 				diags := config.CheckSecrets(cfg, config.SecretSource{LookupEnv: e.lookupEnv, ReadFile: os.ReadFile})
 				if len(diags) > 0 {
@@ -108,6 +110,15 @@ func compileGraph(e *env, cfg *config.Config, opts runtime.Options) (*runtime.Gr
 		return nil, &exitError{code: exitFailure, err: err}
 	}
 	return graph, nil
+}
+
+// warnNotCollected prints a warning for every job that is not collected
+// (ADR 0013): a processing rule broader than intended shows at once.
+func warnNotCollected(e *env, graph *runtime.Graph) {
+	for _, j := range graph.NotCollectedJobs() {
+		fmt.Fprintf(e.stderr, "warning: job %q (account %s) is not collected: %s (settings.collection.skipUnconsumed)\n",
+			j.Name, j.Account, j.NotCollected)
+	}
 }
 
 // newLoader returns the configuration loader and the built-in packages.
