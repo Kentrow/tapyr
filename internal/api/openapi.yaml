@@ -347,7 +347,7 @@ components:
       properties:
         class:
           type: string
-          enum: [auth, forbidden, reauth, rate_limited, penalized, quota_exhausted, deadline, circuit_open, server_error, unreachable, client, decode, mapping, unknown]
+          enum: [auth, forbidden, reauth, rate_limited, penalized, quota_exhausted, deadline, circuit_open, server_error, unreachable, client, decode, mapping, plan_infeasible, unknown]
         title: { type: string, description: A plain sentence that says what happened }
         action: { type: string, description: What to do, always present (it may be that Tapyr recovers on its own) }
         until: { $ref: "#/components/schemas/Time" }
@@ -518,6 +518,7 @@ components:
               feasible: { type: boolean }
               exhaustion_at: { $ref: "#/components/schemas/Time" }
               jobs: { type: array, items: { type: string } }
+              problem: { $ref: "#/components/schemas/Problem" }
     Graph:
       type: object
       additionalProperties: false

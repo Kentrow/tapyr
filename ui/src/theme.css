@@ -361,3 +361,5 @@ pre.code .s { color: var(--code-string); } pre.code .n { color: var(--code-numbe
 .problem .problem-action a { font-weight: 600; white-space: nowrap; }
 .problem .problem-detail { margin-top: 2px; }
 .problem.compact .problem-action { font-size: .82rem; }
+.card.why { margin-bottom: 18px; border-color: color-mix(in srgb, var(--red) 45%, var(--line)); }
+.card.why .why-scope + .why-scope { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }

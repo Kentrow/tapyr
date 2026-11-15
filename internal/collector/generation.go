@@ -16,10 +16,12 @@ import (
 	"github.com/kentrow/tapyr/internal/api"
 	"github.com/kentrow/tapyr/internal/budget"
 	"github.com/kentrow/tapyr/internal/budget/planner"
+	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/collect"
 	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/mapping"
 	"github.com/kentrow/tapyr/internal/model"
+	"github.com/kentrow/tapyr/internal/problem"
 	"github.com/kentrow/tapyr/internal/runtime"
 	"github.com/kentrow/tapyr/internal/scheduler"
 	"github.com/kentrow/tapyr/internal/selfobs"
@@ -48,6 +50,9 @@ type generation struct {
 	planAt time.Time
 	// planSig summarizes the plan applied, to publish its changes.
 	planSig string
+	// infeasible are the quota scopes the last plan did not fit, for the
+	// log of the changes (logFeasibility).
+	infeasible map[string]bool
 
 	// projection is the state of the projection check: whether it is on,
 	// the runs that ask for it (pending, buffered by one), and, owned by
@@ -325,13 +330,34 @@ func (g *generation) replan(ctx context.Context, reason string) *planner.Result 
 				"reason", j.Describe())
 		}
 	}
+	g.logFeasibility(res)
+	return res
+}
+
+// logFeasibility logs when a quota scope stops fitting the plan, with why
+// and what to change, and when it fits again: once per change, not at every
+// replan.
+func (g *generation) logFeasibility(res *planner.Result) {
+	g.pmu.Lock()
+	defer g.pmu.Unlock()
+	if g.infeasible == nil {
+		g.infeasible = map[string]bool{}
+	}
 	for _, s := range res.Scopes {
-		if !s.Feasible {
-			logger.Warn("plan infeasible: critical jobs alone exceed the remaining quota", "component", "planner",
-				"limit", s.Limit, "scope", s.Key, "budget", s.Budget, "projected", s.Projected)
+		attrs := []any{"component", "planner", "limit", s.Limit, "scope", s.Key}
+		switch {
+		case !s.Feasible && !g.infeasible[s.ID]:
+			g.infeasible[s.ID] = true
+			if p := problem.ForPlan(s, buildinfo.Get().Version); p != nil {
+				attrs = append(attrs, "budget", math.Round(s.Shortfall.Budget), "needed", math.Round(s.Shortfall.Needed),
+					"problem", p.Title, "action", p.Action)
+			}
+			g.c.logger.Warn("plan does not fit a quota", attrs...)
+		case s.Feasible && g.infeasible[s.ID]:
+			delete(g.infeasible, s.ID)
+			g.c.logger.Info("plan fits the quota again", attrs...)
 		}
 	}
-	return res
 }
 
 // runJob executes one run: requests, mapping, then outputs and history.

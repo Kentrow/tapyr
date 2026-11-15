@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kentrow/tapyr/internal/budget/planner"
 	"github.com/kentrow/tapyr/internal/config"
 )
 
@@ -119,5 +120,75 @@ func TestAnchorsExist(t *testing.T) {
 		if !anchors[a] {
 			t.Errorf("no section #%s in docs/troubleshooting.md", a)
 		}
+	}
+}
+
+func TestForPlan(t *testing.T) {
+	scope := planner.ScopePlan{Limit: "example-sim/daily", Key: "account=lab", Feasible: false}
+	day := 24 * time.Hour
+	for _, tc := range []struct {
+		name          string
+		shortfall     planner.Shortfall
+		title, action string
+	}{
+		{
+			name: "one critical job",
+			shortfall: planner.Shortfall{
+				Needed: 4679.4, Budget: 4500, Period: day, MaxStretch: 12, Factor: 1.43, FirstFactor: 1.43,
+				Critical: []planner.CriticalJob{{Name: "devices", Desired: 2 * time.Minute, Calls: 4320}},
+			},
+			title:  "The daily quota of account lab is too small: its jobs need at least 4,679 calls a day, it leaves 4,500.",
+			action: "Raise the interval of devices from 2m to 3m, or lower its priority to high so that Tapyr can slow it down.",
+		},
+		{
+			name: "several critical jobs, online",
+			shortfall: planner.Shortfall{
+				Needed: 1234567, Budget: 1000000, Period: 8*time.Hour + 30*time.Minute + 20*time.Second, Online: true, MaxStretch: 12, Factor: 1.25,
+				Critical: []planner.CriticalJob{
+					{Name: "a", Desired: 30 * time.Second}, {Name: "b", Desired: time.Hour}, {Name: "c", Desired: 5 * time.Minute}, {Name: "d", Desired: time.Minute},
+				},
+			},
+			title:  "The daily quota of account lab is too small: its jobs need at least 1,234,567 calls over the next 8h30m, it leaves 1,000,000.",
+			action: "Raise the intervals of the critical jobs about x1.3 (a from 30s to 38s, b from 1h to 1h15m, c from 5m to 7m, and 1 more), or lower their priority to high so that Tapyr can slow them down.",
+		},
+		{
+			name: "one critical job makes room on its own",
+			shortfall: planner.Shortfall{
+				Needed: 29551, Budget: 4500, Period: day, MaxStretch: 12, Factor: 6.65, FirstFactor: 12.57,
+				Critical: []planner.CriticalJob{{Name: "too-often", Desired: 10 * time.Second, Calls: 27216}, {Name: "devices", Desired: 2 * time.Minute, Calls: 2268}},
+			},
+			title:  "The daily quota of account lab is too small: its jobs need at least 29,551 calls a day, it leaves 4,500.",
+			action: "Raise the interval of too-often from 10s to 3m, or lower its priority to high so that Tapyr can slow it down: it makes 92% of the calls.",
+		},
+		{
+			name:      "the other jobs alone exceed it",
+			shortfall: planner.Shortfall{Needed: 7224, Budget: 4500, Period: time.Hour, MaxStretch: 12, Critical: []planner.CriticalJob{{Name: "sites"}}},
+			title:     "The daily quota of account lab is too small: its jobs need at least 7,224 calls an hour, it leaves 4,500.",
+			action:    "Even slowed down x12, the most Tapyr may, the jobs need more: raise their intervals or reduce their fan-out, or let Tapyr slow them down more with settings.budget.maxStretch. Critical jobs are never slowed down.",
+		},
+		{
+			name:      "no critical job, odd window",
+			shortfall: planner.Shortfall{Needed: 900, Budget: 600, Period: 30 * time.Minute, MaxStretch: 4},
+			title:     "The daily quota of account lab is too small: its jobs need at least 900 calls per 30m, it leaves 600.",
+			action:    "Even slowed down x4, the most Tapyr may, the jobs need more: raise their intervals or reduce their fan-out, or let Tapyr slow them down more with settings.budget.maxStretch.",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := scope
+			s.Shortfall = &tc.shortfall
+			p := ForPlan(s, "0.5.0")
+			if p.Class != ClassPlanInfeasible || p.Title != tc.title || p.Action != tc.action || p.DocsURL != "https://docs.tapyr.eu/0.5/troubleshooting/#quota-problems" {
+				t.Errorf("ForPlan() =\n%s\n%s\nwant\n%s\n%s", p.Title, p.Action, tc.title, tc.action)
+			}
+		})
+	}
+	if p := ForPlan(scope, "0.5.0"); p != nil {
+		t.Errorf("a scope without shortfall: %+v", p)
+	}
+	if got := shortDuration(0); got != "0s" {
+		t.Errorf("shortDuration(0) = %q", got)
+	}
+	if got := shortDuration(2*24*time.Hour + 90*time.Second); got != "2d1m30s" {
+		t.Errorf("shortDuration = %q", got)
 	}
 }

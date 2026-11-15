@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,8 +18,10 @@ import (
 
 	"github.com/kentrow/tapyr/internal/budget"
 	"github.com/kentrow/tapyr/internal/budget/planner"
+	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/collector"
 	"github.com/kentrow/tapyr/internal/config"
+	"github.com/kentrow/tapyr/internal/problem"
 	"github.com/kentrow/tapyr/internal/processing"
 	"github.com/kentrow/tapyr/internal/runtime"
 	"github.com/kentrow/tapyr/internal/series"
@@ -142,18 +145,20 @@ func newEngine(e *env, cfg *config.Config, graph *runtime.Graph) (*budget.Engine
 
 func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, outputs []outputEstimate) error {
 	w := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(w, "QUOTA SCOPE\tWINDOW\tBUDGET\tPROJECTED\tRESERVE\tSTATUS")
+	fmt.Fprintln(w, "QUOTA\tWINDOW\tAVAILABLE\tPROJECTED\tFOR RETRIES\tSTATUS")
 	planned := map[string]bool{}
 	for _, s := range res.Scopes {
-		status := "ok"
+		status := "fits"
 		if !s.Feasible {
-			status = "INFEASIBLE"
+			status = "DOES NOT FIT"
 		}
 		if s.Budget > 0 {
 			status += fmt.Sprintf(" (%.1f%%)", 100*s.Projected/s.Budget)
 		}
 		fmt.Fprintf(w, "%s\t%s\t%.0f\t%.0f\t%.0f\t%s\n", s.Limit, shortDuration(s.Period), s.Budget, s.Projected, s.Reserve, status)
-		fmt.Fprintf(w, "  %s\t\t\t\t\t\n", s.Key)
+		if words := strings.TrimPrefix(planner.ScopeWords(s.Key), " of "); words != "" {
+			fmt.Fprintf(w, "  %s\t\t\t\t\t\n", words)
+		}
 		for _, j := range res.Jobs {
 			calls, ok := j.Calls[s.ID]
 			if !ok {
@@ -164,7 +169,7 @@ func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, ou
 			line := fmt.Sprintf("  job %s\tdesired %s\teffective %s\t%.0f runs x %s = %.0f",
 				j.Name, shortDuration(j.Desired), shortDuration(j.Effective), runs, pagesLabel(j), calls)
 			if j.Effective != j.Desired {
-				line += fmt.Sprintf("\t(stretched x%.2f, priority %s, %s)", j.Stretch, j.Priority, j.Describe())
+				line += fmt.Sprintf("\t(slowed down x%s, priority %s, %s)", strconv.FormatFloat(math.Round(j.Stretch*100)/100, 'f', -1, 64), j.Priority, j.Describe())
 			}
 			fmt.Fprintln(w, line+"\t")
 		}
@@ -205,10 +210,36 @@ func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, ou
 			return err
 		}
 	}
+	_, err := fmt.Fprint(e.stdout, planConclusion(res))
+	return err
+}
+
+// planConclusion says what the plan means, in words: it fits as desired,
+// it fits by slowing jobs down, or it does not fit, with why and what to
+// change for every quota it does not fit.
+func planConclusion(res *planner.Result) string {
 	if !res.Feasible {
-		fmt.Fprintln(e.stdout, "\nThe plan is infeasible: critical jobs alone exceed a quota, or stretching every other job to the maximum is not enough.")
+		var b strings.Builder
+		b.WriteString("\nThe plan does not fit:\n")
+		for _, s := range res.Scopes {
+			if p := problem.ForPlan(s, buildinfo.Get().Version); p != nil {
+				b.WriteString(wrapWords("  ", strings.Fields(p.Title), 100))
+				b.WriteString(wrapWords("  ", strings.Fields(p.Action), 100))
+				b.WriteString("  How to fix: " + p.DocsURL + "\n")
+			}
+		}
+		return b.String()
 	}
-	return nil
+	slowed := 0
+	for _, j := range res.Jobs {
+		if j.Effective != j.Desired {
+			slowed++
+		}
+	}
+	if slowed == 0 {
+		return "\nThe plan fits: every job runs at its desired interval.\n"
+	}
+	return fmt.Sprintf("\nThe plan fits by slowing down %d of %d jobs to stay within the quotas (see effective above).\n", slowed, len(res.Jobs))
 }
 
 // printOutputEstimates prints what every output receives (ADR 0014). An
@@ -253,13 +284,20 @@ func printOutputEstimates(out io.Writer, outputs []outputEstimate) error {
 // wrapList writes items after prefix, separated by commas, wrapped at
 // width with the continuation lines aligned under the first item.
 func wrapList(prefix string, items []string, width int) string {
+	words := slices.Clone(items)
+	for i := range len(words) - 1 {
+		words[i] += ","
+	}
+	return wrapWords(prefix, words, width)
+}
+
+// wrapWords writes words after a prefix, wrapped at width, the continuation
+// lines aligned under the first word.
+func wrapWords(prefix string, items []string, width int) string {
 	var b strings.Builder
 	indent := strings.Repeat(" ", len(prefix))
 	line := prefix
-	for i, item := range items {
-		if i < len(items)-1 {
-			item += ","
-		}
+	for _, item := range items {
 		if len(line) > len(indent) && len(line)+1+len(item) > width {
 			b.WriteString(strings.TrimRight(line, " ") + "\n")
 			line = indent

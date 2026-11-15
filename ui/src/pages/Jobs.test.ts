@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { instancesEmpty } from "./Jobs";
-import { unplanned } from "./Plan";
+import { blocking, scopeWords, unplanned } from "./Plan";
 import type { Job, Plan } from "../lib/types";
 
 const job = (name: string, patch: Partial<Job> = {}): Job => ({
@@ -33,5 +33,27 @@ describe("jobs without instances", () => {
       { name: "clients", why: "sites listed no item in its last run." },
       { name: "networks", why: "Waiting for sites to list its items: one instance per item." },
     ]);
+  });
+});
+
+describe("plan that does not fit", () => {
+  it("marks the critical jobs of the quotas that do not fit", () => {
+    const job = (name: string, priority: string) => ({ name, provider: "p", account: "a", priority, desired_interval_seconds: 60, effective_interval_seconds: 60, stretch: 1, instances: 1, pages_per_run: 1 });
+    const scope = (feasible: boolean, jobs: string[]) => ({ limit: "p/daily", scope: "account=a", period_seconds: 86400, budget: 1, reserve: 0, projected: 2, feasible, jobs });
+    const plan: Plan = {
+      at: "2026-11-03T12:00:00Z", feasible: false,
+      jobs: [job("too-often", "critical"), job("sites", "low"), job("other", "critical")],
+      scopes: [scope(false, ["too-often", "sites"]), scope(true, ["other"])],
+    };
+    expect([...blocking(plan)]).toEqual(["too-often"]);
+  });
+});
+
+describe("scope words", () => {
+  it("names a scope key in words", () => {
+    expect(scopeWords("account=demo")).toBe("account demo");
+    expect(scopeWords("account=lab,target=eu")).toBe("account lab and target eu");
+    expect(scopeWords("instance")).toBe("each instance");
+    expect(scopeWords("")).toBe("all accounts");
   });
 });

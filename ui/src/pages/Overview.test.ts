@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jobCounts, quotaHint, squareWord, unhealthyAccounts } from "./Overview";
+import { jobCounts, planHint, quotaHint, squareWord, unhealthyAccounts } from "./Overview";
 import type { Account, Budget, Job } from "../lib/types";
 
 const now = Date.parse("2026-11-03T12:00:00Z");
@@ -10,7 +10,17 @@ describe("tightest quota hint", () => {
     expect(quotaHint(quota, now)).toBe("meraki / daily, resets in 6h");
   });
   it("says when the quota runs out before its reset", () => {
-    expect(quotaHint({ ...quota, exhaustion_eta_seconds: 5400 }, now)).toBe("meraki / daily, runs out in 1h30m, resets in 6h");
+    expect(quotaHint({ ...quota, exhaustion_eta_seconds: 5400 }, now)).toBe("meraki / daily, runs out in 1h30m at the current pace, resets in 6h");
+  });
+});
+
+describe("plan hint", () => {
+  it("names the quota that would run out with the planned intervals", () => {
+    const scope = { limit: "example-sim/daily", scope: "account=lab", period_seconds: 86400, budget: 4500, reserve: 500, projected: 9000, feasible: false, exhaustion_at: "2026-11-03T14:00:00Z", jobs: [] };
+    const plan = { at: "2026-11-03T12:00:00Z", feasible: false, jobs: [], scopes: [{ ...scope, feasible: true, limit: "other" }, scope] };
+    expect(planHint(plan, false, now)).toBe("the daily quota of account lab would run out in 2h with the planned intervals");
+    expect(planHint(undefined, false, now)).toBe("a quota would run out before its reset");
+    expect(planHint(plan, true, now)).toBe("every critical job on schedule");
   });
 });
 
