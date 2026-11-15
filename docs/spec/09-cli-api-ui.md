@@ -76,7 +76,7 @@ Read-only, JSON, versioned under `/api/v1`. It is the **only** interface the UI 
 | `GET /api/v1/status` | Version, uptime, config hash, last reload result and errors, readiness reasons, plan feasibility |
 | `GET /api/v1/providers` | Providers with package version, accounts count, health summary |
 | `GET /api/v1/accounts` / `{name}` | Accounts (no secrets), targets, labels, circuit state, auth status, health and its reasons |
-| `GET /api/v1/jobs` / `{name}` | Effective config (after defaults and template expansion), desired and effective intervals, instances, last run summary, next run |
+| `GET /api/v1/jobs` / `{name}` | Effective config (after defaults and template expansion), desired and effective intervals, instances, last run summary, next run, and `collected` (false, with `not_collected_reason`, for a job that is not collected, [ADR 0013](../adr/0013-unconsumed-jobs.md)) |
 | `GET /api/v1/jobs/{name}/instances` | Fan-out instances with their variables and last result |
 | `GET /api/v1/jobs/{name}/runs?instance=` | Recent runs with statistics and redacted errors |
 | `GET /api/v1/budgets` | Every limit and scope key: kind, max, used, remaining (internal and observed), external usage, reserve, window bounds, projection, and the accounts whose requests count in the scope (named by its account, target or credential dimension; every account of the provider for a scope without one) |
@@ -122,7 +122,7 @@ The UI is built in CI and in `make build`; a binary built without UI assets serv
 
 1. **Overview**: health summary, plan feasibility banner, providers and accounts cards with status, quota gauges (used / projected / limit per window, named by the accounts of their scope), recent errors.
 2. **Graph**: provider -> account -> (targets) -> inventory jobs -> metric jobs -> outputs. Node color by health. Click a node to open its detail panel. Fan-out shown as grouped nodes with instance counts.
-3. **Job detail**: effective config (YAML view), desired vs effective interval with stretch reason, instances table, recent runs (result, duration, requests, pages, retries, samples), errors.
+3. **Job detail**: effective config (YAML view), desired vs effective interval with stretch reason, instances table, recent runs (result, duration, requests, pages, retries, samples), errors. A job that is not collected says so with its reason, on the jobs list and its detail, and stays out of the counts of the Overview and of the Graph.
 4. **Budgets**: one card per limit and scope: timeline of consumption over the window with projection line, reserve, external usage, window reset time. Rate limits show wait time and 429s.
 5. **Plan**: the plan table, sortable, with stretched jobs highlighted.
 6. **Outputs**: queue fill, send rate, failures, last success.

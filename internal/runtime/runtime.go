@@ -40,7 +40,11 @@ type Options struct {
 type Graph struct {
 	Settings *config.SettingsSpec
 	Jobs     []*Job
-	Outputs  []*config.Output
+	// NotCollected are the jobs whose metrics no output keeps, and the
+	// parents whose inventory no collected job takes (ADR 0013): compiled,
+	// but neither scheduled nor planned.
+	NotCollected []*Job
+	Outputs      []*config.Output
 	// OutputCredentials are the resolved headers and basic auth of the
 	// push outputs, by output name (when secrets are resolved).
 	OutputCredentials map[string]*OutputCredentials
@@ -116,6 +120,9 @@ type Job struct {
 	PagesEstimate int
 	// ForEach describes the discovery fan-out of the job, or nil.
 	ForEach *ForEach
+	// NotCollected is the reason why the job is not collected (ADR 0013),
+	// empty for a collected job.
+	NotCollected string
 }
 
 // ForEach describes a fan-out.
@@ -319,6 +326,7 @@ func Compile(cfg *config.Config, opts Options) (*Graph, error) {
 	if len(c.diags) > 0 {
 		return nil, c.diags.Sorted()
 	}
+	c.splitCollected()
 	return c.graph, nil
 }
 

@@ -65,7 +65,7 @@ func (fake) Accounts(context.Context) []Account {
 
 var job = Job{
 	Name: "devices", Provider: "meraki", Account: "acme", Template: "meraki-devices", Role: "metrics", Priority: "normal",
-	DesiredIntervalSeconds: 300, EffectiveIntervalSeconds: 600, StretchReason: "quota daily", Instances: 2,
+	DesiredIntervalSeconds: 300, EffectiveIntervalSeconds: 600, StretchReason: "quota daily", Instances: 2, Collected: true,
 	Outputs: []string{}, Labels: map[string]string{},
 	LastRun: &RunSummary{RunID: "000001", Instance: "devices", Result: "success", StartedAt: at, EndedAt: at.Add(time.Second)},
 	NextRun: ptr(at.Add(time.Minute)),

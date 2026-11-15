@@ -52,6 +52,7 @@ func newPlanCmd(e *env, flags *globalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			warnNotCollected(e, graph)
 			engine, err := newEngine(e, cfg, graph)
 			if err != nil {
 				return &exitError{code: exitFailure, err: err}
@@ -82,15 +83,17 @@ func newPlanCmd(e *env, flags *globalFlags) *cobra.Command {
 				return &exitError{code: exitFailure, err: err}
 			}
 			for name := range hints {
-				if !slices.ContainsFunc(graph.Jobs, func(j *runtime.Job) bool { return j.ForEach != nil && j.ForEach.Parent == name }) {
+				fanOut := func(j *runtime.Job) bool { return j.ForEach != nil && j.ForEach.Parent == name }
+				if !slices.ContainsFunc(graph.Jobs, fanOut) && !slices.ContainsFunc(graph.NotCollected, fanOut) {
 					fmt.Fprintf(e.stderr, "warning: --fanout %s matches no fan-out job\n", name)
 				}
 			}
 			res := planner.Plan(jobs, planner.Options{MaxStretch: graph.Settings.Budget.MaxStretch, Now: e.clock.Now()})
+			notCollected := graph.NotCollectedJobs()
 			if format == "json" {
-				err = printPlanJSON(e, res)
+				err = printPlanJSON(e, res, notCollected)
 			} else {
-				err = printPlanTable(e, res)
+				err = printPlanTable(e, res, notCollected)
 			}
 			if err != nil {
 				return err
@@ -129,7 +132,7 @@ func newEngine(e *env, cfg *config.Config, graph *runtime.Graph) (*budget.Engine
 	}, e.clock, e.logger)
 }
 
-func printPlanTable(e *env, res *planner.Result) error {
+func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job) error {
 	w := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "QUOTA SCOPE\tWINDOW\tBUDGET\tPROJECTED\tRESERVE\tSTATUS")
 	planned := map[string]bool{}
@@ -174,6 +177,12 @@ func printPlanTable(e *env, res *planner.Result) error {
 			fmt.Fprintln(w, line+"\t")
 		}
 	}
+	if len(notCollected) > 0 {
+		fmt.Fprintln(w, "\nJOBS NOT COLLECTED\t\t\t\t\t")
+		for _, j := range notCollected {
+			fmt.Fprintf(w, "  job %s\tdesired %s\t%s\t\t\t\n", j.Name, shortDuration(j.Interval), j.NotCollected)
+		}
+	}
 	if err := w.Flush(); err != nil {
 		return err
 	}
@@ -211,6 +220,16 @@ type planJSON struct {
 	Feasible bool            `json:"feasible"`
 	Jobs     []planJobJSON   `json:"jobs"`
 	Scopes   []planScopeJSON `json:"scopes"`
+	// NotCollected are the jobs that are not collected (ADR 0013).
+	NotCollected []planNotCollectedJSON `json:"not_collected"`
+}
+
+type planNotCollectedJSON struct {
+	Name           string  `json:"name"`
+	Provider       string  `json:"provider"`
+	Account        string  `json:"account"`
+	DesiredSeconds float64 `json:"desired_seconds"`
+	Reason         string  `json:"reason"`
 }
 
 type planJobJSON struct {
@@ -240,8 +259,13 @@ type planScopeJSON struct {
 	Jobs          []string `json:"jobs"`
 }
 
-func printPlanJSON(e *env, res *planner.Result) error {
-	out := planJSON{Feasible: res.Feasible, Jobs: []planJobJSON{}, Scopes: []planScopeJSON{}}
+func printPlanJSON(e *env, res *planner.Result, notCollected []*runtime.Job) error {
+	out := planJSON{Feasible: res.Feasible, Jobs: []planJobJSON{}, Scopes: []planScopeJSON{}, NotCollected: []planNotCollectedJSON{}}
+	for _, j := range notCollected {
+		out.NotCollected = append(out.NotCollected, planNotCollectedJSON{
+			Name: j.Name, Provider: j.Provider, Account: j.Account, DesiredSeconds: j.Interval.Seconds(), Reason: j.NotCollected,
+		})
+	}
 	for _, j := range res.Jobs {
 		out.Jobs = append(out.Jobs, planJobJSON{
 			Name: j.Name, Provider: j.Provider, Account: j.Account, Priority: string(j.Priority),

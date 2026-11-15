@@ -13,7 +13,7 @@ export function Jobs() {
   if (!jobs.data) return <Loading />;
   return (
     <>
-      <PageHead title="Jobs" sub="Every job with its desired and effective interval; implicit jobs are the parents of fan-outs that no job configures." />
+      <PageHead title="Jobs" sub="Every job with its desired and effective interval; implicit jobs are the parents of fan-outs that no job configures, and jobs not collected make no API call (no output keeps their metrics)." />
       <Table<Job>
         rows={jobs.data}
         rowKey={(j) => j.name}
@@ -26,6 +26,7 @@ export function Jobs() {
               <span>
                 <a href={href(["jobs", j.name])}>{j.name}</a>
                 {j.implicit && <span className="muted small"> (implicit)</span>}
+                {!j.collected && <span title={j.not_collected_reason}> <Badge state="unknown">not collected</Badge></span>}
               </span>
             ),
           },
@@ -35,7 +36,9 @@ export function Jobs() {
           {
             key: "interval", label: "Interval", num: true, sort: (j) => j.effective_interval_seconds,
             render: (j) =>
-              j.effective_interval_seconds > j.desired_interval_seconds ? (
+              !j.collected ? (
+                <span className="muted" title={j.not_collected_reason}>-</span>
+              ) : j.effective_interval_seconds > j.desired_interval_seconds ? (
                 <span title={j.stretch_reason}>
                   {duration(j.effective_interval_seconds)} <span className="muted small">(desired {duration(j.desired_interval_seconds)})</span>
                 </span>
@@ -59,7 +62,7 @@ export function JobDetail({ name }: { name: string }) {
   if (job.error && !job.data) return <Failure error={job.error} />;
   if (!job.data) return <Loading />;
   const j = job.data;
-  const stretched = j.effective_interval_seconds > j.desired_interval_seconds;
+  const stretched = j.collected && j.effective_interval_seconds > j.desired_interval_seconds;
   return (
     <>
       <PageHead title={j.name} sub={`${j.provider} / ${j.account}${j.template ? `, template ${j.template}` : ""}`}>
@@ -68,8 +71,17 @@ export function JobDetail({ name }: { name: string }) {
       <div className="grid">
         <div className="card">
           <h3>Interval</h3>
-          <span className="kpi">{duration(j.effective_interval_seconds)}</span>
-          {stretched ? (
+          {!j.collected ? (
+            <>
+              <span className="kpi"><Badge state="unknown">not collected</Badge></span>
+              <p className="small" style={{ margin: "6px 0 0", overflowWrap: "anywhere" }}>
+                No API call: {j.not_collected_reason}. <span className="muted">See the processing rules of the outputs, or <span className="mono">settings.collection.skipUnconsumed</span>.</span>
+              </p>
+            </>
+          ) : (
+            <span className="kpi">{duration(j.effective_interval_seconds)}</span>
+          )}
+          {!j.collected ? null : stretched ? (
             <p className="small" style={{ margin: "6px 0 0" }}>
               <Badge state="degraded">stretched</Badge> desired {duration(j.desired_interval_seconds)}: {j.stretch_reason}
             </p>
@@ -87,7 +99,7 @@ export function JobDetail({ name }: { name: string }) {
           ) : (
             <span className="muted">not yet</span>
           )}
-          <p className="small muted" style={{ marginBottom: 0 }}>next {since(j.next_run)}</p>
+          {j.collected && <p className="small muted" style={{ marginBottom: 0 }}>next {since(j.next_run)}</p>}
         </div>
         <div className="card">
           <h3>Job</h3>
@@ -127,7 +139,7 @@ export function JobDetail({ name }: { name: string }) {
           rows={instances.data ?? []}
           rowKey={(i) => i.key}
           initialSort={{ key: "key" }}
-          empty="No instance: the parent inventory has not run yet."
+          empty={j.collected ? "No instance: the parent inventory has not run yet." : "No instance: the job is not collected."}
           columns={[
             { key: "key", label: "Instance", sort: (i) => i.key, render: (i) => <span className="mono small">{i.key}</span> },
             { key: "vars", label: "Variables", render: (i) => <span className="mono small">{Object.entries(i.vars).map(([k, v]) => `${k}=${v}`).join(" ")}</span> },

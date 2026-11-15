@@ -401,6 +401,7 @@ spec:
     maxConcurrentRequests: 32
     defaultTimeout: 30s
     jitter: 10%
+    skipUnconsumed: true                 # no API call for jobs whose metrics no output keeps (ADR 0013)
   budget:
     retryReserve: 10%                    # 0% to 50%
     replanInterval: 15m

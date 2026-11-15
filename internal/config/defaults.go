@@ -212,6 +212,7 @@ func defaultSettings(s *SettingsSpec) {
 	setDefault(&s.Collection.MaxConcurrentRequests, 32)
 	setDefault(&s.Collection.DefaultTimeout, Duration(30*time.Second))
 	setDefault(&s.Collection.Jitter, ptr(Percent(0.1)))
+	setDefault(&s.Collection.SkipUnconsumed, ptr(true))
 	setDefault(&s.Budget.RetryReserve, ptr(Percent(0.1)))
 	setDefault(&s.Budget.ReplanInterval, Duration(15*time.Minute))
 	setDefault(&s.Budget.ReplanOnProjection, ptr(true))

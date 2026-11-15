@@ -129,6 +129,7 @@ spec:
 - A `labeldrop` can make two series identical; the duplicates are dropped and counted in `tapyr_output_samples_dropped_total{reason="duplicate"}`, which the `TapyrOutputDropping` alert reports: remove a label only when the others still tell the series apart.
 - A changed rule applies from the next run of each job instance; the series it removes or renames get a stale marker then.
 - Tapyr's self-metrics are never filtered.
+- **Rules on the metric name save API calls.** When the rules of every output receiving a job drop all its metrics by name (`sourceLabels: [__name__]`), the job is not collected at all: no API call, no quota spent, and its quota goes to the other jobs. The parents of a fan-out stop too when none of their children is collected. `tapyr validate` and `tapyr plan` print a warning for every such job, so a rule broader than intended shows before you reload. A rule on another label (`[__name__, site]` above) filters the samples, but the call is still made: the values are only known after it. Set `settings.collection.skipUnconsumed: false` to keep every job running ([ADR 0013](adr/0013-unconsumed-jobs.md)).
 
 ## Sizing the queue
 

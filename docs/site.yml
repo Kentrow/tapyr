@@ -73,6 +73,7 @@ nav:
           - docs/adr/0010-documentation-site.md
           - docs/adr/0011-provider-ecosystem.md
           - docs/adr/0012-output-processing.md
+          - docs/adr/0013-unconsumed-jobs.md
 
 # Pages for contributors and maintainers, read on GitHub.
 unpublished:

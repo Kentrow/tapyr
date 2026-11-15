@@ -77,6 +77,10 @@ export interface Job {
   effective_interval_seconds: number;
   stretch_reason?: string;
   instances: number;
+  // False for a job whose metrics no output keeps, or a parent whose
+  // inventory no collected job takes (ADR 0013): neither scheduled nor planned.
+  collected: boolean;
+  not_collected_reason?: string;
   outputs: string[];
   labels: Record<string, string>;
   last_run?: RunSummary;

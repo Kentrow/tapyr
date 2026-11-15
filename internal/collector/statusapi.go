@@ -224,11 +224,11 @@ func nonNilMap(m map[string]string) map[string]string {
 
 func ptr[T any](v T) *T { return &v }
 
-// jobModels returns one runtime job per job name: the static jobs and the
-// models of fan-outs, sorted by name.
+// jobModels returns one runtime job per job name: the static jobs, the
+// models of fan-outs and the jobs that are not collected, sorted by name.
 func jobModels(snap *snapshot) []*runtime.Job {
 	seen := map[string]*runtime.Job{}
-	for _, j := range snap.g.graph.Jobs {
+	for _, j := range slices.Concat(snap.g.graph.Jobs, snap.g.graph.NotCollected) {
 		if _, ok := seen[j.Name]; !ok {
 			seen[j.Name] = j
 		}
@@ -257,7 +257,7 @@ func (s statusSource) job(ctx context.Context, snap *snapshot, j *runtime.Job) a
 	aj := api.Job{
 		Name: j.Name, Provider: j.Provider, Account: j.Account, Role: string(j.Role), Priority: string(j.Priority),
 		Implicit: j.Implicit, DesiredIntervalSeconds: j.Interval.Seconds(), Outputs: slices.Clone(j.Outputs),
-		Labels: map[string]string{},
+		Labels: map[string]string{}, Collected: j.NotCollected == "", NotCollectedReason: j.NotCollected,
 	}
 	if aj.Outputs == nil {
 		aj.Outputs = []string{}
@@ -555,6 +555,9 @@ func (s statusSource) Graph(ctx context.Context) api.Graph {
 		node("output", name, name, "ok", 0)
 	}
 	for _, j := range jobModels(snap) {
+		if j.NotCollected != "" {
+			continue
+		}
 		count := 0
 		for _, inst := range snap.instances {
 			if inst.Name == j.Name {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Jobs whose metrics no output keeps are not collected ([ADR 0013](docs/adr/0013-unconsumed-jobs.md)): when the processing rules of every output receiving a job drop all its metrics by name, Tapyr makes no API call for it and gives its quota to the other jobs, and the parents of a fan-out stop when none of their children is collected. Rules on other labels still filter samples without saving calls. `tapyr validate`, `tapyr plan` (a `JOBS NOT COLLECTED` section, `not_collected` in JSON) and `tapyr run` warn about every such job; the status API reports `collected` and `not_collected_reason`, the web UI shows them as not collected, and the self-metric `tapyr_job_collected` is 0 for them. On by default; `settings.collection.skipUnconsumed: false` keeps every job running.
+
 ## [0.4.0] - 2026-11-14
 
 ### Added

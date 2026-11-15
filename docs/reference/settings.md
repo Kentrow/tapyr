@@ -73,6 +73,7 @@ CollectionSettings configures request execution.
 | `defaultTimeout` | [Duration](#duration) |  | `defaultTimeout` of a request when the provider sets none. Default `30s`. |
 | `jitter` | [Percent](#percent) |  | Jitter spreads scheduled runs, from 0% to 50% of the interval. Default `10%`. |
 | `maxConcurrentRequests` | integer |  | `maxConcurrentRequests` bounds in-flight requests across all providers. Default `32`. Minimum 1. |
+| `skipUnconsumed` | boolean |  | `skipUnconsumed` does not collect the jobs whose metrics no output keeps (the processing rules of every output receiving them drop them by name), nor the parents whose inventory no collected job takes: no API call, no quota spent (ADR 0013). Set it to false to keep every job running, for example as an authentication probe or for the live debug. Default `true`. |
 
 ## LogSettings
 

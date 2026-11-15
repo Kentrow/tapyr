@@ -28,8 +28,10 @@ export function Overview() {
   const quotas = budgets.data.filter((b) => b.kind === "quota");
   const tightest = [...quotas].sort((a, b) => leftOf(a) / (a.max || 1) - leftOf(b) / (b.max || 1))[0];
   const okProviders = providers.data.filter((p) => p.health === "ok").length;
-  const okJobs = jobs.data.filter((j) => jobState(j) === "ok").length;
-  const failing = jobs.data.filter((j) => jobState(j) === "bad");
+  const collected = jobs.data.filter((j) => j.collected !== false);
+  const notCollected = jobs.data.length - collected.length;
+  const okJobs = collected.filter((j) => jobState(j) === "ok").length;
+  const failing = collected.filter((j) => jobState(j) === "bad");
   const reauth = accounts.data.filter((a) => a.auth.reauth_required);
   const unhealthy = unhealthyAccounts(accounts.data);
   return (
@@ -38,8 +40,8 @@ export function Overview() {
       <div className="kpis">
         <Kpi icon="graph" label="Providers healthy" value={`${okProviders}/${providers.data.length}`} ok={okProviders === providers.data.length}
           hint={plural(accounts.data.length, "account")} href={href(["graph"])} />
-        <Kpi icon="jobs" label="Jobs succeeding" value={`${okJobs}/${jobs.data.length}`} ok={failing.length === 0}
-          hint={plural(s.instances, "instance")} href={href(["jobs"])} />
+        <Kpi icon="jobs" label="Jobs succeeding" value={`${okJobs}/${collected.length}`} ok={failing.length === 0}
+          hint={plural(s.instances, "instance") + (notCollected ? `, ${notCollected} not collected` : "")} href={href(["jobs"])} />
         <Kpi icon="budgets" label="Tightest quota" value={tightest ? percent(leftOf(tightest), tightest.max ?? 0) + " left" : "No quota"}
           ok={!tightest || tightest.exhaustion_eta_seconds === undefined}
           hint={tightest ? quotaHint(tightest) : "rate and concurrency limits only"} href={href(["budgets"])} />
@@ -85,7 +87,7 @@ export function Overview() {
           <h2>Providers</h2>
           {providers.data.map((p) => (
             <ProviderCard key={p.name} provider={p} accounts={accounts.data!.filter((a) => a.provider === p.name)}
-              jobs={jobs.data!.filter((j) => j.provider === p.name)} quotas={quotas.filter((q) => q.provider === p.name)} />
+              jobs={collected.filter((j) => j.provider === p.name)} quotas={quotas.filter((q) => q.provider === p.name)} />
           ))}
         </div>
         <div className="stack">

@@ -108,6 +108,10 @@ func (c *Collector) newGeneration(cfg *config.Config, graph *runtime.Graph) (*ge
 		c.retire(instance, c.series.Remove(instance))
 	}, c.logger)
 	g.disc.observe = c.opts.OnInstances
+	for _, j := range graph.NotCollectedJobs() {
+		c.logger.Warn("job not collected", "component", "run", "provider", j.Provider, "account", j.Account, "job", j.Name,
+			"reason", j.NotCollected, "setting", "settings.collection.skipUnconsumed")
+	}
 	clients := c.accountClients(graph)
 	g.executor = collect.New(collect.Options{
 		Client:                c.client,

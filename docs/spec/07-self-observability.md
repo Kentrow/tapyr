@@ -62,6 +62,7 @@ Self-metrics can also be pushed: setting `selfMetrics.outputs: [name]` in `Setti
 | `tapyr_job_lag_seconds` | gauge | provider, account, job | max delay vs schedule across instances |
 | `tapyr_job_instances` | gauge | provider, account, job | fan-out size |
 | `tapyr_job_series` | gauge | provider, account, job | series produced by the last runs |
+| `tapyr_job_collected` | gauge | provider, account, job | 1 when collected, 0 when no output keeps its metrics or no collected job takes its inventory ([ADR 0013](../adr/0013-unconsumed-jobs.md)) |
 | `tapyr_job_pages_per_run` | histogram | provider, job | |
 | `tapyr_job_partial_runs_total` | counter | provider, account, job | |
 | `tapyr_mapping_errors_total` | counter | provider, job, metric | |
