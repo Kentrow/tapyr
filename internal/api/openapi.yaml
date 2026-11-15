@@ -357,11 +357,27 @@ components:
           type: boolean
           description: False for a job whose metrics no output keeps, or a parent whose inventory no collected job takes (ADR 0013); neither scheduled nor planned
         not_collected_reason: { type: string, description: Why the job is not collected }
+        waiting: { $ref: "#/components/schemas/Waiting" }
         outputs: { type: array, items: { type: string } }
         labels: { $ref: "#/components/schemas/Labels" }
         last_run: { $ref: "#/components/schemas/RunSummary" }
         next_run: { $ref: "#/components/schemas/Time" }
         definition: { type: object, description: Effective job definition, in job details only }
+    Waiting:
+      type: object
+      additionalProperties: false
+      description: What a collected job that has not run yet waits for; absent once it has run
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          enum: [first_run, parent, parent_failing]
+          description: first_run, its first run is due at until; parent, a fan-out whose parent has not listed its items yet and runs next at until; parent_failing, the parent or one of its own parents (failing_job) fails, its last run ended at failed_at with error
+        until: { $ref: "#/components/schemas/Time" }
+        parent: { type: string, description: The parent of a fan-out }
+        failing_job: { type: string, description: The job that fails, the parent or one of its own parents }
+        error: { type: string, description: Redacted error of the last run of the failing job }
+        failed_at: { $ref: "#/components/schemas/Time" }
     Instance:
       type: object
       additionalProperties: false
@@ -502,6 +518,7 @@ components:
               label: { type: string }
               health: { $ref: "#/components/schemas/Health" }
               instances: { type: integer }
+              waiting: { type: string, enum: [first_run, parent, parent_failing], description: The waiting reason of a job node that has not run yet }
         edges:
           type: array
           items:

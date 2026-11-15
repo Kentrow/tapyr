@@ -104,6 +104,39 @@ type Job struct {
 	Collected bool `json:"collected"`
 	// NotCollectedReason says why, when Collected is false.
 	NotCollectedReason string `json:"not_collected_reason,omitempty"`
+	// Waiting says what a collected job that has not run yet waits for;
+	// absent once it has run, and for a job not collected.
+	Waiting *Waiting `json:"waiting,omitempty"`
+}
+
+// Waiting reasons of a job that has not run yet.
+const (
+	// WaitingFirstRun: its instances are scheduled, their first run is due
+	// at Until.
+	WaitingFirstRun = "first_run"
+	// WaitingParent: a fan-out whose parent has not listed its items yet;
+	// the parent runs next at Until.
+	WaitingParent = "parent"
+	// WaitingParentFailing: a fan-out whose parent, or one of the parents
+	// of its parent, fails: FailingJob, Error and FailedAt say which and
+	// how, Until when the parent runs next.
+	WaitingParentFailing = "parent_failing"
+)
+
+// Waiting is what a job that has not run yet waits for.
+type Waiting struct {
+	// Reason is first_run, parent or parent_failing.
+	Reason string `json:"reason"`
+	// Until is when the wait should end: the first run of the job, or the
+	// next run of its parent (of the first parent that has instances).
+	Until *time.Time `json:"until,omitempty"`
+	// Parent is the parent of a fan-out.
+	Parent string `json:"parent,omitempty"`
+	// FailingJob is the job that fails, the parent or one of its own
+	// parents, with the redacted error of its last run and when it ended.
+	FailingJob string     `json:"failing_job,omitempty"`
+	Error      string     `json:"error,omitempty"`
+	FailedAt   *time.Time `json:"failed_at,omitempty"`
 }
 
 // RunSummary is the outcome of a run.
@@ -249,6 +282,9 @@ type Node struct {
 	Health string `json:"health"`
 	// Instances counts the instances of a job node.
 	Instances int `json:"instances,omitempty"`
+	// Waiting is the waiting reason of a job node that has not run yet
+	// (first_run, parent or parent_failing, see Waiting).
+	Waiting string `json:"waiting,omitempty"`
 }
 
 // Edge links two nodes.

@@ -1,7 +1,7 @@
 // Formatting helpers. Durations and counts use compact units; times are
 // shown relative to now, with the absolute time in a title.
 
-import type { Budget, Health, Output } from "./types";
+import type { Budget, Health, Output, Waiting, WaitingReason } from "./types";
 
 export function duration(seconds: number | undefined): string {
   if (seconds === undefined || !Number.isFinite(seconds)) return "-";
@@ -118,6 +118,48 @@ export function healthClass(h: string | undefined): "ok" | "warn" | "bad" | "idl
       return "bad";
   }
   return "idle";
+}
+
+// waitingWord names a waiting reason in a few words, for the tiles of the
+// graph.
+export function waitingWord(reason: WaitingReason | undefined): string {
+  switch (reason) {
+    case "first_run":
+      return "first run soon";
+    case "parent":
+      return "waiting for its parent";
+    case "parent_failing":
+      return "waiting, parent failing";
+  }
+  return "no run yet";
+}
+
+// waitingText says what a job that has not run yet waits for: short for
+// the tables and the squares, long for the job page. Waiting is not
+// failing: the words say what the job waits for and until when, and name
+// the job that fails when one does.
+export function waitingText(w: Waiting, now = Date.now()): { short: string; long: string } {
+  const when = (iso: string | undefined) => (iso ? since(iso, now) : "");
+  switch (w.reason) {
+    case "first_run":
+      return {
+        short: w.until ? `first run ${when(w.until)}` : "first run soon",
+        long: w.until ? `Waiting for its first run, due ${when(w.until)}.` : "Waiting for its first run.",
+      };
+    case "parent":
+      return {
+        short: `waiting for ${w.parent}`,
+        long: `Waiting for ${w.parent} to list its items: one instance per item.${w.until ? ` The discovery moves on ${when(w.until)}.` : ""}`,
+      };
+    case "parent_failing": {
+      const who = w.failing_job === w.parent ? `${w.parent}, which fails` : `${w.parent}, whose parent ${w.failing_job} fails`;
+      return {
+        short: `waiting: ${w.failing_job} fails`,
+        long: `Waiting for ${who}${w.error ? `: ${w.error}` : ""}${w.failed_at ? ` (${when(w.failed_at)})` : ""}.${w.until ? ` Next try ${when(w.until)}.` : ""}`,
+      };
+    }
+  }
+  return { short: "no run yet", long: "No run yet." };
 }
 
 // outputHealth is the health of an output: failing when its last error is

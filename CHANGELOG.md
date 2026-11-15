@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `spec.limits.maxSeries` caps the series of an output: the series already sent keep flowing, the samples of a new series beyond the limit are dropped and counted in `tapyr_output_samples_dropped_total{reason="series_limit"}` (reported by `TapyrOutputDropping`), and a series that stops frees its place. The web UI says it in words: the Outputs page shows each output's series against its limit, the new series held back and the samples dropped, and the Overview shows a "Series limit reached" alert.
 - Jobs whose metrics no output keeps are not collected ([ADR 0013](docs/adr/0013-unconsumed-jobs.md)): when the processing rules of every output receiving a job drop all its metrics by name, Tapyr makes no API call for it and gives its quota to the other jobs, and the parents of a fan-out stop when none of their children is collected. Rules on other labels still filter samples without saving calls. `tapyr validate`, `tapyr plan` (a `JOBS NOT COLLECTED` section, `not_collected` in JSON) and `tapyr run` warn about every such job; the status API reports `collected` and `not_collected_reason`, the web UI shows them as not collected, and the self-metric `tapyr_job_collected` is 0 for them. On by default; `settings.collection.skipUnconsumed: false` keeps every job running.
 
+### Changed
+
+- The web UI tells waiting from failing. A job that has not run yet waits for its first run, for its parent to list its items, or for a failing parent, and every page says which and until when: the Overview counts the jobs waiting apart from those failing and explains its squares with a legend, the Graph names the reason on the tiles instead of "unknown" and no longer marks a group "unknown" for a job that has not run, the job page names the failing parent and its error instead of "next never", and the Plan page lists the fan-outs it does not hold yet. The status API adds `waiting` to the jobs (`reason`, `until`, `parent`, `failing_job`, `error`, `failed_at`) and to the job nodes of the graph. A health `unknown` reads "no run yet".
+
 ## [0.4.0] - 2026-11-14
 
 ### Added

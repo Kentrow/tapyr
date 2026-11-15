@@ -100,6 +100,16 @@ Every job, account and provider has a health: `ok`, `degraded`, `failing`, or `u
 
 The Overview lists the accounts that are not ok with their reasons, and the Graph colors the account nodes with their health and shows the reasons in the detail panel.
 
+### Waiting is not failing
+
+A collected job that has not run yet **waits**; it does not fail. `waiting` on the job (`GET /api/v1/jobs`) says for what, and the graph gives the reason on its job nodes:
+
+- `first_run`: its instances are scheduled; `until` is their first run.
+- `parent`: a fan-out without instances, whose parent has not listed its items yet (it waits for its first run, the budget, or its own parent); `parent` names it and `until` is its next run (the next run of the first parent up the chain that has instances).
+- `parent_failing`: the parent, or a parent of the parent, fails: `failing_job` names it, with the redacted `error` and `failed_at` of its last run (`failed`, or skipped by an open circuit), and `until` is its next try.
+
+`waiting` is absent once the job has run, for a job not collected, and for a fan-out whose parent ran and listed no item. The health of a waiting job stays `unknown`, left out of the health of its account and its provider. The web UI says it in words everywhere: the Overview counts the jobs succeeded, failing and waiting and marks the waiting squares with a dashed border and a legend, the Graph names the reason on the tiles and leaves the waiting jobs out of the health of their group, the jobs list and the job page say what a job waits for and until when (and link to the failing job), and the Plan page lists the jobs it does not hold yet, with what they wait for. The badge of the health `unknown` reads "no run yet".
+
 ### Implementation notes
 
 - `internal/api` serves the API from a read-only `Source` interface implemented by `tapyr run`; it never reaches into the collector state directly. The OpenAPI description (OpenAPI 3.1) is maintained by hand; a test checks that every route is documented and that every response of the test suite validates against its schema.
@@ -124,7 +134,7 @@ The UI is built in CI and in `make build`; a binary built without UI assets serv
 2. **Graph**: provider -> account -> (targets) -> inventory jobs -> metric jobs -> outputs. Node color by health. Click a node to open its detail panel. Fan-out shown as grouped nodes with instance counts.
 3. **Job detail**: effective config (YAML view), desired vs effective interval with stretch reason, instances table, recent runs (result, duration, requests, pages, retries, samples), errors. A job that is not collected says so with its reason, on the jobs list and its detail, and stays out of the counts of the Overview and of the Graph.
 4. **Budgets**: one card per limit and scope: timeline of consumption over the window with projection line, reserve, external usage, window reset time. Rate limits show wait time and 429s.
-5. **Plan**: the plan table, sortable, with stretched jobs highlighted.
+5. **Plan**: the plan table, sortable, with stretched jobs highlighted, and the collected jobs the plan does not hold yet (fan-outs without instances) with what they wait for.
 6. **Outputs**: the series each output receives (against its limit, as a meter, when it has one), in words: within the limit, close to it, at it, or reached with the number of new series held back and samples dropped, and the jobs not counted yet; queue fill, send rate, failures, last success. An output holding series back also shows on the Overview, as an alert and on its chip.
 7. **Live debug** (only when enabled): pick a job instance, see the last raw response (pretty JSON, collapsible) side by side with the samples produced. Refresh on new run (SSE).
 

@@ -85,7 +85,25 @@ export interface Job {
   labels: Record<string, string>;
   last_run?: RunSummary;
   next_run?: string;
+  // What a collected job that has not run yet waits for; absent once it
+  // has run.
+  waiting?: Waiting;
   definition?: unknown;
+}
+
+export type WaitingReason = "first_run" | "parent" | "parent_failing";
+
+export interface Waiting {
+  // first_run: its first run is due at until; parent: a fan-out whose
+  // parent has not listed its items yet and runs next at until;
+  // parent_failing: the parent, or one of its own parents (failing_job),
+  // fails.
+  reason: WaitingReason;
+  until?: string;
+  parent?: string;
+  failing_job?: string;
+  error?: string;
+  failed_at?: string;
 }
 
 export interface Instance {
@@ -192,6 +210,8 @@ export interface GraphNode {
   label: string;
   health: Health;
   instances?: number;
+  // The waiting reason of a job node that has not run yet.
+  waiting?: WaitingReason;
 }
 
 export interface Graph {

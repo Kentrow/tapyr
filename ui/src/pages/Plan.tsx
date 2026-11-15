@@ -1,12 +1,28 @@
 import { Badge, Failure, Loading, PageHead, Table } from "../components/ui";
-import { absolute, count, duration, percent, since } from "../lib/format";
-import { useJSON } from "../lib/live";
+import { absolute, count, duration, percent, since, waitingText } from "../lib/format";
+import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
 import { href } from "../lib/router";
-import type { Plan as PlanT, PlanJob, PlanScope } from "../lib/types";
+import type { Job, Plan as PlanT, PlanJob, PlanScope } from "../lib/types";
+
+// unplanned are the collected jobs the plan does not hold yet: fan-outs
+// without instances, waiting for their parent or whose parent listed no
+// item. The planner counts instances, so they join the plan once their
+// parent has listed its items.
+export function unplanned(plan: PlanT, jobs: Job[]): { name: string; why: string }[] {
+  const planned = new Set(plan.jobs.map((j) => j.name.replace(/\[.*$/, "")));
+  return jobs
+    .filter((j) => j.collected && !planned.has(j.name))
+    .map((j) => ({
+      name: j.name,
+      why: j.waiting ? waitingText(j.waiting).long : j.parent && j.instances === 0 ? `${j.parent} listed no item in its last run.` : "Not planned yet.",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
 
 export function Plan() {
   const plan = useJSON<PlanT>("/plan");
+  const jobs = useList<Job>("/jobs");
   if (plan.error instanceof HttpError && plan.error.status === 404) {
     return (
       <>
@@ -18,6 +34,7 @@ export function Plan() {
   if (plan.error && !plan.data) return <Failure error={plan.error} />;
   if (!plan.data) return <Loading />;
   const p = plan.data;
+  const missing = jobs.data ? unplanned(p, jobs.data) : [];
   return (
     <>
       <PageHead title="Plan" sub={<span title={absolute(p.at)}>Applied {since(p.at)}: what each quota scope will spend over a full window, and the jobs stretched to fit.</span>}>
@@ -66,6 +83,17 @@ export function Plan() {
           ]}
         />
       </section>
+      {missing.length > 0 && (
+        <section className="section">
+          <h2>Not planned yet</h2>
+          <p className="small muted">Fan-outs without instances: the plan counts them once their parent has listed its items.</p>
+          <ul className="small">
+            {missing.map((m) => (
+              <li key={m.name}><a href={href(["jobs", m.name])}>{m.name}</a>: {m.why}</li>
+            ))}
+          </ul>
+        </section>
+      )}
     </>
   );
 }

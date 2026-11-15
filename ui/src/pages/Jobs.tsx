@@ -1,7 +1,7 @@
 import { Badge, Failure, Loading, PageHead, Table } from "../components/ui";
 import { CodeBlock } from "../components/Code";
 import { NotFound } from "./NotFound";
-import { absolute, count, duration, since, toYAML } from "../lib/format";
+import { absolute, count, duration, since, toYAML, waitingText } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
 import { href } from "../lib/router";
@@ -46,12 +46,44 @@ export function Jobs() {
                 duration(j.desired_interval_seconds)
               ),
           },
-          { key: "last", label: "Last run", sort: (j) => j.last_run?.ended_at ?? "", render: (j) => (j.last_run ? <span title={absolute(j.last_run.ended_at)}><Badge state={j.last_run.result} /> {since(j.last_run.ended_at)}</span> : <span className="muted">not yet</span>) },
-          { key: "next", label: "Next run", sort: (j) => j.next_run ?? "", render: (j) => <span title={absolute(j.next_run)}>{j.next_run ? since(j.next_run) : "-"}</span> },
+          {
+            key: "last", label: "Last run", sort: (j) => j.last_run?.ended_at ?? "",
+            render: (j) =>
+              j.last_run ? (
+                <span title={absolute(j.last_run.ended_at)}><Badge state={j.last_run.result} /> {since(j.last_run.ended_at)}</span>
+              ) : j.waiting ? (
+                <span className="muted" title={waitingText(j.waiting).long}>{waitingText(j.waiting).short}</span>
+              ) : (
+                <span className="muted">{j.collected ? "no run yet" : "-"}</span>
+              ),
+          },
+          {
+            key: "next", label: "Next run", sort: (j) => j.next_run ?? j.waiting?.until ?? "",
+            render: (j) =>
+              j.next_run ? (
+                <span title={absolute(j.next_run)}>{since(j.next_run)}</span>
+              ) : j.waiting?.until ? (
+                <span className="muted" title={`${absolute(j.waiting.until)}: the next step of its discovery; the job runs after it`}>discovery {since(j.waiting.until)}</span>
+              ) : (
+                "-"
+              ),
+          },
         ]}
       />
     </>
   );
+}
+
+// instancesEmpty says why a job has no instance: not collected, or a
+// fan-out whose parent has not listed its items yet, fails, or listed
+// none.
+export function instancesEmpty(j: Job): string {
+  if (!j.collected) return "No instance: the job is not collected.";
+  const w = j.waiting;
+  if (w?.reason === "parent") return `No instance yet: ${w.parent} has not listed its items.`;
+  if (w?.reason === "parent_failing") return `No instance yet: ${w.failing_job === w.parent ? w.parent : `${w.parent} waits for ${w.failing_job}, which`} fails.`;
+  if (j.parent) return `No instance: ${j.parent} listed no item in its last run.`;
+  return "No instance.";
 }
 
 export function JobDetail({ name }: { name: string }) {
@@ -96,10 +128,18 @@ export function JobDetail({ name }: { name: string }) {
               <div className="row"><Badge state={j.last_run.result} /> <span title={absolute(j.last_run.ended_at)}>{since(j.last_run.ended_at)}</span></div>
               {j.last_run.error && <p className="mono small" style={{ overflowWrap: "anywhere" }}>{j.last_run.error}</p>}
             </>
+          ) : j.waiting ? (
+            <>
+              <div className="row"><Badge state={j.waiting.reason === "parent_failing" ? "degraded" : "unknown"}>waiting</Badge></div>
+              <p className="small" style={{ overflowWrap: "anywhere", marginBottom: 0 }}>
+                {waitingText(j.waiting).long}
+                {j.waiting.failing_job && <> <a href={href(["jobs", j.waiting.failing_job])}>See {j.waiting.failing_job}</a>.</>}
+              </p>
+            </>
           ) : (
-            <span className="muted">not yet</span>
+            <span className="muted">{j.collected ? "no run yet" : "none: not collected"}</span>
           )}
-          {j.collected && <p className="small muted" style={{ marginBottom: 0 }}>next {since(j.next_run)}</p>}
+          {j.collected && j.next_run && <p className="small muted" style={{ marginBottom: 0 }} title={absolute(j.next_run)}>next {since(j.next_run)}</p>}
         </div>
         <div className="card">
           <h3>Job</h3>
@@ -139,12 +179,12 @@ export function JobDetail({ name }: { name: string }) {
           rows={instances.data ?? []}
           rowKey={(i) => i.key}
           initialSort={{ key: "key" }}
-          empty={j.collected ? "No instance: the parent inventory has not run yet." : "No instance: the job is not collected."}
+          empty={instancesEmpty(j)}
           columns={[
             { key: "key", label: "Instance", sort: (i) => i.key, render: (i) => <span className="mono small">{i.key}</span> },
             { key: "vars", label: "Variables", render: (i) => <span className="mono small">{Object.entries(i.vars).map(([k, v]) => `${k}=${v}`).join(" ")}</span> },
             { key: "series", label: "Series", num: true, sort: (i) => i.series, render: (i) => count(i.series) },
-            { key: "last", label: "Last run", sort: (i) => i.last_run?.ended_at ?? "", render: (i) => (i.last_run ? <><Badge state={i.last_run.result} /> {since(i.last_run.ended_at)}</> : <span className="muted">not yet</span>) },
+            { key: "last", label: "Last run", sort: (i) => i.last_run?.ended_at ?? "", render: (i) => (i.last_run ? <><Badge state={i.last_run.result} /> {since(i.last_run.ended_at)}</> : <span className="muted">{i.next_run ? `first run ${since(i.next_run)}` : "no run yet"}</span>) },
             { key: "success", label: "Last success", sort: (i) => i.last_success ?? "", render: (i) => <span title={absolute(i.last_success)}>{since(i.last_success)}</span> },
             { key: "next", label: "Next run", sort: (i) => i.next_run ?? "", render: (i) => since(i.next_run) },
           ]}

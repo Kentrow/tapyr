@@ -334,7 +334,12 @@ pre.code .s { color: var(--code-string); } pre.code .n { color: var(--code-numbe
 .sq.ok { background: var(--green); border-color: var(--green); }
 .sq.bad { background: var(--red); border-color: var(--red); display: grid; place-items: center; }
 .sq.bad::after { content: ""; width: 8px; height: 8px; background: linear-gradient(45deg, transparent 42%, var(--on-red) 42% 58%, transparent 58%), linear-gradient(-45deg, transparent 42%, var(--on-red) 42% 58%, transparent 58%); }
+.sq.idle { border-style: dashed; border-color: var(--ink-2); }
 .sq:hover { outline: 2px solid var(--cyan-2); outline-offset: 1px; }
+.sq-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: -2px 0 6px; }
+.sq-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.sq-legend .sq { width: 11px; height: 11px; border-radius: 3px; }
+.sq-legend .sq.bad::after { width: 5px; height: 5px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 600; font-size: .88rem; text-decoration: none; color: inherit; }
 .chip svg { width: 16px; height: 16px; color: var(--cyan-2); }
 .chip.bad { border-color: var(--red); } .chip.bad svg { color: var(--red); }

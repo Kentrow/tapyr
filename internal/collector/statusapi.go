@@ -78,6 +78,8 @@ type snapshot struct {
 	instances []*runtime.Job
 	next      map[string]time.Time
 	now       time.Time
+	// models are the runtime jobs by name (jobModels).
+	models map[string]*runtime.Job
 }
 
 func (s statusSource) snapshot() (*snapshot, bool) {
@@ -85,7 +87,10 @@ func (s statusSource) snapshot() (*snapshot, bool) {
 	if g == nil {
 		return nil, false
 	}
-	snap := &snapshot{g: g, next: g.sched.Next(), now: s.c.clock.Now()}
+	snap := &snapshot{g: g, next: g.sched.Next(), now: s.c.clock.Now(), models: map[string]*runtime.Job{}}
+	for _, j := range jobModels(snap) {
+		snap.models[j.Name] = j
+	}
 	g.disc.do(func(active map[string]*runtime.Job) {
 		for _, key := range slices.Sorted(maps.Keys(active)) {
 			snap.instances = append(snap.instances, active[key])
@@ -282,17 +287,13 @@ func (s statusSource) job(ctx context.Context, snap *snapshot, j *runtime.Job) a
 			}
 		}
 	}
-	var next time.Time
 	for _, inst := range snap.instances {
-		if inst.Name != j.Name {
-			continue
-		}
-		aj.Instances++
-		aj.EffectiveIntervalSeconds = max(aj.EffectiveIntervalSeconds, snap.g.sched.Interval(scheduler.Group(inst)).Seconds())
-		if t, ok := snap.next[inst.Instance]; ok && (next.IsZero() || t.Before(next)) {
-			next = t
+		if inst.Name == j.Name {
+			aj.EffectiveIntervalSeconds = max(aj.EffectiveIntervalSeconds, snap.g.sched.Interval(scheduler.Group(inst)).Seconds())
 		}
 	}
+	var next time.Time
+	aj.Instances, next = snap.jobInstances(j.Name)
 	if aj.EffectiveIntervalSeconds == 0 {
 		// No instance yet (a fan-out waiting for its parent): the interval
 		// planned for the group, else the desired one.
@@ -304,7 +305,80 @@ func (s statusSource) job(ctx context.Context, snap *snapshot, j *runtime.Job) a
 	if runs, err := s.c.store.RunsOfJob(ctx, j.Name, 1); err == nil && len(runs) > 0 {
 		aj.LastRun = runSummary(runs[0])
 	}
+	if aj.LastRun == nil {
+		aj.Waiting = s.waiting(ctx, snap, j)
+	}
 	return aj
+}
+
+// jobInstances counts the instances of a job in the snapshot and returns
+// the next run among them (zero when none is scheduled).
+func (snap *snapshot) jobInstances(name string) (int, time.Time) {
+	n, next := 0, time.Time{}
+	for _, inst := range snap.instances {
+		if inst.Name != name {
+			continue
+		}
+		n++
+		if t, ok := snap.next[inst.Instance]; ok && (next.IsZero() || t.Before(next)) {
+			next = t
+		}
+	}
+	return n, next
+}
+
+// waiting says what a collected job that has not run yet waits for: the
+// first run of its instances, or, for a fan-out without instances, its
+// parent, which may itself wait or fail. It is nil for a job that has
+// run, a job not collected, and a fan-out whose parent ran and listed no
+// item.
+func (s statusSource) waiting(ctx context.Context, snap *snapshot, j *runtime.Job) *api.Waiting {
+	return s.waitingFor(ctx, snap, j, 0)
+}
+
+func (s statusSource) waitingFor(ctx context.Context, snap *snapshot, j *runtime.Job, depth int) *api.Waiting {
+	if j.NotCollected != "" || depth > len(snap.models) {
+		return nil
+	}
+	if runs, err := s.c.store.RunsOfJob(ctx, j.Name, 1); err != nil || len(runs) > 0 {
+		return nil
+	}
+	if n, next := snap.jobInstances(j.Name); n > 0 {
+		w := &api.Waiting{Reason: api.WaitingFirstRun}
+		if !next.IsZero() {
+			w.Until = ptr(next.UTC())
+		}
+		return w
+	}
+	if j.ForEach == nil || snap.models[j.ForEach.ParentJob] == nil {
+		return nil
+	}
+	parent := snap.models[j.ForEach.ParentJob]
+	w := &api.Waiting{Reason: api.WaitingParent, Parent: parent.Name}
+	if _, next := snap.jobInstances(parent.Name); !next.IsZero() {
+		w.Until = ptr(next.UTC())
+	}
+	runs, err := s.c.store.RunsOfJob(ctx, parent.Name, 1)
+	switch {
+	case err != nil:
+	case len(runs) == 0:
+		// The parent waits too: for its first run, or for its own parent.
+		if pw := s.waitingFor(ctx, snap, parent, depth+1); pw != nil {
+			if pw.Reason == api.WaitingParentFailing {
+				w.Reason, w.FailingJob, w.Error, w.FailedAt = pw.Reason, pw.FailingJob, pw.Error, pw.FailedAt
+			}
+			w.Until = cmp.Or(w.Until, pw.Until)
+		}
+	case runs[0].Result == "failed" || runs[0].Result == "skipped_circuit":
+		w.Reason, w.FailingJob = api.WaitingParentFailing, parent.Name
+		w.Error, w.FailedAt = cmp.Or(runs[0].Error, strings.ReplaceAll(runs[0].Result, "_", " ")), ptr(runs[0].Ended.UTC())
+	case runs[0].Result == "skipped_budget" || runs[0].Result == "skipped_overlap":
+		// The parent has not listed its items yet: it waits for the budget.
+	default:
+		// The parent ran and listed no item: nothing to wait for.
+		return nil
+	}
+	return w
 }
 
 func runSummary(r state.RunRecord) *api.RunSummary {
@@ -565,6 +639,11 @@ func (s statusSource) Graph(ctx context.Context) api.Graph {
 			}
 		}
 		id := node("job", j.Name, j.Name, health[j.Name], count)
+		if health[j.Name] == "" || health[j.Name] == healthUnknown {
+			if w := s.waiting(ctx, snap, j); w != nil {
+				gr.Nodes[len(gr.Nodes)-1].Waiting = w.Reason
+			}
+		}
 		if j.ForEach != nil && j.ForEach.ParentJob != "" {
 			edge("job/"+j.ForEach.ParentJob, id)
 		} else {

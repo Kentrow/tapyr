@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jobAccounts, layout, selectionAfter } from "./Graph";
+import { jobAccounts, layout, nodeWord, selectionAfter, worst } from "./Graph";
 import type { Graph } from "../lib/types";
 
 const n = (id: string, kind: string) => ({ id, kind, label: id, health: "ok" as const });
@@ -100,5 +100,19 @@ describe("graph selection", () => {
     { name: "no change keeps it", changes: [], current: null, want: null },
   ])("$name", ({ changes, current, want }) => {
     expect(selectionAfter(changes, current)).toBe(want);
+  });
+});
+
+describe("waiting jobs", () => {
+  it("leaves the jobs that have not run out of the health of their group", () => {
+    expect(worst(["ok", "unknown"])).toBe("ok");
+    expect(worst(["unknown", "unknown"])).toBe("unknown");
+    expect(worst(["ok", "failing", "unknown"])).toBe("failing");
+    expect(worst(["ok", "degraded"])).toBe("degraded");
+  });
+  it("says what a job node waits for", () => {
+    expect(nodeWord({ id: "job/n", kind: "job", label: "n", health: "unknown", waiting: "parent" })).toBe("waiting for its parent");
+    expect(nodeWord({ id: "account/a", kind: "account", label: "a", health: "unknown" })).toBe("no run yet");
+    expect(nodeWord({ id: "job/d", kind: "job", label: "d", health: "failing" })).toBe("failing");
   });
 });

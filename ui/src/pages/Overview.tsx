@@ -1,14 +1,34 @@
 import { useEffect, useState } from "react";
 import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { count, duration, outputHealth, percent, plural, scopeAccounts, seriesStatus, since } from "../lib/format";
+import { count, duration, outputHealth, percent, plural, scopeAccounts, seriesStatus, since, waitingText } from "../lib/format";
 import { useJSON, useList, useLive, type LiveEvent } from "../lib/live";
 import { href } from "../lib/router";
 import type { Account, Budget, Job, Output, Provider, Status } from "../lib/types";
 
 type JobState = "ok" | "bad" | "idle";
 
+// A job without a run waits (idle): for its first run, or for its parent.
+// Waiting is not failing.
 const jobState = (j: Job): JobState => (!j.last_run ? "idle" : j.last_run.result === "success" ? "ok" : "bad");
+
+// jobCounts says how the jobs stand, in words: how many succeeded, failed
+// and wait, and what most of the waiting ones wait for.
+export function jobCounts(jobs: Job[]): string {
+  const ok = jobs.filter((j) => jobState(j) === "ok").length;
+  const bad = jobs.filter((j) => jobState(j) === "bad").length;
+  const waiting = jobs.filter((j) => jobState(j) === "idle");
+  const parts = [`${ok} succeeded`];
+  if (bad) parts.push(`${bad} failing`);
+  if (waiting.length) {
+    const first = waiting.filter((j) => j.waiting?.reason === "first_run").length;
+    const failing = waiting.filter((j) => j.waiting?.reason === "parent_failing").length;
+    const one = waiting.length === 1;
+    const why = first === waiting.length ? (one ? " for its first run" : " for their first run") : failing === waiting.length ? (one ? " for a failing parent" : " for failing parents") : "";
+    parts.push(`${waiting.length} waiting${why}`);
+  }
+  return `${plural(jobs.length, "job")}: ${parts.join(", ")}`;
+}
 const leftOf = (b: Budget) => Math.max(0, (b.max ?? 0) - (b.used ?? 0) - (b.external_usage ?? 0));
 
 // Overview is the cockpit: four indicators, the conditions that need
@@ -32,6 +52,7 @@ export function Overview() {
   const notCollected = jobs.data.length - collected.length;
   const okJobs = collected.filter((j) => jobState(j) === "ok").length;
   const failing = collected.filter((j) => jobState(j) === "bad");
+  const waiting = collected.filter((j) => jobState(j) === "idle").length;
   const reauth = accounts.data.filter((a) => a.auth.reauth_required);
   const unhealthy = unhealthyAccounts(accounts.data);
   const limited = outputs.data.filter((o) => o.series_refused > 0);
@@ -42,7 +63,7 @@ export function Overview() {
         <Kpi icon="graph" label="Providers healthy" value={`${okProviders}/${providers.data.length}`} ok={okProviders === providers.data.length}
           hint={plural(accounts.data.length, "account")} href={href(["graph"])} />
         <Kpi icon="jobs" label="Jobs succeeding" value={`${okJobs}/${collected.length}`} ok={failing.length === 0}
-          hint={plural(s.instances, "instance") + (notCollected ? `, ${notCollected} not collected` : "")} href={href(["jobs"])} />
+          hint={(waiting ? `${waiting} waiting to run, ` : "") + plural(s.instances, "instance") + (notCollected ? `, ${notCollected} not collected` : "")} href={href(["jobs"])} />
         <Kpi icon="budgets" label="Tightest quota" value={tightest ? percent(leftOf(tightest), tightest.max ?? 0) + " left" : "No quota"}
           ok={!tightest || tightest.exhaustion_eta_seconds === undefined}
           hint={tightest ? quotaHint(tightest) : "rate and concurrency limits only"} href={href(["budgets"])} />
@@ -196,8 +217,6 @@ function Kpi({ icon, label, value, hint, ok, href: to }: { icon: "graph" | "jobs
 }
 
 function ProviderCard({ provider: p, accounts, jobs, quotas }: { provider: Provider; accounts: Account[]; jobs: Job[]; quotas: Budget[] }) {
-  const ok = jobs.filter((j) => jobState(j) === "ok").length;
-  const bad = jobs.filter((j) => jobState(j) === "bad").length;
   const open = accounts.flatMap((a) => (a.targets.length ? a.targets.map((t) => t.circuit) : [a.circuit ?? "closed"])).filter((c) => c !== "closed").length;
   return (
     <div className="card provider-card">
@@ -214,7 +233,7 @@ function ProviderCard({ provider: p, accounts, jobs, quotas }: { provider: Provi
       <div>
         <div className="label">Jobs, by their last run</div>
         <Squares jobs={jobs} />
-        <div className="small muted">{ok} of {plural(jobs.length, "job")} succeeded{bad ? `, ${bad} failing` : ""}</div>
+        <div className="small muted">{jobCounts(jobs)}</div>
       </div>
       {quotas.length > 0 && (
         <div className="provider-body">
@@ -238,17 +257,35 @@ function ProviderCard({ provider: p, accounts, jobs, quotas }: { provider: Provi
   );
 }
 
+// squareWord says what a square stands for: the last run of the job, or
+// what it waits for.
+export function squareWord(j: Job, now = Date.now()): string {
+  const st = jobState(j);
+  if (st === "ok") return "succeeded";
+  if (st === "bad") return "failed";
+  return j.waiting ? waitingText(j.waiting, now).short : "no run yet";
+}
+
 // Squares are the jobs as small squares colored by their last run; a
-// failed one also carries a cross, so that the color is not the only sign.
+// failed one also carries a cross and a waiting one a dashed border, so
+// that the color is not the only sign. The legend names the states shown.
 function Squares({ jobs }: { jobs: Job[] }) {
-  const words = { ok: "succeeded", bad: "failed", idle: "not run yet" };
+  const states = new Set(jobs.map(jobState));
+  const legend = ([["ok", "succeeded"], ["bad", "failed"], ["idle", "waiting"]] as const).filter(([st]) => states.has(st));
   return (
-    <div className="squares">
-      {jobs.map((j) => {
-        const st = jobState(j);
-        return <a key={j.name} href={href(["jobs", j.name])} className={`sq ${st}`} title={`${j.name}: ${words[st]}`} aria-label={`${j.name}: ${words[st]}`} />;
-      })}
-    </div>
+    <>
+      <div className="squares">
+        {jobs.map((j) => {
+          const word = `${j.name}: ${squareWord(j)}`;
+          return <a key={j.name} href={href(["jobs", j.name])} className={`sq ${jobState(j)}`} title={word} aria-label={word} />;
+        })}
+      </div>
+      {legend.length > 1 && (
+        <div className="sq-legend small muted" aria-hidden="true">
+          {legend.map(([st, word]) => <span key={st}><span className={`sq ${st}`} /> {word}</span>)}
+        </div>
+      )}
+    </>
   );
 }
 
