@@ -90,7 +90,7 @@ groups:
         labels: { severity: warning }
         annotations:
           summary: "Output {{ $labels.output }} drops samples ({{ $labels.reason }})"
-          description: The backend is too slow or rejects samples; check tapyr_output_send_failures_total.
+          description: The backend is too slow or rejects samples (check tapyr_output_send_failures_total), or the output reached its series limit (reason series_limit).
 
       - alert: TapyrOutputFailing
         # Not delivered for 10 minutes, or failing without having ever

@@ -1,8 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { count, duration, healthClass, outputHealth, plural, scopeAccounts, since, toYAML, versionLabel } from "./format";
+import { count, duration, healthClass, outputHealth, plural, scopeAccounts, seriesStatus, since, toYAML, versionLabel } from "./format";
 import type { Output } from "./types";
 
 describe("format", () => {
+  it("says how an output stands against its series limit", () => {
+    const o = { series: 950, series_refused: 0, samples_refused: 0 };
+    expect(seriesStatus(o)).toMatchObject({ state: "none", title: "950 series" });
+    expect(seriesStatus({ ...o, max_series: 2000 })).toMatchObject({ state: "ok", title: "950 of 2,000 series" });
+    expect(seriesStatus({ ...o, max_series: 1000 })).toMatchObject({ state: "near", title: "Close to the series limit" });
+    expect(seriesStatus({ ...o, max_series: 950 })).toMatchObject({ state: "full", title: "At the series limit" });
+    const limited = seriesStatus({ series: 1000, max_series: 1000, series_refused: 37, samples_refused: 74 });
+    expect(limited.state).toBe("limited");
+    expect(limited.detail).toBe(
+      "1,000 of 1,000 series: 37 new series not sent to this output (74 samples dropped since the start). The series already sent keep flowing. Raise limits.maxSeries, or drop metrics with processing rules.",
+    );
+  });
   it("names the accounts of a scope", () => {
     expect(scopeAccounts({ scope: "account=campus", accounts: ["campus"] })).toBe("campus");
     expect(scopeAccounts({ scope: "credential=ab12", accounts: ["fleet-a", "fleet-b"] })).toBe("fleet-a and fleet-b");
@@ -72,7 +84,10 @@ describe("format", () => {
 });
 
 describe("output health", () => {
-  const push: Output = { name: "vm", type: "prometheus_remote_write", queue: 0, capacity: 100, sent: 0, dropped: 0 };
+  const push: Output = {
+    name: "vm", type: "prometheus_remote_write", queue: 0, capacity: 100, sent: 0, dropped: 0,
+    series: 0, series_refused: 0, samples_refused: 0, unmeasured_jobs: [],
+  };
   it.each([
     { name: "a scraped output is always ok", o: { ...push, type: "prometheus", last_error: "x", last_error_at: "2026-11-03T12:00:00Z" }, want: "ok" },
     { name: "nothing sent yet is unknown", o: push, want: "unknown" },

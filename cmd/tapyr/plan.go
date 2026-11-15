@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,9 @@ import (
 	"github.com/kentrow/tapyr/internal/budget/planner"
 	"github.com/kentrow/tapyr/internal/collector"
 	"github.com/kentrow/tapyr/internal/config"
+	"github.com/kentrow/tapyr/internal/processing"
 	"github.com/kentrow/tapyr/internal/runtime"
+	"github.com/kentrow/tapyr/internal/series"
 	"github.com/kentrow/tapyr/internal/state"
 )
 
@@ -90,10 +93,14 @@ func newPlanCmd(e *env, flags *globalFlags) *cobra.Command {
 			}
 			res := planner.Plan(jobs, planner.Options{MaxStretch: graph.Settings.Budget.MaxStretch, Now: e.clock.Now()})
 			notCollected := graph.NotCollectedJobs()
+			outputs, err := outputEstimates(ctx, graph, store, res)
+			if err != nil {
+				return &exitError{code: exitFailure, err: err}
+			}
 			if format == "json" {
-				err = printPlanJSON(e, res, notCollected)
+				err = printPlanJSON(e, res, notCollected, outputs)
 			} else {
-				err = printPlanTable(e, res, notCollected)
+				err = printPlanTable(e, res, notCollected, outputs)
 			}
 			if err != nil {
 				return err
@@ -132,7 +139,7 @@ func newEngine(e *env, cfg *config.Config, graph *runtime.Graph) (*budget.Engine
 	}, e.clock, e.logger)
 }
 
-func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job) error {
+func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, outputs []outputEstimate) error {
 	w := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "QUOTA SCOPE\tWINDOW\tBUDGET\tPROJECTED\tRESERVE\tSTATUS")
 	planned := map[string]bool{}
@@ -175,6 +182,26 @@ func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job) er
 				line += "\t(" + j.Describe() + ")"
 			}
 			fmt.Fprintln(w, line+"\t")
+		}
+	}
+	if len(outputs) > 0 {
+		fmt.Fprintln(w, "\nOUTPUT\tSERIES\tSAMPLES/MIN\tLIMIT\t\t")
+		for _, o := range outputs {
+			limit, note := "-", ""
+			if o.MaxSeries > 0 {
+				limit = strconv.Itoa(o.MaxSeries)
+				if o.Series > o.MaxSeries {
+					note = fmt.Sprintf("about %d new series would be held back", o.Series-o.MaxSeries)
+				}
+			}
+			series := strconv.Itoa(o.Series)
+			if len(o.Unmeasured) > 0 {
+				series = "at least " + series
+			}
+			fmt.Fprintf(w, "%s\t%s\t%.0f\t%s\t%s\t\n", o.Name, series, o.SamplesPerMinute, limit, note)
+			if len(o.Unmeasured) > 0 {
+				fmt.Fprintf(w, "  not measured yet (no successful run): %s\t\t\t\t\t\n", strings.Join(o.Unmeasured, ", "))
+			}
 		}
 	}
 	if len(notCollected) > 0 {
@@ -222,6 +249,75 @@ type planJSON struct {
 	Scopes   []planScopeJSON `json:"scopes"`
 	// NotCollected are the jobs that are not collected (ADR 0013).
 	NotCollected []planNotCollectedJSON `json:"not_collected"`
+	// Outputs are the series estimates of the outputs (ADR 0014).
+	Outputs []outputEstimate `json:"outputs"`
+}
+
+// outputEstimate is what an output receives, from the series of the last
+// successful runs kept in the state store (ADR 0014).
+type outputEstimate struct {
+	Name             string  `json:"name"`
+	Series           int     `json:"series"`
+	SamplesPerMinute float64 `json:"samples_per_minute"`
+	MaxSeries        int     `json:"max_series,omitempty"`
+	// Unmeasured are the jobs sent to the output without a successful run
+	// yet: Series is then a lower bound.
+	Unmeasured []string `json:"unmeasured_jobs"`
+}
+
+// outputEstimates counts the series every output receives: those of the
+// last successful run of every job instance routed to it (kept in the state
+// store), after its processing rules; samples per minute divide the series
+// of an instance by the effective interval of its job.
+func outputEstimates(ctx context.Context, graph *runtime.Graph, store state.Store, res *planner.Result) ([]outputEstimate, error) {
+	registry := series.New()
+	if store != nil {
+		snaps, err := store.LoadSeries(ctx)
+		if err != nil {
+			return nil, err
+		}
+		registry.Restore(snaps)
+	}
+	effective := map[string]time.Duration{}
+	for _, j := range res.Jobs {
+		effective[j.Name] = j.Effective
+	}
+	out := []outputEstimate{}
+	for _, o := range graph.Outputs {
+		name := string(o.Metadata.Name)
+		proc, err := processing.Compile(o.Spec.Processing)
+		if err != nil {
+			return nil, err
+		}
+		est := outputEstimate{Name: name, Unmeasured: []string{}}
+		if o.Spec.Limits != nil {
+			est.MaxSeries = o.Spec.Limits.MaxSeries
+		}
+		routed := collector.RoutedTo(graph, name)
+		measured := map[string]bool{}
+		for instance, n := range registry.OutputSeriesByInstance(series.Output{Name: name, Processor: proc}, routed) {
+			job, _, _ := strings.Cut(instance, "[")
+			measured[job] = true
+			est.Series += n
+			interval := effective[job]
+			for _, j := range graph.Jobs {
+				if j.Name == job && interval == 0 {
+					interval = j.Interval
+				}
+			}
+			if interval > 0 {
+				est.SamplesPerMinute += float64(n) * time.Minute.Seconds() / interval.Seconds()
+			}
+		}
+		for _, j := range graph.Jobs {
+			if routed(j.Name) && !measured[j.Name] && !slices.Contains(est.Unmeasured, j.Name) {
+				est.Unmeasured = append(est.Unmeasured, j.Name)
+			}
+		}
+		slices.Sort(est.Unmeasured)
+		out = append(out, est)
+	}
+	return out, nil
 }
 
 type planNotCollectedJSON struct {
@@ -259,8 +355,10 @@ type planScopeJSON struct {
 	Jobs          []string `json:"jobs"`
 }
 
-func printPlanJSON(e *env, res *planner.Result, notCollected []*runtime.Job) error {
-	out := planJSON{Feasible: res.Feasible, Jobs: []planJobJSON{}, Scopes: []planScopeJSON{}, NotCollected: []planNotCollectedJSON{}}
+func printPlanJSON(e *env, res *planner.Result, notCollected []*runtime.Job, outputs []outputEstimate) error {
+	out := planJSON{
+		Feasible: res.Feasible, Jobs: []planJobJSON{}, Scopes: []planScopeJSON{}, NotCollected: []planNotCollectedJSON{}, Outputs: outputs,
+	}
 	for _, j := range notCollected {
 		out.NotCollected = append(out.NotCollected, planNotCollectedJSON{
 			Name: j.Name, Provider: j.Provider, Account: j.Account, DesiredSeconds: j.Interval.Seconds(), Reason: j.NotCollected,

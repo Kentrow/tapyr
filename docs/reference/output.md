@@ -29,6 +29,7 @@ OutputSpec is the specification of an Output.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `externalLabels` | map of string to string |  | `externalLabels` added to every sample sent through this output. Keys match `^[a-zA-Z_][a-zA-Z0-9_]*$`. |
+| `limits` | [OutputLimits](#outputlimits) |  | Limits caps what the output receives (ADR 0014). |
 | `otlp` | [OTLPOutput](#otlpoutput) |  | `otlp` pushes OTLP metrics (type otlp). |
 | `processing` | list of [ProcessingRule](#processingrule) |  | Processing is an ordered list of rules applied to the samples of the jobs sent to this output only, with the semantics of Prometheus metric\_relabel\_configs (ADR 0012). Self-metrics are never processed. |
 | `prometheus` | [PrometheusOutput](#prometheusoutput) |  | Prometheus pull exposition on /metrics (type prometheus, at most one). |
@@ -42,6 +43,14 @@ OutputSpec is the specification of an Output.
 ## Name
 
 Type: string. Pattern `^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$`.
+
+## OutputLimits
+
+OutputLimits caps what an output receives.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `maxSeries` | integer |  | `maxSeries` is the most series the output receives, after its processing rules: the series already sent keep flowing, the samples of a new series beyond it are dropped and counted (tapyr\_output\_samples\_dropped\_total{reason="series\_limit"}). Minimum 1. |
 
 ## OTLPOutput
 

@@ -194,7 +194,7 @@ func TestStateGauges(t *testing.T) {
 		},
 		Tokens:   []TokenGauge{{Provider: "aruba", Account: "lab", Expiry: at}, {Provider: "aruba", Account: "lab2", ReauthRequired: true}},
 		Circuits: []CircuitGauge{{Provider: "meraki", Account: "acme", State: 2}},
-		Outputs:  []OutputGauge{{Output: "vm", Queue: 5, LastSuccess: at}, {Output: "prom"}},
+		Outputs:  []OutputGauge{{Output: "vm", Queue: 5, LastSuccess: at, Series: 900, MaxSeries: 1000}, {Output: "prom", Series: 1200}},
 
 		NotCollected: []JobRef{{Provider: "meraki", Account: "acme", Job: "uplinks"}},
 	}
@@ -242,6 +242,13 @@ tapyr_job_instances{account="acme",job="devices",provider="meraki"} 3
 # HELP tapyr_output_last_success_timestamp_seconds Time of the last successful send.
 # TYPE tapyr_output_last_success_timestamp_seconds gauge
 tapyr_output_last_success_timestamp_seconds{output="vm"} 1.7937072e+09
+# HELP tapyr_output_series Series the output receives, after its processing rules and its limit.
+# TYPE tapyr_output_series gauge
+tapyr_output_series{output="prom"} 1200
+tapyr_output_series{output="vm"} 900
+# HELP tapyr_output_series_limit Series limit of the output (maxSeries), when it has one.
+# TYPE tapyr_output_series_limit gauge
+tapyr_output_series_limit{output="vm"} 1000
 # HELP tapyr_output_queue_samples Samples waiting in the output queue.
 # TYPE tapyr_output_queue_samples gauge
 tapyr_output_queue_samples{output="prom"} 0
@@ -254,7 +261,8 @@ tapyr_plan_feasible{limit="daily",provider="meraki",scope="account=acme"} 1
 		"tapyr_auth_reauth_required", "tapyr_auth_token_expiry_timestamp_seconds", "tapyr_budget_exhaustion_eta_seconds",
 		"tapyr_budget_limit", "tapyr_budget_limit_mismatch", "tapyr_budget_remaining_observed", "tapyr_circuit_state",
 		"tapyr_job_collected", "tapyr_job_effective_interval_seconds", "tapyr_job_last_success_timestamp_seconds", "tapyr_job_instances",
-		"tapyr_output_last_success_timestamp_seconds", "tapyr_output_queue_samples", "tapyr_plan_feasible",
+		"tapyr_output_last_success_timestamp_seconds", "tapyr_output_queue_samples", "tapyr_output_series",
+		"tapyr_output_series_limit", "tapyr_plan_feasible",
 	}
 	if err := testutil.GatherAndCompare(m.reg, strings.NewReader(want), names...); err != nil {
 		t.Error(err)

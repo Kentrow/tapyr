@@ -203,6 +203,7 @@ func (c *Collector) Run(ctx context.Context, cfg *config.Config, graph *runtime.
 		return err
 	}
 	c.applyOutputs(ctx, graph)
+	c.reconcileLimits(graph)
 	c.outputsStarted.Store(true)
 	g, err := c.newGeneration(cfg, graph)
 	if err != nil {
@@ -364,6 +365,7 @@ func (c *Collector) reload(ctx context.Context) error {
 	resume := old.sched.Next()
 	next.engine.Restore(old.engine.Export())
 	c.applyOutputs(ctx, graph)
+	c.reconcileLimits(graph)
 	c.start(ctx, next, resume, reasonReload)
 	after := next.disc.activeKeys()
 	retired := 0

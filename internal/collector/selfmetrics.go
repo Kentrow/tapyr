@@ -87,7 +87,9 @@ func (c *Collector) selfState() selfobs.State {
 	c.omu.RLock()
 	for name, ro := range c.outputs {
 		s := ro.out.State()
-		st.Outputs = append(st.Outputs, selfobs.OutputGauge{Output: name, Queue: s.Queue, LastSuccess: s.LastSuccess})
+		og := selfobs.OutputGauge{Output: name, Queue: s.Queue, LastSuccess: s.LastSuccess, MaxSeries: ro.maxSeries}
+		og.Series, _ = c.series.OutputSeries(ro.target(name), RoutedTo(g.graph, name))
+		st.Outputs = append(st.Outputs, og)
 	}
 	c.omu.RUnlock()
 	slices.SortFunc(st.Outputs, func(a, b selfobs.OutputGauge) int { return strings.Compare(a.Output, b.Output) })

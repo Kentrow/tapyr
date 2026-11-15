@@ -346,6 +346,8 @@ spec:
       regex: "meraki_uplink_.*"
     - action: labeldrop
       regex: firmware
+  limits:
+    maxSeries: 10000                    # optional: new series beyond it are not sent (ADR 0014)
 ---
 apiVersion: tapyr/v1alpha1
 kind: Output

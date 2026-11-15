@@ -54,6 +54,17 @@ type OutputSpec struct {
 	// jobs sent to this output only, with the semantics of Prometheus
 	// metric_relabel_configs (ADR 0012). Self-metrics are never processed.
 	Processing []ProcessingRule `json:"processing,omitempty"`
+	// Limits caps what the output receives (ADR 0014).
+	Limits *OutputLimits `json:"limits,omitempty"`
+}
+
+// OutputLimits caps what an output receives.
+type OutputLimits struct {
+	// MaxSeries is the most series the output receives, after its
+	// processing rules: the series already sent keep flowing, the samples
+	// of a new series beyond it are dropped and counted
+	// (tapyr_output_samples_dropped_total{reason="series_limit"}).
+	MaxSeries int `json:"maxSeries,omitempty" jsonschema:"minimum=1"`
 }
 
 // JSONSchemaExtend implements the schema reflector hook.

@@ -338,3 +338,11 @@ pre.code .s { color: var(--code-string); } pre.code .n { color: var(--code-numbe
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); font-weight: 600; font-size: .88rem; text-decoration: none; color: inherit; }
 .chip svg { width: 16px; height: 16px; color: var(--cyan-2); }
 .chip.bad { border-color: var(--red); } .chip.bad svg { color: var(--red); }
+.chip.warn { border-color: var(--sun); } .chip.warn svg { color: var(--sun-ink); }
+.series-block { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.series-status { display: flex; gap: 8px; align-items: flex-start; overflow-wrap: anywhere; }
+.series-status svg { flex: none; width: 18px; height: 18px; margin-top: 2px; }
+.series-status .small { color: var(--ink-2); }
+.series-status.limited, .series-status.near, .series-status.full { padding: 10px 12px; border-radius: var(--radius); background: var(--sun-soft); color: var(--sun-ink); }
+.series-status.limited .small, .series-status.near .small, .series-status.full .small { color: var(--sun-ink); }
+.series-block .label + .meter, .card > .label + .meter { margin-top: 6px; }

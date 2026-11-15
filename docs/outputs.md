@@ -131,6 +131,40 @@ spec:
 - Tapyr's self-metrics are never filtered.
 - **Rules on the metric name save API calls.** When the rules of every output receiving a job drop all its metrics by name (`sourceLabels: [__name__]`), the job is not collected at all: no API call, no quota spent, and its quota goes to the other jobs. The parents of a fan-out stop too when none of their children is collected. `tapyr validate` and `tapyr plan` print a warning for every such job, so a rule broader than intended shows before you reload. A rule on another label (`[__name__, site]` above) filters the samples, but the call is still made: the values are only known after it. Set `settings.collection.skipUnconsumed: false` to keep every job running ([ADR 0013](adr/0013-unconsumed-jobs.md)).
 
+## Series and limits
+
+Backends count **series**: one metric with one set of label values, such as the clients of one access point. Hosted backends bill by active series, self-hosted ones pay in memory and disk. Tapyr tells you how many series each output receives, and can cap them ([ADR 0014](adr/0014-output-series.md)).
+
+**Before connecting a backend**, run Tapyr once against your accounts (or a first collection with a local output), then `tapyr plan`:
+
+```console
+$ tapyr plan --config config/
+...
+OUTPUT  SERIES  SAMPLES/MIN  LIMIT
+local   1240    250          -
+hosted  1240    250          1000   about 240 new series would be held back
+```
+
+The counts come from the last successful run of every job, after the processing rules of each output. A job that has not run yet is listed as not measured: the count is then a lower bound.
+
+**To cap an output**, set `limits.maxSeries`:
+
+```yaml
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: hosted }
+spec:
+  type: remote_write
+  remoteWrite: { url: https://metrics.example.com/api/v1/write }
+  limits:
+    maxSeries: 1000
+```
+
+- The series already sent keep flowing. Once the output has 1,000 series, a **new** series (a new device, a new site) is not sent to it; its samples are dropped and counted in `tapyr_output_samples_dropped_total{reason="series_limit"}`, which the `TapyrOutputDropping` alert reports.
+- A series that stops (a device removed, a job removed) frees its place for a new one.
+- The limit applies after the processing rules: to send less, drop metrics or labels you do not need first ([Sending less to an output](#sending-less-to-an-output)), then cap what is left.
+- The web UI says it in words: the Outputs page shows the series of each output against its limit, how many new series are held back and how many samples were dropped, and the jobs not counted yet; the Overview shows a "Series limit reached" alert. `tapyr run` logs `output series limit reached: new series are held back`.
+
 ## Sizing the queue
 
 The queue holds `capacity` samples per output. While a backend is down, the batch at the head of the queue is retried and new samples queue behind it; once full, the oldest samples are dropped and counted. Size `capacity` for the outage you want to ride out: samples per minute across your jobs, times the minutes. The batch being sent is never dropped while its request is in flight.
@@ -141,7 +175,9 @@ The queue holds `capacity` samples per output. While a backend is down, the batc
 |---|---|
 | `tapyr_output_queue_samples` | Samples waiting; grows while a backend is slow or down |
 | `tapyr_output_samples_sent_total` | Samples accepted by the backend |
-| `tapyr_output_samples_dropped_total{reason}` | `queue_full`, `rejected`, `out_of_order` or `duplicate` (made identical by processing rules) |
+| `tapyr_output_samples_dropped_total{reason}` | `queue_full`, `rejected`, `out_of_order`, `duplicate` (made identical by processing rules) or `series_limit` (new series beyond `limits.maxSeries`) |
+| `tapyr_output_series` | Series the output receives, after its processing rules and its limit |
+| `tapyr_output_series_limit` | `limits.maxSeries` of the output, when it has one |
 | `tapyr_output_samples_filtered_total` | Samples removed by the `keep` and `drop` processing rules |
 | `tapyr_output_send_failures_total{class}` | Failed requests: `transient`, `throttled`, `rejected`, `out_of_order` |
 | `tapyr_output_last_success_timestamp_seconds` | Last successful send |

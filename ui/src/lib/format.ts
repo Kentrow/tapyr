@@ -154,3 +154,35 @@ export function scopeAccounts(b: Pick<Budget, "scope" | "accounts">): string {
   if (a.length <= 3) return `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`;
   return `${a.slice(0, 2).join(", ")} and ${a.length - 2} more`;
 }
+
+// SeriesStatus says how an output stands against its series limit, in
+// words (never by color alone): no limit, within it, close to it (90% or
+// more), full (a new series would not be sent) or reached (new series held
+// back at the last runs).
+export interface SeriesStatus {
+  state: "none" | "ok" | "near" | "full" | "limited";
+  title: string;
+  detail: string;
+}
+
+export function seriesStatus(o: Pick<Output, "series" | "max_series" | "series_refused" | "samples_refused">): SeriesStatus {
+  const series = plural(o.series, "series", "series");
+  if (!o.max_series) {
+    return { state: "none", title: series, detail: "No series limit: every series is sent (limits.maxSeries sets one)." };
+  }
+  const of = `${count(o.series)} of ${count(o.max_series)} series`;
+  if (o.series_refused > 0) {
+    return {
+      state: "limited",
+      title: "Series limit reached",
+      detail: `${of}: ${plural(o.series_refused, "new series", "new series")} not sent to this output (${plural(o.samples_refused, "sample")} dropped since the start). The series already sent keep flowing. Raise limits.maxSeries, or drop metrics with processing rules.`,
+    };
+  }
+  if (o.series >= o.max_series) {
+    return { state: "full", title: "At the series limit", detail: `${of}: a new series would not be sent to this output.` };
+  }
+  if (o.series >= o.max_series * 0.9) {
+    return { state: "near", title: "Close to the series limit", detail: `${of}: a new series beyond ${count(o.max_series)} would not be sent.` };
+  }
+  return { state: "ok", title: of, detail: "Within the series limit." };
+}

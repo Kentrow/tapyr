@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"maps"
 	"math"
 	"net/http"
@@ -406,8 +407,7 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 		var targets []series.Output
 		for _, name := range slices.Sorted(maps.Keys(c.outputs)) {
 			if len(job.Outputs) == 0 || slices.Contains(job.Outputs, name) {
-				ro := c.outputs[name]
-				targets = append(targets, series.Output{Name: name, Dedup: ro.dedup, Processor: ro.proc})
+				targets = append(targets, c.outputs[name].target(name))
 			}
 		}
 		for name, d := range c.series.Success(job.Instance, out.Samples, targets, started) {
@@ -420,6 +420,7 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 				log.Warn("samples dropped: the processing rules of the output made them identical", "output", name,
 					"samples", d.Duplicates)
 			}
+			c.seriesLimit(g, log, name, d)
 			c.outputs[name].out.Enqueue(model.Batch{
 				Instance: job.Instance, Job: job.Name, RunID: run.ID, Provider: job.Provider, Account: job.Account, At: started,
 				Samples: d.Samples, Stale: d.Stale,
@@ -433,6 +434,31 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 	log.Info("run finished", "requests", res.Requests, "retries", res.Retries, "pages", len(res.Pages), "items", out.Items,
 		"samples", len(out.Samples), "deduplicated", deduplicated, "mapping_errors", out.MappingErrors, "truncated", res.Truncated,
 		"duration_ms", c.clock.Since(started).Milliseconds())
+}
+
+// seriesLimit accounts for the samples an output's series limit dropped
+// in a run, and logs when the output starts and stops holding series back.
+// The caller holds c.omu.
+func (c *Collector) seriesLimit(g *generation, log *slog.Logger, name string, d series.Delivery) {
+	ro := c.outputs[name]
+	if ro.maxSeries == 0 {
+		return
+	}
+	if d.Refused > 0 {
+		c.metrics.OutputDropped(name, "series_limit", d.Refused)
+		ro.refusedSamples.Add(int64(d.Refused))
+		if ro.refusing.CompareAndSwap(false, true) {
+			log.Warn("output series limit reached: new series are held back", "output", name, "max_series", ro.maxSeries,
+				"series_held_back", d.RefusedSeries)
+		}
+		return
+	}
+	if ro.refusing.Load() {
+		if _, refused := c.series.OutputSeries(ro.target(name), RoutedTo(g.graph, name)); refused == 0 &&
+			ro.refusing.CompareAndSwap(true, false) {
+			log.Info("output series limit: no series held back any more", "output", name, "max_series", ro.maxSeries)
+		}
+	}
 }
 
 // publishCircuit publishes the change of the circuit of a job's account

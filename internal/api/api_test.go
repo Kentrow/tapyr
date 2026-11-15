@@ -151,8 +151,11 @@ func (fake) Graph(context.Context) Graph {
 
 func (fake) Outputs(context.Context) []Output {
 	return []Output{
-		{Name: "prom", Type: "prometheus"},
-		{Name: "vm", Type: "remote_write", Queue: 3, Capacity: 50000, Sent: 100, Dropped: 2, LastSuccess: ptr(at), LastError: "transient: down", LastErrorAt: ptr(at)},
+		{Name: "prom", Type: "prometheus", Series: 120, UnmeasuredJobs: []string{"uplinks"}},
+		{
+			Name: "vm", Type: "remote_write", Queue: 3, Capacity: 50000, Sent: 100, Dropped: 2, LastSuccess: ptr(at), LastError: "transient: down", LastErrorAt: ptr(at),
+			Series: 100, MaxSeries: 100, SeriesRefused: 20, SamplesRefused: 40, UnmeasuredJobs: []string{},
+		},
 	}
 }
 

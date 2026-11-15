@@ -82,6 +82,9 @@ type OutputGauge struct {
 	Queue int
 	// LastSuccess is zero before the first successful send.
 	LastSuccess time.Time
+	// Series is the number of series the output receives, and MaxSeries
+	// its series limit, 0 without one (ADR 0014).
+	Series, MaxSeries int
 }
 
 func desc(name, help string, labels ...string) *prometheus.Desc {
@@ -119,6 +122,8 @@ var (
 
 	descOutputQueue       = desc("tapyr_output_queue_samples", "Samples waiting in the output queue.", "output")
 	descOutputLastSuccess = desc("tapyr_output_last_success_timestamp_seconds", "Time of the last successful send.", "output")
+	descOutputSeries      = desc("tapyr_output_series", "Series the output receives, after its processing rules and its limit.", "output")
+	descOutputSeriesLimit = desc("tapyr_output_series_limit", "Series limit of the output (maxSeries), when it has one.", "output")
 )
 
 // stateCollector exposes a State as gauges at scrape time.
@@ -131,7 +136,7 @@ func (c *stateCollector) Describe(ch chan<- *prometheus.Desc) {
 		descBudgetLimit, descBudgetUsed, descBudgetRemaining, descBudgetObserved, descBudgetExternal, descBudgetReserve,
 		descBudgetWindowEnd, descBudgetETA, descBudgetMismatch, descPlanFeasible,
 		descJobLastSuccess, descJobDesired, descJobEffective, descJobLag, descJobInstances, descJobSeries, descJobCollected,
-		descTokenExpiry, descReauth, descCircuit, descOutputQueue, descOutputLastSuccess,
+		descTokenExpiry, descReauth, descCircuit, descOutputQueue, descOutputLastSuccess, descOutputSeries, descOutputSeriesLimit,
 	} {
 		ch <- d
 	}
@@ -194,6 +199,10 @@ func (c *stateCollector) Collect(ch chan<- prometheus.Metric) {
 		gauge(descOutputQueue, float64(o.Queue), o.Output)
 		if !o.LastSuccess.IsZero() {
 			gauge(descOutputLastSuccess, seconds(o.LastSuccess), o.Output)
+		}
+		gauge(descOutputSeries, float64(o.Series), o.Output)
+		if o.MaxSeries > 0 {
+			gauge(descOutputSeriesLimit, float64(o.MaxSeries), o.Output)
 		}
 	}
 }

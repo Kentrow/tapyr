@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { count, duration, outputHealth, percent, plural, scopeAccounts, since } from "../lib/format";
+import { count, duration, outputHealth, percent, plural, scopeAccounts, seriesStatus, since } from "../lib/format";
 import { useJSON, useList, useLive, type LiveEvent } from "../lib/live";
 import { href } from "../lib/router";
 import type { Account, Budget, Job, Output, Provider, Status } from "../lib/types";
@@ -34,6 +34,7 @@ export function Overview() {
   const failing = collected.filter((j) => jobState(j) === "bad");
   const reauth = accounts.data.filter((a) => a.auth.reauth_required);
   const unhealthy = unhealthyAccounts(accounts.data);
+  const limited = outputs.data.filter((o) => o.series_refused > 0);
   return (
     <>
       <PageHead title="Overview" sub={`Tapyr ${s.version}, up ${duration(s.uptime_seconds)}, configuration ${s.config_hash.slice(0, 8)} loaded ${since(s.last_reload.at)}.`} />
@@ -49,7 +50,7 @@ export function Overview() {
           hint={s.plan_feasible ? "every critical job on schedule" : "a quota would run out before its reset"} href={href(["plan"])} />
       </div>
 
-      {(!s.ready || !s.last_reload.success || reauth.length > 0 || unhealthy.length > 0) && (
+      {(!s.ready || !s.last_reload.success || reauth.length > 0 || unhealthy.length > 0 || limited.length > 0) && (
         <div className="cells attention">
           {!s.ready && (
             <div className="cell warn">
@@ -71,6 +72,13 @@ export function Overview() {
               <span className="value"><Icon name="alert" />Re-bootstrap required</span>
               <span className="hint">Account {a.name}: its credentials can no longer be renewed. Generate new ones and reload.</span>
             </div>
+          ))}
+          {limited.map((o) => (
+            <a className="cell warn" key={`limit-${o.name}`} href={href(["outputs"])}>
+              <span className="label">Output {o.name}</span>
+              <span className="value"><Icon name="alert" />Series limit reached</span>
+              <span className="hint">{seriesStatus(o).detail}</span>
+            </a>
           ))}
           {unhealthy.map((a) => (
             <div className={`cell ${a.health === "failing" ? "bad" : "warn"}`} key={`health-${a.name}`}>
@@ -132,10 +140,15 @@ export function Overview() {
         <div className="row">
           {outputs.data.map((o) => {
             const bad = outputHealth(o) === "failing";
+            const limited = o.series_refused > 0;
             return (
-              <a key={o.name} className={`chip ${bad ? "bad" : "ok"}`} href={href(["outputs"])}>
+              <a key={o.name} className={`chip ${bad ? "bad" : limited ? "warn" : "ok"}`} href={href(["outputs"])}
+                title={limited ? seriesStatus(o).detail : undefined}>
                 <Icon name="outputs" /> {o.name}
-                <span className="muted">{bad ? "failing" : o.type === "prometheus" ? "/metrics" : `${count(o.sent)} sent`}</span>
+                <span className="muted">
+                  {bad ? "failing" : o.type === "prometheus" ? "/metrics" : `${count(o.sent)} sent`}, {plural(o.series, "series", "series")}
+                  {limited ? ", series limit reached" : ""}
+                </span>
               </a>
             );
           })}

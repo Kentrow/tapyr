@@ -3,6 +3,9 @@ package collector
 import (
 	"context"
 	"reflect"
+	"slices"
+	"strings"
+	"sync/atomic"
 
 	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/config"
@@ -12,6 +15,7 @@ import (
 	"github.com/kentrow/tapyr/internal/output/remotewrite"
 	"github.com/kentrow/tapyr/internal/processing"
 	"github.com/kentrow/tapyr/internal/runtime"
+	"github.com/kentrow/tapyr/internal/series"
 )
 
 // runningOutput is an output and its sender loop.
@@ -23,9 +27,49 @@ type runningOutput struct {
 	// timestamp (push outputs).
 	dedup bool
 	// proc applies the processing rules of the output (nil without).
-	proc   *processing.Processor
-	cancel context.CancelFunc
-	done   chan struct{}
+	proc *processing.Processor
+	// maxSeries is the series limit of the output, 0 without (ADR 0014).
+	maxSeries int
+	// refusedSamples counts the samples dropped by the limit since start,
+	// and refusing tells whether the output holds series back (for the
+	// log of the transitions).
+	refusedSamples atomic.Int64
+	refusing       atomic.Bool
+	cancel         context.CancelFunc
+	done           chan struct{}
+}
+
+// target is the output as the series registry sees it.
+func (ro *runningOutput) target(name string) series.Output {
+	return series.Output{Name: name, Dedup: ro.dedup, Processor: ro.proc, MaxSeries: ro.maxSeries}
+}
+
+// RoutedTo returns whether a job instance of the graph sends to an output:
+// a collected job producing metrics, sent to every output or to this one.
+func RoutedTo(graph *runtime.Graph, output string) func(instance string) bool {
+	outputs := map[string][]string{}
+	for _, j := range graph.Jobs {
+		if j.Role != config.RoleInventory {
+			outputs[j.Name] = j.Outputs
+		}
+	}
+	return func(instance string) bool {
+		name, _, _ := strings.Cut(instance, "[")
+		list, ok := outputs[name]
+		return ok && (len(list) == 0 || slices.Contains(list, output))
+	}
+}
+
+// reconcileLimits prepares the series registry for the outputs with a
+// series limit, after a load: see series.Registry.Reconcile.
+func (c *Collector) reconcileLimits(graph *runtime.Graph) {
+	c.omu.RLock()
+	defer c.omu.RUnlock()
+	for name, ro := range c.outputs {
+		if ro.maxSeries > 0 {
+			c.series.Reconcile(ro.target(name), RoutedTo(graph, name))
+		}
+	}
 }
 
 // applyOutputs starts the outputs of a graph: an output whose spec did not
@@ -71,6 +115,9 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 			ro = &runningOutput{
 				out: out, spec: o.Spec, creds: graph.OutputCredentials[name], dedup: o.Spec.Type != config.OutputPrometheus,
 				proc: proc, cancel: cancel, done: make(chan struct{}),
+			}
+			if o.Spec.Limits != nil {
+				ro.maxSeries = o.Spec.Limits.MaxSeries
 			}
 			go func() {
 				defer close(ro.done)

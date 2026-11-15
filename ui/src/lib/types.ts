@@ -209,6 +209,16 @@ export interface Output {
   last_success?: string;
   last_error?: string;
   last_error_at?: string;
+  // The series the output receives, after its processing rules and its
+  // limit (ADR 0014); max_series is absent without a limit.
+  series: number;
+  max_series?: number;
+  // New series held back by the limit at the last runs, and samples it
+  // dropped since the start.
+  series_refused: number;
+  samples_refused: number;
+  // Jobs sent to the output without a successful run yet: not counted.
+  unmeasured_jobs: string[];
 }
 
 export interface DebugPage {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Badge, Failure, Loading, Meter, PageHead, Sparkline } from "../components/ui";
-import { absolute, count, outputHealth, since } from "../lib/format";
+import { Icon } from "../components/Icon";
+import { absolute, count, outputHealth, seriesStatus, since } from "../lib/format";
 import { useList } from "../lib/live";
 import type { Output } from "../lib/types";
 
@@ -32,19 +33,46 @@ export function Outputs() {
   if (!outputs.data) return <Loading />;
   return (
     <>
-      <PageHead title="Outputs" sub="Where the samples go: queue fill, what was sent and dropped, and the last errors." />
+      <PageHead title="Outputs" sub="Where the samples go: the series each output receives and its limit, queue fill, what was sent and dropped, and the last errors." />
       <div className="grid wide">
         {outputs.data.map((o) => {
           const health = outputHealth(o);
           const values = rates[o.name] ?? [];
+          const series = seriesStatus(o);
           return (
             <div className="card" key={o.name}>
               <div className="row" style={{ justifyContent: "space-between" }}>
                 <h3>
                   {o.name} <span className="muted small">{o.type}</span>
                 </h3>
-                <Badge state={health}>{health === "failing" ? "failing" : health === "unknown" ? "not sent yet" : o.type === "prometheus" ? "serving" : "sending"}</Badge>
+                <span className="row" style={{ gap: 8 }}>
+                  {series.state === "limited" && <Badge state="degraded">series limit reached</Badge>}
+                  <Badge state={health}>{health === "failing" ? "failing" : health === "unknown" ? "not sent yet" : o.type === "prometheus" ? "serving" : "sending"}</Badge>
+                </span>
               </div>
+              <div className="series-block">
+                <div className="label">Series</div>
+                {o.max_series ? (
+                  <Meter total={o.max_series} label={`${o.series} of ${o.max_series} series`} parts={[{
+                    value: Math.min(o.series, o.max_series),
+                    color: series.state === "ok" ? "var(--cyan-2)" : "var(--sun)",
+                    label: `${count(o.series)} of ${count(o.max_series)} series`,
+                  }]} />
+                ) : null}
+                <div className={`series-status ${series.state}`}>
+                  {series.state !== "ok" && series.state !== "none" && <Icon name="alert" />}
+                  <div>
+                    <strong>{series.title}</strong>
+                    <div className="small">{series.detail}</div>
+                  </div>
+                </div>
+                {o.unmeasured_jobs.length > 0 && (
+                  <div className="small muted">
+                    Not counted yet (no successful run): {o.unmeasured_jobs.join(", ")}.
+                  </div>
+                )}
+              </div>
+              {o.capacity > 0 && <div className="label" style={{ marginTop: 14 }}>Queue</div>}
               {o.capacity > 0 ? (
                 <Meter total={o.capacity} label={`${o.queue} of ${o.capacity} samples queued`} parts={[{ value: o.queue, color: o.queue > o.capacity * 0.8 ? "var(--red)" : "var(--cyan-2)", label: `${count(o.queue)} of ${count(o.capacity)} samples queued` }]} />
               ) : (

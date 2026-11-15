@@ -268,6 +268,20 @@ type Output struct {
 	LastSuccess *time.Time `json:"last_success,omitempty"`
 	LastError   string     `json:"last_error,omitempty"`
 	LastErrorAt *time.Time `json:"last_error_at,omitempty"`
+
+	// Series is the number of series the output receives: those of the
+	// last successful run of every job instance sent to it, after its
+	// processing rules and its limit (ADR 0014).
+	Series int `json:"series"`
+	// MaxSeries is the series limit of the output, absent without one.
+	MaxSeries int `json:"max_series,omitempty"`
+	// SeriesRefused are the new series held back by the limit at the last
+	// runs, and SamplesRefused the samples it dropped since the start.
+	SeriesRefused  int   `json:"series_refused"`
+	SamplesRefused int64 `json:"samples_refused"`
+	// UnmeasuredJobs are the jobs sent to the output that have not run
+	// successfully yet: their series are not counted.
+	UnmeasuredJobs []string `json:"unmeasured_jobs"`
 }
 
 // List is a page of a list endpoint.
