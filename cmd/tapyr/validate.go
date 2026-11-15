@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -97,7 +98,19 @@ func loadConfig(e *env, flags *globalFlags) (*config.Config, error) {
 	for _, w := range cfg.Warnings {
 		fmt.Fprintf(e.stderr, "warning: %s\n", w)
 	}
+	warnEmpty(e, cfg, paths)
 	return cfg, nil
+}
+
+// warnEmpty warns when the configuration paths hold no document of the
+// user (an empty directory, a typo in the path, files of another
+// extension): the configuration is valid, and collects nothing.
+func warnEmpty(e *env, cfg *config.Config, paths []string) {
+	if len(cfg.Accounts)+len(cfg.Jobs)+len(cfg.Outputs) > 0 || cfg.Settings != nil && cfg.Settings.Source != nil {
+		return
+	}
+	fmt.Fprintf(e.stderr, "warning: no configuration document found in %s (files must end in .yaml or .yml; hidden files are skipped)\n",
+		strings.Join(paths, ", "))
 }
 
 // compileGraph compiles the configuration into the runtime graph.
