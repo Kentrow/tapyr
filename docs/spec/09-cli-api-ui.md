@@ -83,7 +83,7 @@ Read-only, JSON, versioned under `/api/v1`. It is the **only** interface the UI 
 | `GET /api/v1/budgets/{limit}/timeline?scope=` | `{limit}` is `provider/limit`, URL-encoded (`meraki-dashboard%2Fdaily`). Consumption time series for the current and previous window (per-minute buckets from the ledger) |
 | `GET /api/v1/plan` | The current plan (same data as `tapyr plan`) |
 | `GET /api/v1/graph` | Nodes and edges: provider, account, target, job, job instance groups, output |
-| `GET /api/v1/outputs` | Outputs with queue state and last send results |
+| `GET /api/v1/outputs` | Outputs with queue state and last send results, the series they receive, their series limit, the new series it holds back and the samples it dropped, and the jobs not measured yet ([ADR 0014](../adr/0014-output-series.md)) |
 | `GET /api/v1/debug/jobs/{name}/last?instance=` | Last raw response pages (redacted, truncated to `settings.server.debug.maxBodyBytes`, default 1 MiB) and the samples produced. Only when `settings.server.debug.enabled` |
 | `GET /api/v1/events` | Server-Sent Events stream: run finished, plan changed, circuit changed, config reloaded |
 
@@ -125,7 +125,7 @@ The UI is built in CI and in `make build`; a binary built without UI assets serv
 3. **Job detail**: effective config (YAML view), desired vs effective interval with stretch reason, instances table, recent runs (result, duration, requests, pages, retries, samples), errors. A job that is not collected says so with its reason, on the jobs list and its detail, and stays out of the counts of the Overview and of the Graph.
 4. **Budgets**: one card per limit and scope: timeline of consumption over the window with projection line, reserve, external usage, window reset time. Rate limits show wait time and 429s.
 5. **Plan**: the plan table, sortable, with stretched jobs highlighted.
-6. **Outputs**: queue fill, send rate, failures, last success.
+6. **Outputs**: the series each output receives (against its limit, as a meter, when it has one), in words: within the limit, close to it, at it, or reached with the number of new series held back and samples dropped, and the jobs not counted yet; queue fill, send rate, failures, last success. An output holding series back also shows on the Overview, as an alert and on its chip.
 7. **Live debug** (only when enabled): pick a job instance, see the last raw response (pretty JSON, collapsible) side by side with the samples produced. Refresh on new run (SSE).
 
 Every page shows, at the foot of the navigation, the version of the running Tapyr (`Tapyr v0.3.0`; a binary built without a version, such as `go build` in a clone, shows `Tapyr dev` and its short revision), with the full version, the revision and the Go version in its tooltip. It is read from `GET /api/v1/status` when the UI loads and again when the event stream reconnects, so an upgrade shows after the restart.

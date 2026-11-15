@@ -68,7 +68,7 @@ The quota headers of a provider announce a maximum different from the one declar
 
 ### TapyrOutputDropping
 
-A push output (remote write or OTLP) drops samples: `queue_full` when the backend is slower than the collection, `rejected` or `out_of_order` when it refuses them. `tapyr_output_send_failures_total` gives the class of the errors; for `out_of_order`, check that no other writer sends the same series.
+A push output (remote write or OTLP) drops samples: `queue_full` when the backend is slower than the collection, `rejected` or `out_of_order` when it refuses them. `tapyr_output_send_failures_total` gives the class of the errors; for `out_of_order`, check that no other writer sends the same series. `duplicate` means that processing rules made two series identical. `series_limit` means that the output reached its `limits.maxSeries`: the series already sent keep flowing, new ones are not sent; the Outputs page of the web UI says how many are held back. Raise the limit, or drop metrics with processing rules ([Series and limits](outputs.md#series-and-limits)).
 
 ### TapyrOutputFailing
 

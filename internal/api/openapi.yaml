@@ -514,7 +514,7 @@ components:
     Output:
       type: object
       additionalProperties: false
-      required: [name, type, queue, capacity, sent, dropped]
+      required: [name, type, queue, capacity, sent, dropped, series, series_refused, samples_refused, unmeasured_jobs]
       properties:
         name: { type: string }
         type: { type: string, enum: [prometheus, remote_write, otlp] }
@@ -525,6 +525,16 @@ components:
         last_success: { $ref: "#/components/schemas/Time" }
         last_error: { type: string }
         last_error_at: { $ref: "#/components/schemas/Time" }
+        series:
+          type: integer
+          description: Series the output receives, from the last successful run of every job instance sent to it, after its processing rules and its limit (ADR 0014)
+        max_series: { type: integer, description: The series limit of the output (limits.maxSeries), absent without one }
+        series_refused: { type: integer, description: New series held back by the limit at the last runs }
+        samples_refused: { type: integer, description: Samples dropped by the limit since the start }
+        unmeasured_jobs:
+          type: array
+          description: Jobs sent to the output that have not run successfully yet, whose series are not counted
+          items: { type: string }
     Debug:
       type: object
       required: [job, instance, run_id, time, result, pages, samples, instances]

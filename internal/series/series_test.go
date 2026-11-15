@@ -1,6 +1,7 @@
 package series
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/model"
 	"github.com/kentrow/tapyr/internal/processing"
+	"github.com/kentrow/tapyr/internal/state"
 )
 
 var t0 = time.Date(2026, time.November, 2, 12, 0, 0, 0, time.UTC)
@@ -270,4 +272,90 @@ func TestProcessedWithdrawal(t *testing.T) {
 	if diff := cmp.Diff([]string{"up//north"}, sites(d["hosted"].Stale)); diff != "" {
 		t.Errorf("derived staleness after a restart (-want +got):\n%s", diff)
 	}
+}
+
+// up returns one up sample per serial at ts.
+func up(ts time.Time, serials ...string) []model.Sample {
+	var out []model.Sample
+	for _, s := range serials {
+		out = append(out, sample("up", s, ts, false))
+	}
+	return out
+}
+
+func TestSeriesLimit(t *testing.T) {
+	r := New()
+	hosted := Output{Name: "hosted", MaxSeries: 4}
+	local := Output{Name: "local"}
+	both := []Output{hosted, local}
+	all := func(string) bool { return true }
+	check := func(t *testing.T, d Delivery, sent []string, refused, refusedSeries int) {
+		t.Helper()
+		var got []string
+		for i := range d.Samples {
+			got = append(got, d.Samples[i].Labels.Get("serial"))
+		}
+		if !slices.Equal(got, sent) || d.Refused != refused || d.RefusedSeries != refusedSeries {
+			t.Errorf("sent %v (refused %d samples, %d series), want %v (%d, %d)", got, d.Refused, d.RefusedSeries, sent, refused, refusedSeries)
+		}
+	}
+
+	// Two instances share the limit of 4: a gets 3, b the last place.
+	check(t, r.Success("a", up(t0, "a1", "a2", "a3"), both, t0)["hosted"], []string{"a1", "a2", "a3"}, 0, 0)
+	d := r.Success("b", up(t0, "b1", "b2", "b3"), both, t0)
+	check(t, d["hosted"], []string{"b1"}, 2, 2)
+	check(t, d["local"], []string{"b1", "b2", "b3"}, 0, 0) // no limit on the other output
+	if s, refused := r.OutputSeries(hosted, all); s != 4 || refused != 2 {
+		t.Errorf("hosted: %d series, %d refused, want 4 and 2", s, refused)
+	}
+	if s, refused := r.OutputSeries(local, all); s != 6 || refused != 0 {
+		t.Errorf("local: %d series, %d refused, want 6 and 0", s, refused)
+	}
+
+	// The series already sent keep flowing; a new one of a waits.
+	check(t, r.Success("a", up(t0.Add(time.Minute), "a0", "a1", "a2", "a3"), both, t0)["hosted"], []string{"a1", "a2", "a3"}, 1, 1)
+	// A series that stops frees its place: b takes it, in key order.
+	check(t, r.Success("a", up(t0.Add(2*time.Minute), "a1", "a2"), both, t0)["hosted"], []string{"a1", "a2"}, 0, 0)
+	check(t, r.Success("b", up(t0.Add(2*time.Minute), "b1", "b2", "b3"), both, t0)["hosted"], []string{"b1", "b2"}, 1, 1)
+	// A removed instance frees all its places.
+	r.Remove("a")
+	check(t, r.Success("b", up(t0.Add(3*time.Minute), "b1", "b2", "b3"), both, t0)["hosted"], []string{"b1", "b2", "b3"}, 0, 0)
+
+	// A limit lowered below the series sent keeps them and admits none.
+	lower := Output{Name: "hosted", MaxSeries: 1}
+	check(t, r.Success("b", up(t0.Add(4*time.Minute), "b1", "b2", "b3", "b4"), []Output{lower}, t0)["hosted"], []string{"b1", "b2", "b3"}, 1, 1)
+}
+
+func TestSeriesLimitAfterRestart(t *testing.T) {
+	r := New()
+	r.Restore([]state.SeriesSnapshot{
+		{Instance: "a", LastSuccess: t0, Series: seriesKeys(up(t0, "a1", "a2", "a3"))},
+		{Instance: "b", LastSuccess: t0, Series: seriesKeys(up(t0, "b1", "b2"))},
+		{Instance: "c", LastSuccess: t0, Series: seriesKeys(up(t0, "c1"))},
+	})
+	hosted := Output{Name: "hosted", MaxSeries: 4, Processor: mustProcessor(t, config.ProcessingRule{
+		Action: config.ProcessingDrop, SourceLabels: []string{"serial"}, Regex: "a3",
+	})}
+	routed := func(instance string) bool { return instance != "c" }
+	// Before any run: the series each instance would send, after the rules.
+	if s, _ := r.OutputSeries(hosted, routed); s != 4 {
+		t.Errorf("before reconcile: %d series, want 4 (a1, a2, b1, b2)", s)
+	}
+	// Reconcile admits up to the limit, in instance and key order.
+	r.Reconcile(Output{Name: hosted.Name, MaxSeries: 3, Processor: hosted.Processor}, routed)
+	if s, _ := r.OutputSeries(hosted, routed); s != 3 {
+		t.Errorf("after reconcile: %d series, want 3", s)
+	}
+	d := r.Success("b", up(t0.Add(time.Minute), "b1", "b2"), []Output{{Name: hosted.Name, MaxSeries: 3, Processor: hosted.Processor}}, t0)
+	if got := d["hosted"]; len(got.Samples) != 1 || got.Samples[0].Labels.Get("serial") != "b1" || got.RefusedSeries != 1 {
+		t.Errorf("b after the restart: %+v", got)
+	}
+}
+
+func seriesKeys(samples []model.Sample) []string {
+	var out []string
+	for i := range samples {
+		out = append(out, samples[i].SeriesKey())
+	}
+	return out
 }

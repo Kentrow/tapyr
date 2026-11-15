@@ -580,6 +580,7 @@ func (s statusSource) Graph(ctx context.Context) api.Graph {
 }
 
 func (s statusSource) Outputs(context.Context) []api.Output {
+	snap, live := s.snapshot()
 	s.c.omu.RLock()
 	defer s.c.omu.RUnlock()
 	out := []api.Output{}
@@ -596,7 +597,32 @@ func (s statusSource) Outputs(context.Context) []api.Output {
 		if !st.LastErrorAt.IsZero() {
 			ao.LastErrorAt = ptr(st.LastErrorAt.UTC())
 		}
+		ao.MaxSeries, ao.SamplesRefused, ao.UnmeasuredJobs = ro.maxSeries, ro.refusedSamples.Load(), []string{}
+		if live {
+			routed := RoutedTo(snap.g.graph, name)
+			ao.Series, ao.SeriesRefused = s.c.series.OutputSeries(ro.target(name), routed)
+			ao.UnmeasuredJobs = s.unmeasured(snap, routed)
+		}
 		out = append(out, ao)
+	}
+	return out
+}
+
+// unmeasured returns the collected jobs sent to an output whose instances
+// have not run successfully yet (fan-outs waiting for their parent
+// included): their series are not counted.
+func (s statusSource) unmeasured(snap *snapshot, routed func(string) bool) []string {
+	measured := map[string]bool{}
+	for _, inst := range snap.instances {
+		if _, ok := s.c.series.LastSuccess(inst.Instance); ok {
+			measured[inst.Name] = true
+		}
+	}
+	out := []string{}
+	for _, j := range jobModels(snap) {
+		if j.NotCollected == "" && routed(j.Name) && !measured[j.Name] {
+			out = append(out, j.Name)
+		}
 	}
 	return out
 }

@@ -82,12 +82,14 @@ Self-metrics can also be pushed: setting `selfMetrics.outputs: [name]` in `Setti
 | Metric | Type | Labels | Notes |
 |---|---|---|---|
 | `tapyr_output_samples_sent_total` | counter | output | |
-| `tapyr_output_samples_dropped_total` | counter | output, reason | queue_full, rejected, out_of_order, duplicate (samples that processing rules made identical) |
+| `tapyr_output_samples_dropped_total` | counter | output, reason | queue_full, rejected, out_of_order, duplicate (samples that processing rules made identical), series_limit (new series beyond `limits.maxSeries`, ADR 0014) |
 | `tapyr_output_samples_filtered_total` | counter | output | removed by the keep and drop processing rules of the output (intended, not a loss) |
 | `tapyr_output_send_failures_total` | counter | output, class | |
 | `tapyr_output_queue_samples` | gauge | output | |
 | `tapyr_output_send_duration_seconds` | histogram | output | |
 | `tapyr_output_last_success_timestamp_seconds` | gauge | output | |
+| `tapyr_output_series` | gauge | output | series the output receives: those of the last successful run of every job instance sent to it, after its processing rules and its limit ([ADR 0014](../adr/0014-output-series.md)) |
+| `tapyr_output_series_limit` | gauge | output | `limits.maxSeries` of the output, when it has one |
 
 ### Process and config
 

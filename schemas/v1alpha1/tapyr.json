@@ -1552,6 +1552,18 @@
       ],
       "type": "object"
     },
+    "OutputLimits": {
+      "additionalProperties": false,
+      "description": "OutputLimits caps what an output receives.",
+      "properties": {
+        "maxSeries": {
+          "description": "MaxSeries is the most series the output receives, after its\nprocessing rules: the series already sent keep flowing, the samples\nof a new series beyond it are dropped and counted\n(tapyr_output_samples_dropped_total{reason=\"series_limit\"}).",
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
     "OutputSpec": {
       "additionalProperties": false,
       "allOf": [
@@ -1601,6 +1613,10 @@
             "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
           },
           "type": "object"
+        },
+        "limits": {
+          "$ref": "#/$defs/OutputLimits",
+          "description": "Limits caps what the output receives (ADR 0014)."
         },
         "otlp": {
           "$ref": "#/$defs/OTLPOutput",
