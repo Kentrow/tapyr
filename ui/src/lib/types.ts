@@ -167,6 +167,11 @@ export interface Budget {
   tokens?: number;
   in_use?: number;
   penalty_until?: string;
+  // What the provider definition says of the limit.
+  description?: string;
+  source?: { kind: "vendor-docs" | "measured" | "assumed"; url?: string; date?: string };
+  // The calendar window of a quota (minute ... month), absent when rolling.
+  period?: string;
 }
 
 export interface Bucket {

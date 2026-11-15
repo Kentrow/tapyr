@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { instancesEmpty } from "./Jobs";
-import { blocking, scopeWords, unplanned } from "./Plan";
+import { blocking, unplanned } from "./Plan";
+import { scopeWords } from "../lib/format";
 import type { Job, Plan } from "../lib/types";
 
 const job = (name: string, patch: Partial<Job> = {}): Job => ({

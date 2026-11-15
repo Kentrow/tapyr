@@ -231,6 +231,24 @@ type Budget struct {
 	InUse *int64 `json:"in_use,omitempty"`
 	// PenaltyUntil is the end of a 429 penalty.
 	PenaltyUntil *time.Time `json:"penalty_until,omitempty"`
+
+	// Description and Source are those of the limit in the provider
+	// definition: what it is, and where its values come from.
+	Description string       `json:"description,omitempty"`
+	Source      *LimitSource `json:"source,omitempty"`
+	// Period is the calendar window of a quota (minute, hour, day, week or
+	// month), empty for a rolling one.
+	Period string `json:"period,omitempty"`
+}
+
+// LimitSource says where the values of a limit come from: the vendor
+// documentation (with its URL), a measurement against the real API (with
+// its date), or an assumption when nothing is documented.
+type LimitSource struct {
+	// Kind is vendor-docs, measured or assumed.
+	Kind string `json:"kind"`
+	URL  string `json:"url,omitempty"`
+	Date string `json:"date,omitempty"`
 }
 
 // Timeline is the consumption of a quota scope per bucket.

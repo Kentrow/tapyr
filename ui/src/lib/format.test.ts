@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { count, duration, healthClass, outputHealth, plural, scopeAccounts, seriesStatus, since, toYAML, versionLabel, waitingText, waitingWord } from "./format";
-import type { Output } from "./types";
+import { count, duration, healthClass, limitSummary, limitTitle, outputHealth, plural, scopeAccounts, seriesStatus, since, sourceWords, toYAML, versionLabel, waitingText, waitingWord } from "./format";
+import type { Budget, Output } from "./types";
 
 describe("format", () => {
+  it("names a limit and says what it allows", () => {
+    const b: Budget = { provider: "p", limit: "account-rate", kind: "rate", scope: "account=demo", accounts: ["demo"], rate_per_second: 10 };
+    expect(limitTitle("account-rate")).toBe("Account rate");
+    expect(limitTitle("daily")).toBe("Daily");
+    expect(limitSummary(b)).toBe("10 requests per second");
+    expect(limitSummary({ ...b, rate_per_second: 0.5 })).toBe("30 requests per minute");
+    expect(limitSummary({ ...b, kind: "concurrency", max: 4 })).toBe("4 requests at once");
+    expect(limitSummary({ ...b, kind: "quota", max: 5000, period: "day" })).toBe("5,000 calls per day");
+    expect(limitSummary({ ...b, kind: "quota", max: 100, window_start: "2026-11-03T11:00:00Z", window_end: "2026-11-03T12:00:00Z" })).toBe("100 calls per 1h, rolling");
+    expect(sourceWords({ kind: "vendor-docs", url: "https://example.com" })).toBe("from the vendor documentation");
+    expect(sourceWords({ kind: "measured", date: "2026-11" })).toBe("measured against the real API (2026-11)");
+    expect(sourceWords({ kind: "assumed" })).toBe("assumed (the vendor documents no value)");
+    expect(sourceWords(undefined)).toBe("no source given by the provider definition");
+  });
   it("says what a job that has not run yet waits for", () => {
     const now = Date.parse("2026-11-03T12:00:00Z");
     expect(waitingText({ reason: "first_run", until: "2026-11-03T12:00:40Z" }, now)).toEqual({

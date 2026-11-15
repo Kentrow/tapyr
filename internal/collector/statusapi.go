@@ -536,6 +536,7 @@ func (s statusSource) Budgets(context.Context) []api.Budget {
 		if eta := exhaustionETA(q, now); eta > 0 {
 			b.ExhaustionETASeconds = ptr(eta.Seconds())
 		}
+		describeLimit(&b, g.cfg)
 		out = append(out, b)
 	}
 	for _, l := range g.engine.Limits() {
@@ -548,9 +549,33 @@ func (s statusSource) Budgets(context.Context) []api.Budget {
 		if !l.PenaltyUntil.IsZero() {
 			b.PenaltyUntil = ptr(l.PenaltyUntil.UTC())
 		}
+		describeLimit(&b, g.cfg)
 		out = append(out, b)
 	}
 	return out
+}
+
+// describeLimit adds to a budget what the provider definition says of its
+// limit: its description, its source and the period of a quota window.
+func describeLimit(b *api.Budget, cfg *config.Config) {
+	for _, p := range cfg.Providers {
+		if string(p.Metadata.Name) != b.Provider {
+			continue
+		}
+		for _, l := range p.Spec.Limits {
+			if string(l.Name) != b.Limit {
+				continue
+			}
+			b.Description = l.Description
+			if l.Source != nil {
+				b.Source = &api.LimitSource{Kind: l.Source.Kind, URL: l.Source.URL, Date: l.Source.Date}
+			}
+			if l.Window != nil {
+				b.Period = l.Window.Period
+			}
+			return
+		}
+	}
 }
 
 func (s statusSource) Timeline(_ context.Context, limit, scope string) (api.Timeline, error) {

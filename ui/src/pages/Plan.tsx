@@ -1,6 +1,6 @@
 import { Badge, Failure, Loading, PageHead, Table } from "../components/ui";
 import { ProblemNote } from "../components/Problem";
-import { absolute, count, duration, percent, since, waitingText } from "../lib/format";
+import { absolute, count, duration, percent, scopeWords, since, waitingText } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
 import { href } from "../lib/router";
@@ -10,13 +10,6 @@ import type { Job, Plan as PlanT, PlanJob, PlanScope } from "../lib/types";
 // without instances, waiting for their parent or whose parent listed no
 // item. The planner counts instances, so they join the plan once their
 // parent has listed its items.
-// scopeWords names a scope key in words: "account demo", "account lab
-// and target eu", "each instance", "all accounts" for a provider-wide one.
-export function scopeWords(key: string): string {
-  if (!key) return "all accounts";
-  return key.split(",").map((part) => (part === "instance" ? "each instance" : part.replace("=", " "))).join(" and ");
-}
-
 // blocking returns the critical jobs of the quotas the plan does not fit:
 // they are never slowed down, so they are what to change.
 export function blocking(plan: PlanT): Set<string> {
