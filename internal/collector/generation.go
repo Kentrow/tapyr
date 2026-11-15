@@ -346,6 +346,7 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 	obs := selfobs.Run{Provider: job.Provider, Account: job.Account, Job: job.Name}
 	var res *collect.Result
 	var samples []model.Sample
+	var failed *collect.Error // the request that failed, with its response
 	defer func() {
 		record.Ended = c.clock.Now()
 		// The error may quote the response (an excerpt of its body), and an
@@ -357,11 +358,18 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 		if err := c.store.AddRun(context.WithoutCancel(ctx), record); err != nil {
 			log.Warn("recording the run", "error", err)
 		}
-		c.debug.keep(job, run.ID, started, record.Result, record.Error, res, samples, g.headers[job.Provider])
-		c.events.Publish(api.EventRunFinished, map[string]any{
+		problem := runProblem(g.cfg, job.Account, job.Target, record)
+		c.debug.keep(job, run.ID, started, record.Result, record.Error, res, samples, g.headers[job.Provider], debugFailure{
+			problem: problem, request: failed,
+		})
+		event := map[string]any{
 			"job": job.Name, "instance": job.Instance, "provider": job.Provider, "account": job.Account, "run_id": run.ID,
 			"result": record.Result, "duration_ms": record.Ended.Sub(started).Milliseconds(), "samples": record.Samples,
-		})
+		}
+		if problem != nil {
+			event["problem"] = problem.Title
+		}
+		c.events.Publish(api.EventRunFinished, event)
 		c.publishCircuit(g, job)
 	}()
 
@@ -371,6 +379,8 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 	}
 	if err != nil {
 		record.Result, record.Error = failure(err)
+		classifyError(&record, err)
+		failed, _ = errors.AsType[*collect.Error](err)
 		attrs := []any{"result", record.Result, "error", err, "duration_ms", c.clock.Since(started).Milliseconds()}
 		if ce, ok := errors.AsType[*collect.Error](err); ok {
 			attrs = append(attrs, "class", string(ce.Class), "endpoint", ce.Endpoint, "status", ce.Status)
@@ -382,7 +392,7 @@ func (g *generation) runJob(ctx context.Context, run scheduler.Run) {
 		Pages: res.Pages, Vars: job.Vars, Account: job.AccountInfo, Target: job.TargetInfo, Now: started, Labels: job.Labels,
 	}, job.Limits)
 	if err != nil {
-		record.Result, record.Error = "failed", err.Error()
+		record.Result, record.Error, record.ErrorClass = "failed", err.Error(), errorClassMapping
 		log.Warn("run failed", "result", record.Result, "error", err, "class", string(collect.ClassDecode))
 		return
 	}
@@ -478,6 +488,22 @@ func (c *Collector) publishCircuit(g *generation, job *runtime.Job) {
 }
 
 // failure maps a run error to its result and summary.
+// errorClassMapping classifies a response that does not map.
+const errorClassMapping = "mapping"
+
+// classifyError records the class of a run error: the reason of a budget
+// refusal (with the limit and when it should end), else the class of the
+// failed request (with its status and endpoint).
+func classifyError(r *state.RunRecord, err error) {
+	if re, ok := errors.AsType[*budget.RefusalError](err); ok {
+		r.ErrorClass, r.ErrorSubject, r.ErrorUntil = re.Reason, re.Limit, re.Until
+		return
+	}
+	if ce, ok := errors.AsType[*collect.Error](err); ok {
+		r.ErrorClass, r.ErrorStatus, r.ErrorSubject = string(ce.Class), ce.Status, ce.Endpoint
+	}
+}
+
 func failure(err error) (result, summary string) {
 	if reason, ok := budget.IsRefusal(err); ok {
 		if reason == budget.ReasonCircuitOpen {

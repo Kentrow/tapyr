@@ -26,13 +26,13 @@ func TestDebugCaptures(t *testing.T) {
 	samples := []model.Sample{{Name: "up", Type: model.Gauge, Labels: model.Labels{{Name: "k", Value: "s3cr3t"}}, Value: 1}}
 	job := func(name, instance string) *runtime.Job { return &runtime.Job{Name: name, Instance: instance} }
 
-	d.keep(job("devices", "devices"), "1", at, "success", "", res, samples, debugHeaders)
+	d.keep(job("devices", "devices"), "1", at, "success", "", res, samples, debugHeaders, debugFailure{})
 	if _, err := d.get(context.Background(), "devices", ""); !errors.Is(err, api.ErrDebugDisabled) {
 		t.Fatalf("disabled: %v", err)
 	}
 	d.configure(true, 0)
-	d.keep(job("devices", "devices[a]"), "1", at, "success", "", res, samples, debugHeaders)
-	d.keep(job("devices", "devices[b]"), "2", at, "failed", "boom s3cr3t", nil, nil, debugHeaders)
+	d.keep(job("devices", "devices[a]"), "1", at, "success", "", res, samples, debugHeaders, debugFailure{})
+	d.keep(job("devices", "devices[b]"), "2", at, "failed", "boom s3cr3t", nil, nil, debugHeaders, debugFailure{})
 	c, err := d.get(context.Background(), "devices", "")
 	if err != nil || c.Instance != "devices[b]" || c.Error != "boom [REDACTED]" || len(c.Pages) != 0 || strings.Join(c.Instances, ",") != "devices[a],devices[b]" {
 		t.Fatalf("latest = %+v, %v", c, err)
@@ -42,6 +42,26 @@ func TestDebugCaptures(t *testing.T) {
 		c.Pages[0].Headers["Content-Type"] != "application/json" || c.Samples[0].Labels["k"] != "[REDACTED]" || c.Samples[0].Type != "gauge" {
 		t.Fatalf("instance a = %+v, %v", c, err)
 	}
+	// A failed request keeps its response, redacted, with the problem.
+	failed := &collect.Error{
+		Class: collect.ClassAuth, Endpoint: "/sites", Status: 401, Err: errors.New("response: denied"),
+		Body: []byte(`{"error":"invalid key s3cr3t"}`), Header: http.Header{"Content-Type": {"application/json"}, "Set-Cookie": {"sid=1"}},
+	}
+	prob := &api.Problem{Class: "auth", Title: "The provider rejected the credentials of fleet."}
+	d.keep(job("devices", "devices[c]"), "3", at, "failed", "auth /sites: HTTP 401", nil, nil, debugHeaders, debugFailure{problem: prob, request: failed})
+	c, err = d.get(context.Background(), "devices", "devices[c]")
+	if err != nil || c.Problem != prob || len(c.Pages) != 1 || c.Pages[0].Status != 401 || c.Pages[0].Headers["Set-Cookie"] != "" ||
+		c.Pages[0].Body != "{\n  \"error\": \"invalid key [REDACTED]\"\n}" {
+		t.Fatalf("failed run = %+v, %v", c, err)
+	}
+	// A request that failed before any response keeps no page.
+	d.keep(job("devices", "devices[d]"), "4", at, "failed", "transient /sites: timeout", nil, nil, debugHeaders,
+		debugFailure{request: &collect.Error{Class: collect.ClassTransient, Endpoint: "/sites", Err: errors.New("timeout")}})
+	if c, err = d.get(context.Background(), "devices", "devices[d]"); err != nil || len(c.Pages) != 0 {
+		t.Fatalf("no response = %+v, %v", c, err)
+	}
+	d.remove("devices[c]")
+	d.remove("devices[d]")
 	d.remove("devices[a]")
 	if _, err := d.get(context.Background(), "devices", "devices[a]"); !errors.Is(err, api.ErrNotFound) {
 		t.Errorf("removed: %v", err)
@@ -49,7 +69,7 @@ func TestDebugCaptures(t *testing.T) {
 	// Truncation, and the oldest captures go first.
 	d.configure(true, 10)
 	for i := range maxDebugCaptures + 5 {
-		d.keep(job("fan", fmt.Sprintf("fan[%03d]", i)), "1", at, "success", "", res, nil, debugHeaders)
+		d.keep(job("fan", fmt.Sprintf("fan[%03d]", i)), "1", at, "success", "", res, nil, debugHeaders, debugFailure{})
 	}
 	if _, err := d.get(context.Background(), "fan", "fan[000]"); !errors.Is(err, api.ErrNotFound) {
 		t.Error("the oldest capture was kept")

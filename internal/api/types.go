@@ -59,6 +59,10 @@ type Account struct {
 	// HealthReasons say why the account is not ok (the redacted errors of
 	// its jobs, a re-bootstrap required, an open circuit); empty when ok.
 	HealthReasons []string `json:"health_reasons"`
+	// Problem says in words the first thing to fix when the account is not
+	// ok: credentials to renew, then the error of a failing job (rejected
+	// credentials first), then a degraded one.
+	Problem *Problem `json:"problem,omitempty"`
 }
 
 // Target is one target of a multi-target account.
@@ -137,6 +141,8 @@ type Waiting struct {
 	FailingJob string     `json:"failing_job,omitempty"`
 	Error      string     `json:"error,omitempty"`
 	FailedAt   *time.Time `json:"failed_at,omitempty"`
+	// Problem says the error of the failing job in words.
+	Problem *Problem `json:"problem,omitempty"`
 }
 
 // RunSummary is the outcome of a run.
@@ -147,6 +153,26 @@ type RunSummary struct {
 	StartedAt time.Time `json:"started_at"`
 	EndedAt   time.Time `json:"ended_at"`
 	Error     string    `json:"error,omitempty"`
+	// Problem says the error in words, with what to do, when the run did
+	// not succeed.
+	Problem *Problem `json:"problem,omitempty"`
+}
+
+// Problem says in words what went wrong and what to do about it (spec 09,
+// "Messages"): a plain sentence, an action, and the section of the
+// troubleshooting guide of the running version. The technical error is
+// shown next to it.
+type Problem struct {
+	// Class is auth, forbidden, reauth, rate_limited, penalized,
+	// quota_exhausted, deadline, circuit_open, server_error, unreachable,
+	// client, decode, mapping or unknown.
+	Class  string `json:"class"`
+	Title  string `json:"title"`
+	Action string `json:"action"`
+	// Until is when the problem should end on its own, when known (a quota
+	// reset, the end of a pause).
+	Until   *time.Time `json:"until,omitempty"`
+	DocsURL string     `json:"docs_url"`
 }
 
 // Instance is one instance of a job.
@@ -339,14 +365,16 @@ type ErrorDetail struct {
 
 // Debug is the capture of the last run of a job instance.
 type Debug struct {
-	Job      string        `json:"job"`
-	Instance string        `json:"instance"`
-	RunID    string        `json:"run_id"`
-	Time     time.Time     `json:"time"`
-	Result   string        `json:"result"`
-	Error    string        `json:"error,omitempty"`
-	Pages    []DebugPage   `json:"pages"`
-	Samples  []DebugSample `json:"samples"`
+	Job      string    `json:"job"`
+	Instance string    `json:"instance"`
+	RunID    string    `json:"run_id"`
+	Time     time.Time `json:"time"`
+	Result   string    `json:"result"`
+	Error    string    `json:"error,omitempty"`
+	// Problem says the error in words, when the run did not succeed.
+	Problem *Problem      `json:"problem,omitempty"`
+	Pages   []DebugPage   `json:"pages"`
+	Samples []DebugSample `json:"samples"`
 	// Instances lists the instances of the job with a capture.
 	Instances []string `json:"instances"`
 }

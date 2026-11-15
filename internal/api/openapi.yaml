@@ -216,7 +216,8 @@ paths:
     get:
       summary: Server-Sent Events stream
       description: >-
-        Events run_finished (job, instance, result, duration_ms, samples),
+        Events run_finished (job, instance, result, duration_ms, samples,
+        and problem, the sentence of the problem of a run that did not succeed),
         plan_changed, circuit_changed (account, target, state) and
         config_reloaded (result, error); every data line is a JSON object
         with time. A comment line is sent every 15 seconds.
@@ -326,6 +327,7 @@ components:
           type: array
           description: Why the account is not ok (redacted job errors, a re-bootstrap required, open circuits); empty when ok
           items: { type: string }
+        problem: { $ref: "#/components/schemas/Problem" }
     RunSummary:
       type: object
       required: [run_id, instance, result, started_at, ended_at]
@@ -336,6 +338,20 @@ components:
         started_at: { $ref: "#/components/schemas/Time" }
         ended_at: { $ref: "#/components/schemas/Time" }
         error: { type: string, description: Redacted summary }
+        problem: { $ref: "#/components/schemas/Problem" }
+    Problem:
+      type: object
+      additionalProperties: false
+      description: What went wrong, in words, and what to do; the technical error is shown next to it
+      required: [class, title, action, docs_url]
+      properties:
+        class:
+          type: string
+          enum: [auth, forbidden, reauth, rate_limited, penalized, quota_exhausted, deadline, circuit_open, server_error, unreachable, client, decode, mapping, unknown]
+        title: { type: string, description: A plain sentence that says what happened }
+        action: { type: string, description: What to do, always present (it may be that Tapyr recovers on its own) }
+        until: { $ref: "#/components/schemas/Time" }
+        docs_url: { type: string, description: The section of the troubleshooting guide, in the documentation of the running version }
     Job:
       type: object
       additionalProperties: false
@@ -378,6 +394,7 @@ components:
         failing_job: { type: string, description: The job that fails, the parent or one of its own parents }
         error: { type: string, description: Redacted error of the last run of the failing job }
         failed_at: { $ref: "#/components/schemas/Time" }
+        problem: { $ref: "#/components/schemas/Problem" }
     Instance:
       type: object
       additionalProperties: false
@@ -562,6 +579,7 @@ components:
         time: { $ref: "#/components/schemas/Time" }
         result: { type: string }
         error: { type: string }
+        problem: { $ref: "#/components/schemas/Problem" }
         pages:
           type: array
           items:

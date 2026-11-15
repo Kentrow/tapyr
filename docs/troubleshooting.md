@@ -47,6 +47,14 @@ The runs fail with an authentication error, and `tapyr_auth_token_requests_total
 - After a rejected token or login request, Tapyr waits before trying again: 1 minute, then 2, 4... up to 1 hour, so that a wrong password does not lock the account. Fixing the secret and reloading (`SIGHUP`) ends the wait at once.
 - `tapyr_auth_reauth_required` at 1 (and the `TapyrReauthRequired` alert) means the credentials can no longer be renewed on their own, for example an expired Aruba Central refresh token: create new ones, update the secret and reload. The provider README explains how.
 
+## The provider fails or does not answer
+
+The runs fail with `HTTP 5xx`, a timeout or a connection error (the class `transient` in the logs and in `tapyr_requests_total`), or are skipped with `skipped_circuit`.
+
+- **Tapyr retries on its own.** A `5xx`, a timeout or a network error is retried with backoff within the run, and the job runs again at its next interval: there is nothing to do when it is rare.
+- **The circuit opens after repeated failures.** After 5 failures in a row (`settings.circuitBreaker.failureThreshold`), Tapyr stops calling the account (or the target) for 2 minutes, then probes it with one request; the pause doubles up to 30 minutes while it keeps failing. No quota is spent meanwhile. `tapyr_circuit_state` and the `TapyrCircuitOpen` alert show it, and the runs are `skipped_circuit`.
+- **If it lasts**, check the status page of the provider, then the network between Tapyr and the provider: DNS, an HTTP proxy (`HTTPS_PROXY`), a firewall, the TLS settings of the account (`spec.tls`) for a private certificate authority.
+
 ## Quota problems
 
 The budget engine is meant to make these impossible: when they happen, one of its inputs is wrong. The Budgets page of the UI and `GET /api/v1/budgets` show every limit and scope: what Tapyr used, what is left as Tapyr counts it and as the provider reports it, the external usage and the projection.

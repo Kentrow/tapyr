@@ -1,5 +1,6 @@
 import { Badge, Failure, Loading, PageHead, Table } from "../components/ui";
 import { CodeBlock } from "../components/Code";
+import { ProblemNote } from "../components/Problem";
 import { NotFound } from "./NotFound";
 import { absolute, count, duration, since, toYAML, waitingText } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
@@ -126,7 +127,9 @@ export function JobDetail({ name }: { name: string }) {
           {j.last_run ? (
             <>
               <div className="row"><Badge state={j.last_run.result} /> <span title={absolute(j.last_run.ended_at)}>{since(j.last_run.ended_at)}</span></div>
-              {j.last_run.error && <p className="mono small" style={{ overflowWrap: "anywhere" }}>{j.last_run.error}</p>}
+              {(j.last_run.problem || j.last_run.error) && (
+                <div className="small" style={{ marginTop: 8 }}><ProblemNote problem={j.last_run.problem} detail={j.last_run.error} /></div>
+              )}
             </>
           ) : j.waiting ? (
             <>
@@ -135,6 +138,7 @@ export function JobDetail({ name }: { name: string }) {
                 {waitingText(j.waiting).long}
                 {j.waiting.failing_job && <> <a href={href(["jobs", j.waiting.failing_job])}>See {j.waiting.failing_job}</a>.</>}
               </p>
+              {j.waiting.problem && <div className="small" style={{ marginTop: 8 }}><ProblemNote problem={j.waiting.problem} compact /></div>}
             </>
           ) : (
             <span className="muted">{j.collected ? "no run yet" : "none: not collected"}</span>
@@ -168,7 +172,7 @@ export function JobDetail({ name }: { name: string }) {
             { key: "pages", label: "Pages", num: true, render: (r) => r.pages },
             { key: "retries", label: "Retries", num: true, render: (r) => r.retries },
             { key: "samples", label: "Samples", num: true, render: (r) => count(r.samples) },
-            { key: "error", label: "Error", render: (r) => <span className="mono small" style={{ overflowWrap: "anywhere" }}>{r.error ?? ""}</span> },
+            { key: "error", label: "Error", render: (r) => (r.problem ? <span className="small" title={r.error}>{r.problem.title}</span> : <span className="mono small" style={{ overflowWrap: "anywhere" }}>{r.error ?? ""}</span>) },
           ]}
         />
       </section>

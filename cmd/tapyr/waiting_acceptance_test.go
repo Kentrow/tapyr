@@ -88,6 +88,8 @@ func TestWaiting(t *testing.T) {
 				t.Errorf("%s: waiting %+v", name, w)
 			case !strings.Contains(w.Error, "401") || w.FailedAt == nil || !w.FailedAt.Equal(failedAt) || w.Until == nil:
 				t.Errorf("%s: error %q at %v until %v, want a 401 at %v and the next run of the sites", name, w.Error, w.FailedAt, w.Until, failedAt)
+			case w.Problem == nil || w.Problem.Class != "auth" || w.Problem.Title != "The provider rejected the credentials of fleet.":
+				t.Errorf("%s: problem %+v", name, w.Problem)
 			}
 		}
 		if strings.Contains(fmt.Sprint(jobs["network-devices"].Waiting), "rejected-key") {

@@ -30,6 +30,15 @@ describe("unhealthy accounts", () => {
       ["b", "degraded", ["jobs: server /sites: HTTP 502"]],
     ]);
   });
+  it("keeps the problem of an account, but not a re-bootstrap, which has its own cell", () => {
+    const problem = { class: "auth", title: "The provider rejected the credentials of a.", action: "Check it.", docs_url: "u" };
+    const got = unhealthyAccounts([
+      { ...account("a", "failing", ["devices: auth /sites: HTTP 401"]), problem },
+      { ...account("b", "failing", ["circuit open"], true), problem: { ...problem, class: "reauth" } },
+    ]);
+    expect(got.map((a) => [a.name, a.problem?.class])).toEqual([["a", "auth"], ["b", undefined]]);
+  });
+
   it("leaves a re-bootstrap to its own cell", () => {
     const got = unhealthyAccounts([
       account("only", "failing", ["aps: auth /aps: a manual re-bootstrap is required", "the credentials need a manual re-bootstrap"], true),

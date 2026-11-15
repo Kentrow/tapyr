@@ -124,4 +124,14 @@ type RunRecord struct {
 	Samples  int
 	// Error is a redacted summary, empty on success.
 	Error string
+	// ErrorClass classifies the error: the class of the failed request
+	// (auth, rate_limited, transient, client, decode), mapping for a
+	// response that does not map, or the reason of a budget refusal
+	// (quota_exhausted, penalized, circuit_open, deadline). ErrorStatus is
+	// the HTTP status, ErrorSubject the templated endpoint or the limit
+	// that refused, ErrorUntil when a refusal is expected to end.
+	ErrorClass   string
+	ErrorStatus  int
+	ErrorSubject string
+	ErrorUntil   time.Time
 }

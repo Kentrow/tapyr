@@ -150,7 +150,9 @@ func (s statusSource) lastRuns(ctx context.Context, snap *snapshot) (map[string]
 			continue
 		}
 		perJob[j.Name] = append(perJob[j.Name], runHealth(runs[0].Result))
-		accounts[j.Account] = append(accounts[j.Account], lastRun{Job: j.Name, Result: runs[0].Result, Error: runs[0].Error})
+		accounts[j.Account] = append(accounts[j.Account], lastRun{
+			Job: j.Name, Result: runs[0].Result, Error: runs[0].Error, Problem: runProblem(snap.g.cfg, j.Account, j.Target, runs[0]),
+		})
 	}
 	jobs := make(map[string]string, len(perJob))
 	for name, h := range perJob {
@@ -214,6 +216,11 @@ func (s statusSource) accounts(snap *snapshot, runs map[string][]lastRun) []api.
 			in.Circuits = append(in.Circuits, circuit{Target: string(t.Name), State: c})
 		}
 		aa.Health, aa.HealthReasons = accountHealth(in)
+		if aa.Auth.ReauthRequired {
+			aa.Problem = reauthProblem(snap.g.cfg, name)
+		} else {
+			aa.Problem = accountProblem(in.Runs)
+		}
 		out = append(out, aa)
 	}
 	slices.SortFunc(out, func(a, b api.Account) int { return strings.Compare(a.Name, b.Name) })
@@ -303,7 +310,7 @@ func (s statusSource) job(ctx context.Context, snap *snapshot, j *runtime.Job) a
 		aj.NextRun = ptr(next.UTC())
 	}
 	if runs, err := s.c.store.RunsOfJob(ctx, j.Name, 1); err == nil && len(runs) > 0 {
-		aj.LastRun = runSummary(runs[0])
+		aj.LastRun = snap.runSummary(runs[0])
 	}
 	if aj.LastRun == nil {
 		aj.Waiting = s.waiting(ctx, snap, j)
@@ -365,13 +372,14 @@ func (s statusSource) waitingFor(ctx context.Context, snap *snapshot, j *runtime
 		// The parent waits too: for its first run, or for its own parent.
 		if pw := s.waitingFor(ctx, snap, parent, depth+1); pw != nil {
 			if pw.Reason == api.WaitingParentFailing {
-				w.Reason, w.FailingJob, w.Error, w.FailedAt = pw.Reason, pw.FailingJob, pw.Error, pw.FailedAt
+				w.Reason, w.FailingJob, w.Error, w.FailedAt, w.Problem = pw.Reason, pw.FailingJob, pw.Error, pw.FailedAt, pw.Problem
 			}
 			w.Until = cmp.Or(w.Until, pw.Until)
 		}
 	case runs[0].Result == "failed" || runs[0].Result == "skipped_circuit":
 		w.Reason, w.FailingJob = api.WaitingParentFailing, parent.Name
 		w.Error, w.FailedAt = cmp.Or(runs[0].Error, strings.ReplaceAll(runs[0].Result, "_", " ")), ptr(runs[0].Ended.UTC())
+		w.Problem = snap.runSummary(runs[0]).Problem
 	case runs[0].Result == "skipped_budget" || runs[0].Result == "skipped_overlap":
 		// The parent has not listed its items yet: it waits for the budget.
 	default:
@@ -381,10 +389,24 @@ func (s statusSource) waitingFor(ctx context.Context, snap *snapshot, j *runtime
 	return w
 }
 
-func runSummary(r state.RunRecord) *api.RunSummary {
-	return &api.RunSummary{
+// runSummary describes a run, with its problem in words when it did not
+// succeed.
+func (snap *snapshot) runSummary(r state.RunRecord) *api.RunSummary {
+	sum := &api.RunSummary{
 		RunID: r.RunID, Instance: r.Instance, Result: r.Result, StartedAt: r.Started.UTC(), EndedAt: r.Ended.UTC(), Error: r.Error,
 	}
+	account, target := "", ""
+	if j := snap.models[r.Job]; j != nil {
+		account = j.Account
+	}
+	for _, inst := range snap.instances {
+		if inst.Instance == r.Instance {
+			account, target = inst.Account, inst.Target
+			break
+		}
+	}
+	sum.Problem = runProblem(snap.g.cfg, account, target, r)
+	return sum
 }
 
 func (s statusSource) Job(ctx context.Context, name string) (api.Job, error) {
@@ -456,7 +478,7 @@ func (s statusSource) Instances(ctx context.Context, name string) ([]api.Instanc
 			inst.NextRun = ptr(t.UTC())
 		}
 		if runs, err := s.c.store.Runs(ctx, j.Name, j.Instance, 1); err == nil && len(runs) > 0 {
-			inst.LastRun = runSummary(runs[0])
+			inst.LastRun = snap.runSummary(runs[0])
 		}
 		out = append(out, inst)
 	}
@@ -484,7 +506,7 @@ func (s statusSource) Runs(ctx context.Context, name, instance string, limit int
 	out := make([]api.Run, 0, len(records))
 	for _, r := range records {
 		out = append(out, api.Run{
-			RunSummary: *runSummary(r), DurationSeconds: r.Ended.Sub(r.Started).Seconds(),
+			RunSummary: *snap.runSummary(r), DurationSeconds: r.Ended.Sub(r.Started).Seconds(),
 			Requests: r.Requests, Retries: r.Retries, Pages: r.Pages, Items: r.Items, Samples: r.Samples,
 		})
 	}

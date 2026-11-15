@@ -155,7 +155,8 @@ export function waitingText(w: Waiting, now = Date.now()): { short: string; long
       const who = w.failing_job === w.parent ? `${w.parent}, which fails` : `${w.parent}, whose parent ${w.failing_job} fails`;
       return {
         short: `waiting: ${w.failing_job} fails`,
-        long: `Waiting for ${who}${w.error ? `: ${w.error}` : ""}${w.failed_at ? ` (${when(w.failed_at)})` : ""}.${w.until ? ` Next try ${when(w.until)}.` : ""}`,
+        // The problem, when there is one, says the error in words below.
+        long: `Waiting for ${who}${w.error && !w.problem ? `: ${w.error}` : ""}${w.failed_at ? ` (${when(w.failed_at)})` : ""}.${w.until ? ` Next try ${when(w.until)}.` : ""}`,
       };
     }
   }

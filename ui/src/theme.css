@@ -146,6 +146,8 @@ h3 { font-size: 1rem; font-weight: 650; }
 
 .banner { display: flex; gap: 12px; align-items: center; padding: 14px 18px; border-radius: var(--radius-s); margin-bottom: 18px; font-weight: 550; }
 .banner.bad { background: var(--red-soft); color: var(--red); }
+.banner.warn { background: var(--sun-soft); color: var(--sun-ink); }
+.banner .problem { color: var(--ink); font-weight: 400; }
 .banner svg { width: 20px; height: 20px; flex: none; }
 
 /* Tables */
@@ -351,3 +353,11 @@ pre.code .s { color: var(--code-string); } pre.code .n { color: var(--code-numbe
 .series-status.limited, .series-status.near, .series-status.full { padding: 10px 12px; border-radius: var(--radius); background: var(--sun-soft); color: var(--sun-ink); }
 .series-status.limited .small, .series-status.near .small, .series-status.full .small { color: var(--sun-ink); }
 .series-block .label + .meter, .card > .label + .meter { margin-top: 6px; }
+
+/* Problems: the sentence, the action and its link, then the technical detail (spec 09, "Messages"). */
+.problem { display: flex; flex-direction: column; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.problem .problem-title { font-weight: 650; }
+.problem .problem-action { font-size: .88rem; }
+.problem .problem-action a { font-weight: 600; white-space: nowrap; }
+.problem .problem-detail { margin-top: 2px; }
+.problem.compact .problem-action { font-size: .82rem; }

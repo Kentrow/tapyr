@@ -100,6 +100,32 @@ Every job, account and provider has a health: `ok`, `degraded`, `failing`, or `u
 
 The Overview lists the accounts that are not ok with their reasons, and the Graph colors the account nodes with their health and shows the reasons in the detail panel.
 
+### Messages
+
+Every message that reports a problem to a user is written the same way, and every new one follows it; the errors of the runs do, in the status API and the web UI:
+
+1. **What happened**, in one plain sentence, from the point of view of the user: "The provider rejected the credentials of lab.", not "auth /sites: HTTP 401".
+2. **What to do**, always: a step to take, or "Nothing to do: Tapyr tries again." when Tapyr recovers on its own. A secret is named by its reference (the environment variable or the file), never by its value.
+3. **Where to read more**: a link to the section of the [troubleshooting guide](../troubleshooting.md) in the documentation of the running version (`https://docs.tapyr.eu/<minor>/troubleshooting/#...` for a release, `/dev/` for a release candidate or a development build).
+4. **The technical detail** last, smaller: the redacted error, for those who need it.
+
+In the status API, a run that did not succeed (`last_run`, the runs of a job, the instances, the live debug) carries a `problem`: `class`, `title` (the sentence), `action`, `until` when it should end on its own (a quota reset, a pause), and `docs_url`. An account that is not ok carries the problem to fix first: credentials to renew, then the error of a failing job (rejected credentials first), then of a degraded one. A job waiting for a failing parent carries the problem of the parent. The `run_finished` event carries the sentence as `problem`.
+
+| Class | When | Section |
+|---|---|---|
+| `auth` | The provider rejected the credentials (401, a rejected token or login request) | Authentication fails |
+| `forbidden` | The credentials lack a permission (403) | Authentication fails |
+| `reauth` | The credentials can no longer be renewed | Authentication fails |
+| `rate_limited`, `penalized` | The provider rate limits Tapyr, or asked it to wait | Quota problems |
+| `quota_exhausted` | A quota is used up until its reset | Quota problems |
+| `deadline` | The run gave up waiting for the budget | Jobs run less often than configured |
+| `server_error`, `unreachable`, `circuit_open` | A 5xx, no answer or a timeout, or the circuit open after repeated failures | The provider fails or does not answer |
+| `client` | Another 4xx (404, 400) | Metrics are wrong or missing |
+| `decode`, `mapping` | A response that cannot be read, or turned into metrics | Metrics are wrong or missing |
+| `unknown` | Anything else | Asking for help |
+
+The live debug keeps the response that failed (an error status, a body that does not decode), redacted and truncated like the other pages, and says why a capture has no response or no sample.
+
 ### Waiting is not failing
 
 A collected job that has not run yet **waits**; it does not fail. `waiting` on the job (`GET /api/v1/jobs`) says for what, and the graph gives the reason on its job nodes:
@@ -151,6 +177,6 @@ Every page shows, at the foot of the navigation, the version of the running Tapy
 ### Implementation notes
 
 - **Serving.** The UI is served under `/ui/` (`/` redirects there) with `Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'` (the `CSP` constant of `internal/ui`), so that the browser itself refuses any external call; `settings.server.ui.enabled: false` removes it. Hashed assets are cached for a year, `index.html` is never cached. A binary built without the UI serves a page explaining `make ui`.
-- **Events.** `GET /api/v1/events` is a Server-Sent Events stream of `run_finished` (job, instance, result, duration, samples), `plan_changed`, `circuit_changed` (account, target, state) and `config_reloaded` (result, error), each `data` a JSON object with `time`. A comment line is sent every 15 seconds to keep proxies from closing the stream. Slow clients lose events rather than slowing the collector: the UI refetches what it shows on every event and polls every 15 seconds when the stream is down.
-- **Debug.** With `settings.server.debug.enabled`, the collector keeps, per job instance and in memory only, the pages of its last run (status, the `Content-Type` and quota headers, the body truncated to `maxBodyBytes`) and the samples it produced. Bodies go through the log redactor, so configured secrets and tokens never appear. Without it, the endpoint answers `404` with the code `debug_disabled`.
+- **Events.** `GET /api/v1/events` is a Server-Sent Events stream of `run_finished` (job, instance, result, duration, samples, and the sentence of its problem when it did not succeed), `plan_changed`, `circuit_changed` (account, target, state) and `config_reloaded` (result, error), each `data` a JSON object with `time`. A comment line is sent every 15 seconds to keep proxies from closing the stream. Slow clients lose events rather than slowing the collector: the UI refetches what it shows on every event and polls every 15 seconds when the stream is down.
+- **Debug.** With `settings.server.debug.enabled`, the collector keeps, per job instance and in memory only, the pages of its last run (status, the `Content-Type` and quota headers, the body truncated to `maxBodyBytes`), the response that failed, and the samples it produced. Bodies go through the log redactor, so configured secrets and tokens never appear. Without it, the endpoint answers `404` with the code `debug_disabled`.
 - **Look.** The colors, fonts and shapes follow tapyr.eu: background `#f2f8fb` / `#0b1824`, surface `#ffffff` / `#102335`, ink `#0f2a3f` / `#e4f1f7`, cyan `#3aa9d6` / `#5cc3ea`, sun `#ffc845` / `#ffd166`, red `#cc2f35` / `#ff7a7a`; Bricolage Grotesque for titles, JetBrains Mono for data. States always carry a word or an icon next to their color.
