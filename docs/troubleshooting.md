@@ -20,10 +20,11 @@ config.yaml:8:5: spec.secrets.apiKey: environment variable TAPYR_EXAMPLE_API_KEY
 configuration is invalid: 1 error
 ```
 
-- **Unknown field, wrong type.** Check the field in the [configuration reference](reference/README.md). Editors catch these as you type with the JSON Schema (see the reference for the `yaml-language-server` line).
-- **Unknown template or provider.** `tapyr provider list` shows the packages Tapyr knows; user packages need `settings.providerPaths`, and each package README lists its templates.
+- **Unknown field, wrong type.** The message suggests the closest field when there is one (`unknown field "intervall" (did you mean "interval"?)`); the [configuration reference](reference/README.md) has them all. Editors catch these as you type with the JSON Schema (see the reference for the `yaml-language-server` line).
+- **Unknown template, provider, account, output, param or secret.** The message suggests the closest name when there is one (`unknown provider "meraki" (did you mean "meraki-dashboard"?)`). `tapyr provider list` shows the packages Tapyr knows; user packages need `settings.providerPaths`, and each package README lists its templates, params and secrets. A missing param or secret comes with the description its provider gives.
+- **Invalid YAML.** Most of these are indentation: the message says which line is indented more or less than the keys around it, and where to align it. YAML takes spaces, never tabs. A key followed by nothing (`secrets:`) whose fields are not indented under it is reported as empty.
 - **A secret is not set.** `--check-secrets` checks that every referenced environment variable or file exists and is not empty. Without it, `validate` checks the configuration only, which suits a CI without the secrets.
-- **Nothing is collected and no error.** `configuration is valid: ... 0 accounts, 0 jobs` means the paths contain no document: check `--config` (files must end in `.yaml` or `.yml`, hidden files are skipped).
+- **Nothing is collected and no error.** `configuration is valid: 0 accounts, 0 jobs, 0 outputs` means the paths contain no document: check `--config` (files must end in `.yaml` or `.yml`, hidden files are skipped).
 - **A job never runs.** `warning: job "..." is not collected: no output keeps its metrics` means the processing rules of every output receiving it drop all its metrics by name, so Tapyr makes no API call for it ([Sending less to an output](outputs.md#sending-less-to-an-output)). Change the rules, route the job to another output, or set `settings.collection.skipUnconsumed: false`.
 
 ## Tapyr does not start
@@ -36,7 +37,7 @@ configuration is invalid: 1 error
 
 - **First runs are spread.** Jobs start at a random point within the first 10% of their interval (`settings.collection.jitter`), so that a restart does not fire every request at once: a job polled every hour may wait up to 6 minutes for its first run.
 - **Discovery comes first.** A fan-out job waits for the first run of its parents (organizations, then networks...). A newly discovered instance runs first within the jitter of its interval, then at its own point of the interval, so that a thousand networks never fire at once: with the default jitter, each level of the chain adds at most a tenth of its interval. After that, the inventory is cached and restarts no longer wait. The Graph page of the UI shows the chain.
-- **No output.** `/metrics` serves the samples only with a `prometheus` output; push outputs deliver to their backend (see [their troubleshooting](#samples-do-not-reach-the-backend)).
+- **No output.** Without any Output document, `validate`, `plan` and `run` warn and show the smallest one to add: the jobs run, but their metrics go nowhere. `/metrics` serves the samples only with a `prometheus` output; push outputs deliver to their backend (see [their troubleshooting](#samples-do-not-reach-the-backend)).
 - **The job fails.** Open it in the UI, or `GET /api/v1/jobs/<name>/runs`: every run has its result and its error.
 
 ## Authentication fails (401, 403)

@@ -1,0 +1,2 @@
+testdata/invalid/indentation-empty.yaml:6:11: spec.secrets: is empty: its fields must be indented under it (more than this key)
+testdata/invalid/indentation-empty.yaml:7:3: spec.apiKey: unknown field "apiKey"

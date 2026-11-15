@@ -40,6 +40,7 @@ func newRunCmd(e *env, flags *globalFlags) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			warnNoOutput(e, cfg)
 			// Compile once to report every problem (secrets included) before
 			// touching the state store, then again with the credential salt.
 			// Secrets are compiled twice at startup: short ones are counted
@@ -86,7 +87,13 @@ func newRunCmd(e *env, flags *globalFlags) *cobra.Command {
 			c, err := collector.New(collector.Options{
 				Clock: e.clock, Listen: e.listen, Store: store, Logger: logger, Redactor: redactor, Secrets: secrets,
 				Salt: salt, InstanceID: instance, StateKey: e.getenv("TAPYR_STATE_KEY"), Plugins: plugins.Builtin(),
-				Load: func() (*config.Config, error) { return loadConfig(e, flags) },
+				Load: func() (*config.Config, error) {
+					cfg, err := loadConfig(e, flags)
+					if err == nil {
+						warnNoOutput(e, cfg)
+					}
+					return cfg, err
+				},
 				Compile: func(cfg *config.Config, opts runtime.Options) (*runtime.Graph, error) {
 					return compileGraph(e, cfg, opts)
 				},

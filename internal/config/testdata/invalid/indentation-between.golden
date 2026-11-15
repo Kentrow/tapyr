@@ -1,0 +1,1 @@
+testdata/invalid/indentation-between.yaml:6:2: invalid YAML: line 6 is indented between two levels (column 2): align it with line 5 (column 3) or with line 4 (column 1)

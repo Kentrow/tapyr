@@ -464,3 +464,43 @@ spec:
 		t.Errorf("warnings = %q", got)
 	}
 }
+
+func TestIndentationHint(t *testing.T) {
+	for _, tc := range []struct {
+		name, data   string
+		line         int
+		message      string
+		wantLine     int
+		wantColumn   int
+		wantContains string
+	}{
+		{
+			name: "deeper after a blank line and a comment", data: "spec:\n  provider: x\n\n  # the secrets\n   secrets: {}\n", line: 2,
+			message: "mapping value is not allowed in this context", wantLine: 5, wantColumn: 4,
+			wantContains: `line 5 is indented more than line 2 above it (column 4, not 3), whose key "provider" already has a value`,
+		},
+		{
+			name: "between two levels", data: "spec:\n  provider: x\n secrets: {}\n", line: 3,
+			message: "value is not allowed in this context", wantLine: 3, wantColumn: 2,
+			wantContains: "align it with line 2 (column 3) or with line 1 (column 1)",
+		},
+		{name: "tab", data: "spec:\n\tprovider: x\n", line: 2, message: "found character '\t' that cannot start any token", wantLine: 2, wantColumn: 1, wantContains: "tabs"},
+		{name: "a block scalar is indented more", data: "spec:\n  text: |\n    line\n", line: 2, message: "something else"},
+		{name: "an anchor is indented more", data: "spec:\n  base: &base\n    a: 1\n", line: 2, message: "something else"},
+		{name: "no indentation mistake", data: "spec:\n  a: [1, 2\n", line: 2, message: "sequence end token ']' not found"},
+		{name: "line out of range", data: "a: 1\n", line: 9, message: "x"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			line, column, hint := indentationHint([]byte(tc.data), tc.line, tc.message)
+			if tc.wantContains == "" {
+				if hint != "" {
+					t.Errorf("hint = %q, want none", hint)
+				}
+				return
+			}
+			if line != tc.wantLine || column != tc.wantColumn || !strings.Contains(hint, tc.wantContains) {
+				t.Errorf("indentationHint() = %d:%d %q", line, column, hint)
+			}
+		})
+	}
+}

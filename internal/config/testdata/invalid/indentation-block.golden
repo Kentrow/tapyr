@@ -1,0 +1,2 @@
+testdata/invalid/indentation-block.yaml:7:3: spec.description: unknown field "description"
+testdata/invalid/indentation-block.yaml:10:3: spec.intervall: unknown field "intervall" (did you mean "interval"?)

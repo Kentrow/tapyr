@@ -1,0 +1,11 @@
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: demo }
+spec:
+  provider: example-sim
+  secrets: { apiKey: { env: TAPYR_EXAMPLE_API_KEY } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: devices }
+spec: { account: demo, template: example-sim-devices }

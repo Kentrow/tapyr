@@ -60,6 +60,7 @@ func newPlanCmd(e *env, flags *globalFlags) *cobra.Command {
 				return err
 			}
 			warnNotCollected(e, graph)
+			warnNoOutput(e, cfg)
 			engine, err := newEngine(e, cfg, graph)
 			if err != nil {
 				return &exitError{code: exitFailure, err: err}

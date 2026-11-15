@@ -307,7 +307,7 @@ func (c *checker) checkSecretRef(a at, v Value, p *Provider) {
 			return
 		}
 	}
-	c.errorf(a, "secret %q is not declared in provider %q", v.Secret, p.Metadata.Name)
+	c.errorf(a, "secret %q is not declared in provider %q%s", v.Secret, p.Metadata.Name, didYouMean(v.Secret, paramNames(p.Spec.Secrets)))
 }
 
 func (c *checker) checkPagination(a at, p *Pagination) {
@@ -332,7 +332,7 @@ func (c *checker) checkTemplate(t *JobTemplate) {
 	base := loc(t.Source, "spec")
 	p, ok := c.providers[string(t.Spec.Provider)]
 	if !ok {
-		c.errorf(base.child("provider"), "unknown provider %q", t.Spec.Provider)
+		c.errorf(base.child("provider"), "unknown provider %q%s", t.Spec.Provider, didYouMean(string(t.Spec.Provider), sortedKeys(c.providers)))
 	}
 	if t.Spec.ForEach != nil && t.Spec.ForEach.Job != "" {
 		c.errorf(base.child("forEach", "job"), "forEach.job is only allowed in inline jobs; use forEach.template")
@@ -356,7 +356,7 @@ func (c *checker) checkDefinition(base at, d *JobDefinition, p *Provider) {
 			parent, ok := c.templates[string(fe.Template)]
 			switch {
 			case !ok:
-				c.errorf(fa.child("template"), "unknown job template %q", fe.Template)
+				c.errorf(fa.child("template"), "unknown job template %q%s", fe.Template, didYouMean(string(fe.Template), c.templatesOf(p)))
 			case p != nil && parent.Spec.Provider != p.Metadata.Name:
 				c.errorf(fa.child("template"), "parent template %q belongs to provider %q, not %q",
 					fe.Template, parent.Spec.Provider, p.Metadata.Name)
@@ -497,7 +497,7 @@ func (c *checker) checkAccount(acc *Account) {
 	base := loc(acc.Source, "spec")
 	p, ok := c.providers[string(acc.Spec.Provider)]
 	if !ok {
-		c.errorf(base.child("provider"), "unknown provider %q", acc.Spec.Provider)
+		c.errorf(base.child("provider"), "unknown provider %q%s", acc.Spec.Provider, didYouMean(string(acc.Spec.Provider), sortedKeys(c.providers)))
 		return
 	}
 	targetNames := map[Name]bool{}
@@ -521,16 +521,17 @@ func (c *checker) checkAccount(acc *Account) {
 		for _, d := range f.declared {
 			declared[string(d.Name)] = true
 		}
+		hint := func(k string) string { return didYouMean(k, paramNames(f.declared)) }
 		singular := strings.TrimSuffix(f.kind, "s")
 		for _, k := range f.account {
 			if !declared[k] {
-				c.errorf(base.child(f.kind, k), "%s %q is not declared by provider %q", singular, k, p.Metadata.Name)
+				c.errorf(base.child(f.kind, k), "%s %q is not declared by provider %q%s", singular, k, p.Metadata.Name, hint(k))
 			}
 		}
 		for i, t := range acc.Spec.Targets {
 			for _, k := range f.target(t) {
 				if !declared[k] {
-					c.errorf(base.child("targets", strconv.Itoa(i), f.kind, k), "%s %q is not declared by provider %q", singular, k, p.Metadata.Name)
+					c.errorf(base.child("targets", strconv.Itoa(i), f.kind, k), "%s %q is not declared by provider %q%s", singular, k, p.Metadata.Name, hint(k))
 				}
 			}
 		}
@@ -539,13 +540,13 @@ func (c *checker) checkAccount(acc *Account) {
 				continue
 			}
 			if len(acc.Spec.Targets) == 0 {
-				c.errorf(base, "missing required %s %q (declared by provider %q)", singular, d.Name, p.Metadata.Name)
+				c.errorf(base, "missing required %s %q (declared by provider %q%s)", singular, d.Name, p.Metadata.Name, described(d))
 				continue
 			}
 			for i, t := range acc.Spec.Targets {
 				if !slices.Contains(f.target(t), string(d.Name)) {
-					c.errorf(base.child("targets", strconv.Itoa(i)), "missing required %s %q for target %q (declared by provider %q)",
-						singular, d.Name, t.Name, p.Metadata.Name)
+					c.errorf(base.child("targets", strconv.Itoa(i)), "missing required %s %q for target %q (declared by provider %q%s)",
+						singular, d.Name, t.Name, p.Metadata.Name, described(d))
 				}
 			}
 		}
@@ -557,7 +558,7 @@ func (c *checker) checkJob(j *Job) {
 	spec := &j.Spec
 	acc, accOK := c.accounts[string(spec.Account)]
 	if !accOK {
-		c.errorf(base.child("account"), "unknown account %q", spec.Account)
+		c.errorf(base.child("account"), "unknown account %q%s", spec.Account, didYouMean(string(spec.Account), sortedKeys(c.accounts)))
 	}
 	var p *Provider
 	if accOK {
@@ -565,7 +566,7 @@ func (c *checker) checkJob(j *Job) {
 	}
 	for i, o := range spec.Outputs {
 		if _, ok := c.outputs[string(o)]; !ok {
-			c.errorf(base.child("outputs", strconv.Itoa(i)), "unknown output %q", o)
+			c.errorf(base.child("outputs", strconv.Itoa(i)), "unknown output %q%s", o, didYouMean(string(o), sortedKeys(c.outputs)))
 		}
 	}
 	if spec.Interval != 0 && spec.Interval.Std() <= 0 {
@@ -578,7 +579,7 @@ func (c *checker) checkJob(j *Job) {
 		}
 		t, ok := c.templates[string(spec.Template)]
 		if !ok {
-			c.errorf(base.child("template"), "unknown job template %q", spec.Template)
+			c.errorf(base.child("template"), "unknown job template %q%s", spec.Template, didYouMean(string(spec.Template), c.templatesOf(p)))
 			return
 		}
 		if p != nil && t.Spec.Provider != p.Metadata.Name {
@@ -598,7 +599,7 @@ func (c *checker) checkJob(j *Job) {
 		parent, ok := c.jobs[string(fe.Job)]
 		switch {
 		case !ok:
-			c.errorf(base.child("forEach", "job"), "unknown job %q", fe.Job)
+			c.errorf(base.child("forEach", "job"), "unknown job %q%s", fe.Job, didYouMean(string(fe.Job), sortedKeys(c.jobs)))
 		case parent.Spec.Account != spec.Account:
 			c.errorf(base.child("forEach", "job"), "parent job %q collects for account %q, not %q",
 				fe.Job, parent.Spec.Account, spec.Account)
@@ -744,7 +745,7 @@ func (c *checker) checkSettings(s *Settings) {
 	spec := &s.Spec
 	for i, o := range spec.SelfMetrics.Outputs {
 		if _, ok := c.outputs[string(o)]; !ok {
-			c.errorf(base.child("selfMetrics", "outputs", strconv.Itoa(i)), "unknown output %q", o)
+			c.errorf(base.child("selfMetrics", "outputs", strconv.Itoa(i)), "unknown output %q%s", o, didYouMean(string(o), sortedKeys(c.outputs)))
 		}
 	}
 	percentRange := func(a at, p *Percent, maxFraction float64) {
@@ -849,4 +850,34 @@ func (c *checker) checkDiscovery() {
 			check(node{KindJob, string(j.Metadata.Name)}, loc(j.Source, "spec", "forEach"))
 		}
 	}
+}
+
+// templatesOf returns the names of the job templates of a provider, or of
+// every provider when it is unknown: the candidates of a "did you mean".
+func (c *checker) templatesOf(p *Provider) []string {
+	var out []string
+	for name, t := range c.templates {
+		if p == nil || t.Spec.Provider == p.Metadata.Name {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// paramNames returns the names of declared params or secrets.
+func paramNames(specs []ParamSpec) []string {
+	out := make([]string, 0, len(specs))
+	for _, s := range specs {
+		out = append(out, string(s.Name))
+	}
+	return out
+}
+
+// described adds the description a provider declares for a param or a
+// secret to the message that asks for it.
+func described(d ParamSpec) string {
+	if d.Description == "" {
+		return ""
+	}
+	return ": " + strings.TrimSuffix(d.Description, ".")
 }

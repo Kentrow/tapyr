@@ -149,7 +149,26 @@ func TestCLI(t *testing.T) {
 			name:       "validate examples",
 			args:       []string{"validate", "--config", examples},
 			wantCode:   exitOK,
-			wantStdout: []string{"configuration is valid: ", " job templates, 1 account, 3 jobs, 1 output"},
+			wantStdout: []string{"configuration is valid: 1 account, 3 jobs, 1 output (", " job templates available)"},
+		},
+		{
+			name:     "validate names the fix of typical mistakes",
+			args:     []string{"validate", "--config", filepath.Join("testdata", "typos.yaml")},
+			wantCode: exitInvalidConfig,
+			wantStderr: []string{
+				`spec.provider: unknown provider "meraki" (did you mean "meraki-dashboard"?)`,
+				`spec.secrets.token: secret "token" is not declared by provider "juniper-mist" (did you mean "apiToken"?)`,
+				`spec: missing required param "orgId" (declared by provider "juniper-mist": Organization ID (Organization > Settings in the Mist portal))`,
+				`spec.template: unknown job template "example-sim-device" (did you mean "example-sim-devices"?)`,
+			},
+		},
+		{
+			name:       "validate warns about a configuration without output",
+			env:        map[string]string{"TAPYR_EXAMPLE_API_KEY": "sim-api-key"},
+			args:       []string{"validate", "--config", filepath.Join("testdata", "no-output.yaml")},
+			wantCode:   exitOK,
+			wantStdout: []string{"configuration is valid: 1 account, 1 job, 0 outputs"},
+			wantStderr: []string{"warning: no Output document: the jobs run and spend quota, but their metrics go nowhere", "  kind: Output\n  metadata: { name: prometheus }"},
 		},
 		{
 			name:       "validate reads TAPYR_CONFIG as a path list",

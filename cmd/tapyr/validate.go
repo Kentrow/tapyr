@@ -39,6 +39,7 @@ func newValidateCmd(e *env, flags *globalFlags) *cobra.Command {
 				return err
 			}
 			warnNotCollected(e, graph)
+			warnNoOutput(e, cfg)
 			if checkSecrets {
 				diags := config.CheckSecrets(cfg, config.SecretSource{LookupEnv: e.lookupEnv, ReadFile: os.ReadFile})
 				if len(diags) > 0 {
@@ -146,10 +147,29 @@ func invalidConfig(e *env, diags config.Diagnostics) error {
 	return &exitError{code: exitInvalidConfig, silent: true, err: diags}
 }
 
+// summary counts what the configuration of the user declares first, then
+// the provider packages it can draw on (built in, or from provider paths).
 func summary(cfg *config.Config) string {
-	return fmt.Sprintf("%s, %s, %s, %s, %s",
-		plural(len(cfg.Providers), "provider"), plural(len(cfg.JobTemplates), "job template"),
-		plural(len(cfg.Accounts), "account"), plural(len(cfg.Jobs), "job"), plural(len(cfg.Outputs), "output"))
+	return fmt.Sprintf("%s, %s, %s (%s and %s available)",
+		plural(len(cfg.Accounts), "account"), plural(len(cfg.Jobs), "job"), plural(len(cfg.Outputs), "output"),
+		plural(len(cfg.Providers), "provider package"), plural(len(cfg.JobTemplates), "job template"))
+}
+
+// warnNoOutput warns about a configuration that collects but declares no
+// output: the jobs run and spend quota, and their metrics go nowhere. The
+// warning gives the smallest output to copy.
+func warnNoOutput(e *env, cfg *config.Config) {
+	if len(cfg.Outputs) > 0 || len(cfg.Jobs) == 0 {
+		return
+	}
+	fmt.Fprint(e.stderr, `warning: no Output document: the jobs run and spend quota, but their metrics go nowhere (/metrics answers 404). Add one, for example:
+
+  apiVersion: tapyr/v1alpha1
+  kind: Output
+  metadata: { name: prometheus }
+  spec: { type: prometheus }
+
+`)
 }
 
 func plural(n int, noun string) string {

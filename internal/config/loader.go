@@ -55,13 +55,16 @@ func (c *Config) add(doc envelope) {
 // Loader loads configuration documents. It is safe for concurrent use.
 type Loader struct {
 	schemas map[Kind]*jsonschema.Schema
+	// docs are the schema documents by URL, to name the fields a schema
+	// allows (propertyNames).
+	docs map[string]any
 }
 
 // NewLoader compiles the embedded JSON Schemas.
 func NewLoader() (*Loader, error) {
 	c := jsonschema.NewCompiler()
 	c.AssertFormat()
-	l := &Loader{schemas: make(map[Kind]*jsonschema.Schema, len(allKinds))}
+	l := &Loader{schemas: make(map[Kind]*jsonschema.Schema, len(allKinds)), docs: map[string]any{}}
 	for _, k := range allKinds {
 		b, err := fs.ReadFile(schemas.V1alpha1, "v1alpha1/"+SchemaFile(k))
 		if err != nil {
@@ -72,6 +75,7 @@ func NewLoader() (*Loader, error) {
 			return nil, fmt.Errorf("parsing embedded %s schema: %w", k, err)
 		}
 		url := SchemaBaseURL + SchemaFile(k)
+		l.docs[url] = doc
 		if err := c.AddResource(url, doc); err != nil {
 			return nil, fmt.Errorf("adding %s schema: %w", k, err)
 		}
@@ -245,7 +249,7 @@ func fileError(err error) string {
 func (l *Loader) parseDocuments(file string, data []byte, allowed map[Kind]bool) ([]envelope, Diagnostics) {
 	f, err := parser.ParseBytes(data, 0)
 	if err != nil {
-		return nil, Diagnostics{yamlDiagnostic(file, err)}
+		return nil, Diagnostics{yamlDiagnostic(file, data, err)}
 	}
 	var docs []envelope
 	var diags Diagnostics
@@ -279,13 +283,70 @@ func (l *Loader) parseDocuments(file string, data []byte, allowed map[Kind]bool)
 	return docs, diags
 }
 
-func yamlDiagnostic(file string, err error) Diagnostic {
+func yamlDiagnostic(file string, data []byte, err error) Diagnostic {
 	var ye yaml.Error
 	if errors.As(err, &ye) && ye.GetToken() != nil {
 		p := ye.GetToken().Position
-		return Diagnostic{Pos: Position{File: file, Line: p.Line, Column: p.Column}, Message: "invalid YAML: " + ye.GetMessage()}
+		d := Diagnostic{Pos: Position{File: file, Line: p.Line, Column: p.Column}, Message: "invalid YAML: " + ye.GetMessage()}
+		if line, column, hint := indentationHint(data, p.Line, ye.GetMessage()); hint != "" {
+			d.Pos.Line, d.Pos.Column, d.Message = line, column, "invalid YAML: "+hint
+		}
+		return d
 	}
 	return Diagnostic{Pos: Position{File: file}, Message: "invalid YAML: " + err.Error()}
+}
+
+// indentationHint says what is wrong with the indentation around a YAML
+// error, the most frequent cause of the messages of the parser, which do
+// not say it: a tab, a line indented more than the keys above it while
+// the key above has a value, or a line between two levels. It returns the
+// line and column to point to and the message, or "" when the lines do
+// not show an indentation mistake.
+func indentationHint(data []byte, line int, message string) (int, int, string) {
+	lines := strings.Split(string(data), "\n")
+	if strings.Contains(message, "'\t'") || strings.Contains(message, "\t") {
+		return line, 1, "YAML does not allow tabs to indent: use spaces"
+	}
+	if line < 1 || line > len(lines) {
+		return 0, 0, ""
+	}
+	indent := func(s string) int { return len(s) - len(strings.TrimLeft(s, " ")) }
+	blank := func(s string) bool { t := strings.TrimSpace(s); return t == "" || strings.HasPrefix(t, "#") }
+	// previous returns the nearest line above i (0-based) with content.
+	previous := func(i int) int {
+		i--
+		for i >= 0 && blank(lines[i]) {
+			i--
+		}
+		return i
+	}
+	at := line - 1
+	// A key with a value, followed by a line indented more: the line
+	// continues nothing, it was meant as a sibling.
+	if key, value, ok := strings.Cut(strings.TrimSpace(lines[at]), ":"); ok && key != "" && strings.TrimSpace(value) != "" &&
+		!strings.ContainsAny(strings.TrimSpace(value)[:1], "|>&") {
+		next := at + 1
+		for next < len(lines) && blank(lines[next]) {
+			next++
+		}
+		if next < len(lines) && indent(lines[next]) > indent(lines[at]) {
+			return next + 1, indent(lines[next]) + 1, fmt.Sprintf("line %d is indented more than line %d above it (column %d, not %d), whose key %q already has a value: align it with the keys above",
+				next+1, line, indent(lines[next])+1, indent(lines[at])+1, key)
+		}
+	}
+	// A line between two levels: less indented than the line above, more
+	// than the mapping that holds it.
+	if prev := previous(at); prev >= 0 && indent(lines[at]) < indent(lines[prev]) {
+		parent := previous(prev)
+		for parent >= 0 && indent(lines[parent]) >= indent(lines[prev]) {
+			parent = previous(parent)
+		}
+		if parent >= 0 && indent(lines[at]) > indent(lines[parent]) {
+			return line, indent(lines[at]) + 1, fmt.Sprintf("line %d is indented between two levels (column %d): align it with line %d (column %d) or with line %d (column %d)",
+				line, indent(lines[at])+1, prev+1, indent(lines[prev])+1, parent+1, indent(lines[parent])+1)
+		}
+	}
+	return 0, 0, ""
 }
 
 func treeDiagnostic(file string, err error) Diagnostic {
@@ -351,7 +412,7 @@ func (l *Loader) decode(d *rawDocument) (envelope, Diagnostics) {
 	if err := l.schemas[d.kind].Validate(any(d.tree)); err != nil {
 		var ve *jsonschema.ValidationError
 		if errors.As(err, &ve) {
-			return nil, schemaDiagnostics(ve, d.index)
+			return nil, schemaDiagnostics(ve, d.index, l.propertyNames)
 		}
 		return nil, Diagnostics{{Pos: d.index.position(nil, false), Message: err.Error()}}
 	}
@@ -377,4 +438,31 @@ func quoteAny(v any) string {
 	}
 	b, _ := json.Marshal(v)
 	return string(b)
+}
+
+// propertyNames returns the fields allowed by the object schema at a
+// schema URL (a document and a JSON pointer, as the validator reports
+// them), sorted, or nil when there is none.
+func (l *Loader) propertyNames(schemaURL string) []string {
+	base, pointer, _ := strings.Cut(schemaURL, "#")
+	node := l.docs[base]
+	for token := range strings.SplitSeq(strings.TrimPrefix(pointer, "/"), "/") {
+		if token == "" {
+			continue
+		}
+		m, ok := node.(map[string]any)
+		if !ok {
+			return nil
+		}
+		token = strings.NewReplacer("~1", "/", "~0", "~").Replace(token)
+		node = m[token]
+	}
+	m, _ := node.(map[string]any)
+	props, _ := m["properties"].(map[string]any)
+	out := make([]string, 0, len(props))
+	for name := range props {
+		out = append(out, name)
+	}
+	slices.Sort(out)
+	return out
 }
