@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
 import { QuotaTimeline } from "../components/QuotaTimeline";
-import { absolute, count, duration, plural, scopeAccounts, since } from "../lib/format";
+import { absolute, count, duration, limitSummary, limitTitle, plural, scopeAccounts, scopeWords, since, sourceWords } from "../lib/format";
 import { useJSON, useList, useNow } from "../lib/live";
 import { useRoute } from "../lib/router";
 import type { Budget, Timeline } from "../lib/types";
@@ -19,7 +19,7 @@ export function Budgets() {
   }
   return (
     <>
-      <PageHead title="Budgets" sub="Every limit of every provider, per scope: quotas over their window, rates and concurrency now." />
+      <PageHead title="Budgets" sub="Every limit of every provider, per scope: quotas over their window, rates and concurrency now. The limits come from the provider definitions, each with its source." />
       {[...groups.entries()].map(([provider, list]) => (
         <section className="section" key={provider}>
           <h2>{provider}</h2>
@@ -42,15 +42,21 @@ function BudgetCard({ budget: b, focused }: { budget: Budget; focused: boolean }
   }, [focused]);
   return (
     <div className="card" ref={ref} style={focused ? { outline: "3px solid var(--cyan)" } : undefined}>
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <h3>
-          {b.limit} <span className="muted small">{b.kind}</span>
-        </h3>
+      <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div>
+          <h3 style={{ marginBottom: 2 }} title={`${b.provider}/${b.limit} (${b.kind}) in the provider definition`}>{limitTitle(b.limit)}</h3>
+          <div className="small">
+            {limitSummary(b)}, <span title={b.scope}>for {scopeWords(b.scope)}</span>
+            {(b.accounts ?? []).length > 0 && !b.scope.split(",").some((d) => d.startsWith("account=")) && <span className="muted"> ({plural(b.accounts.length, "account")}: {scopeAccounts(b)})</span>}
+          </div>
+        </div>
         <BudgetState budget={b} />
       </div>
-      <div className="muted small" style={{ marginBottom: 10 }}>
-        <span className="mono">{b.scope}</span>
-        {(b.accounts ?? []).length > 0 && !b.scope.split(",").some((d) => d.startsWith("account=")) && <>, {plural(b.accounts.length, "account")}: {scopeAccounts(b)}</>}
+      <div className="limit-about small muted">
+        {b.description && <div>{b.description}</div>}
+        <div>
+          Source: {b.source?.url ? <a href={b.source.url} target="_blank" rel="noreferrer">{sourceWords(b.source)}</a> : sourceWords(b.source)}
+        </div>
       </div>
       {b.kind === "quota" ? <QuotaBody budget={b} /> : b.kind === "rate" ? <RateBody budget={b} /> : <ConcurrencyBody budget={b} />}
     </div>
@@ -61,9 +67,26 @@ function BudgetState({ budget: b }: { budget: Budget }) {
   const now = useNow();
   const penalty = b.penalty_until && Date.parse(b.penalty_until) > now;
   if (penalty) return <Badge state="failing">rate limited until {since(b.penalty_until)}</Badge>;
-  if (b.kind === "quota" && b.exhaustion_eta_seconds !== undefined) return <Badge state="failing">exhausted in {duration(b.exhaustion_eta_seconds)}</Badge>;
-  if (b.limit_mismatch) return <Badge state="degraded">headers disagree</Badge>;
+  if (b.kind === "quota" && b.exhaustion_eta_seconds !== undefined) return <span title="At the pace of the consumption so far, others included"><Badge state="failing">runs out in {duration(b.exhaustion_eta_seconds)}</Badge></span>;
+  if (b.limit_mismatch) return <span title="The quota headers announce another maximum than the provider definition: Tapyr follows the headers."><Badge state="degraded">the API reports another maximum</Badge></span>;
   return <Badge state="ok">ok</Badge>;
+}
+
+// help explains the figures of a quota card, for the people who do not
+// know the budget engine.
+export const help = {
+  limit: "The maximum of the window: declared by the provider definition, or learned from the quota headers of the responses.",
+  used: "The calls Tapyr made in this window.",
+  others: "The calls of other clients of the same quota (the vendor UI, scripts, other integrations): what the provider counts, minus what Tapyr made. Known only when the API sends quota headers.",
+  remaining: "What is left in this window, as Tapyr counts it.",
+  observed: "What is left as the API reports it in its quota headers. Tapyr spends no more than the lower of both.",
+  reserve: "Calls kept for retries and critical jobs: the planner leaves them out, so that a retry never finds the quota empty.",
+};
+
+// Help marks a term that has an explanation: dotted underline, the text as
+// a tooltip and for screen readers.
+function Help({ text, children }: { text: string; children: React.ReactNode }) {
+  return <abbr className="help" title={text}>{children}</abbr>;
 }
 
 function QuotaBody({ budget: b }: { budget: Budget }) {
@@ -80,21 +103,21 @@ function QuotaBody({ budget: b }: { budget: Budget }) {
           {b.rolling ? "rolling, " : ""}
           <span title={absolute(b.window_start)}>from {since(b.window_start)}</span>, <span title={absolute(b.window_end)}>resets {since(b.window_end)}</span>
         </dd>
-        <dt>Limit</dt>
+        <dt><Help text={help.limit}>Limit</Help></dt>
         <dd className="num">
           {count(max)}
           {b.usable !== undefined && b.usable !== max && <span className="muted"> ({count(b.usable)} usable after the share)</span>}
         </dd>
-        <dt>Used by Tapyr</dt>
+        <dt><Help text={help.used}>Used by Tapyr</Help></dt>
         <dd className="num">{count(used)}</dd>
-        <dt>Used by others</dt>
+        <dt><Help text={help.others}>Used by others</Help></dt>
         <dd className="num">{b.external_usage !== undefined ? count(external) : <span className="muted">unknown (no quota headers)</span>}</dd>
-        <dt>Remaining</dt>
+        <dt><Help text={help.remaining}>Remaining</Help></dt>
         <dd className="num">
           {count(b.remaining)}
-          {b.remaining_observed !== undefined && <span className="muted"> ({count(b.remaining_observed)} reported by the API)</span>}
+          {b.remaining_observed !== undefined && <span className="muted"> (<Help text={help.observed}>{count(b.remaining_observed)} reported by the API</Help>)</span>}
         </dd>
-        <dt>Retry reserve</dt>
+        <dt><Help text={help.reserve}>Retry reserve</Help></dt>
         <dd className="num">
           {count(b.reserve_remaining)} of {count(b.reserve)}
         </dd>

@@ -229,3 +229,47 @@ export function seriesStatus(o: Pick<Output, "series" | "max_series" | "series_r
   }
   return { state: "ok", title: of, detail: "Within the series limit." };
 }
+
+// scopeWords names a scope key in words: "account demo", "account lab
+// and target eu", "each instance", "all accounts" for a provider-wide one.
+export function scopeWords(key: string): string {
+  if (!key) return "all accounts";
+  return key.split(",").map((part) => (part === "instance" ? "each instance" : part.replace("=", " "))).join(" and ");
+}
+
+// limitTitle names a limit for people: its name as the provider declares
+// it, with spaces and a capital ("account-rate" is "Account rate").
+export function limitTitle(name: string): string {
+  const words = name.replace(/[-_]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+// limitSummary says what a limit allows, in words: "10 requests per
+// second", "4 requests at once", "5,000 calls per day", "100 calls per 1h,
+// rolling".
+export function limitSummary(b: Budget): string {
+  switch (b.kind) {
+    case "rate": {
+      const rate = b.rate_per_second ?? 0;
+      return rate >= 1 || rate === 0 ? `${+rate.toFixed(2)} requests per second` : `${+(rate * 60).toFixed(2)} requests per minute`;
+    }
+    case "concurrency":
+      return `${count(b.max)} requests at once`;
+  }
+  if (b.period) return `${count(b.max)} calls per ${b.period}`;
+  const length = b.window_start && b.window_end ? (Date.parse(b.window_end) - Date.parse(b.window_start)) / 1000 : 0;
+  return `${count(b.max)} calls per ${length ? duration(length) : "window"}, rolling`;
+}
+
+// sourceWords says where the values of a limit come from.
+export function sourceWords(source: Budget["source"]): string {
+  switch (source?.kind) {
+    case "vendor-docs":
+      return "from the vendor documentation";
+    case "measured":
+      return `measured against the real API${source.date ? ` (${source.date})` : ""}`;
+    case "assumed":
+      return "assumed (the vendor documents no value)";
+  }
+  return "no source given by the provider definition";
+}

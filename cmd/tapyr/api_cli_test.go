@@ -224,6 +224,11 @@ spec:
 		if !slices.Equal(b.Accounts, want) {
 			t.Errorf("budget %s/%s %s: accounts %q, want %q", b.Provider, b.Limit, b.Scope, b.Accounts, want)
 		}
+		// What the provider definition says of the limit: every limit of
+		// example-sim is described and assumed, the daily quota per day.
+		if b.Description == "" || b.Source == nil || b.Source.Kind != "assumed" || (b.Limit == "daily") != (b.Period == "day") {
+			t.Errorf("budget %s/%s: description %q, source %+v, period %q", b.Provider, b.Limit, b.Description, b.Source, b.Period)
+		}
 		if b.Kind != "quota" {
 			continue
 		}

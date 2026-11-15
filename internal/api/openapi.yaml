@@ -451,6 +451,17 @@ components:
         tokens: { type: number }
         in_use: { type: integer }
         penalty_until: { $ref: "#/components/schemas/Time" }
+        description: { type: string, description: The description of the limit in the provider definition }
+        source:
+          type: object
+          additionalProperties: false
+          description: Where the values of the limit come from, as the provider definition says
+          required: [kind]
+          properties:
+            kind: { type: string, enum: [vendor-docs, measured, assumed] }
+            url: { type: string }
+            date: { type: string }
+        period: { type: string, enum: [minute, hour, day, week, month], description: The calendar window of a quota, absent for a rolling one }
     TimelineWindow:
       type: object
       additionalProperties: false
