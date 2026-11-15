@@ -1,8 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { count, duration, healthClass, outputHealth, plural, scopeAccounts, seriesStatus, since, toYAML, versionLabel } from "./format";
+import { count, duration, healthClass, outputHealth, plural, scopeAccounts, seriesStatus, since, toYAML, versionLabel, waitingText, waitingWord } from "./format";
 import type { Output } from "./types";
 
 describe("format", () => {
+  it("says what a job that has not run yet waits for", () => {
+    const now = Date.parse("2026-11-03T12:00:00Z");
+    expect(waitingText({ reason: "first_run", until: "2026-11-03T12:00:40Z" }, now)).toEqual({
+      short: "first run in 40s",
+      long: "Waiting for its first run, due in 40s.",
+    });
+    expect(waitingText({ reason: "first_run" }, now).short).toBe("first run soon");
+    expect(waitingText({ reason: "parent", parent: "sites", until: "2026-11-03T12:05:00Z" }, now)).toEqual({
+      short: "waiting for sites",
+      long: "Waiting for sites to list its items: one instance per item. The discovery moves on in 5m.",
+    });
+    const failing = { reason: "parent_failing" as const, parent: "sites", failing_job: "sites", error: "HTTP 401", failed_at: "2026-11-03T11:58:00Z", until: "2026-11-03T13:00:00Z" };
+    expect(waitingText(failing, now)).toEqual({
+      short: "waiting: sites fails",
+      long: "Waiting for sites, which fails: HTTP 401 (2m ago). Next try in 1h.",
+    });
+    expect(waitingText({ ...failing, parent: "networks" }, now).long).toBe("Waiting for networks, whose parent sites fails: HTTP 401 (2m ago). Next try in 1h.");
+    expect(waitingWord("parent_failing")).toBe("waiting, parent failing");
+    expect(waitingWord(undefined)).toBe("no run yet");
+  });
   it("says how an output stands against its series limit", () => {
     const o = { series: 950, series_refused: 0, samples_refused: 0 };
     expect(seriesStatus(o)).toMatchObject({ state: "none", title: "950 series" });

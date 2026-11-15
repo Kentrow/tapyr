@@ -2,8 +2,12 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import { Icon } from "./Icon";
 import { healthClass } from "../lib/format";
 
+// stateWord is the word of a state. The health "unknown" means that no run
+// has happened yet: the word says so, since nothing is wrong.
+const stateWord = (state: string | undefined) => (!state || state === "unknown" ? "no run yet" : state.replace(/_/g, " "));
+
 export function Badge({ state, children }: { state: string | undefined; children?: ReactNode }) {
-  return <span className={`badge ${healthClass(state)}`}>{children ?? (state || "unknown").replace(/_/g, " ")}</span>;
+  return <span className={`badge ${healthClass(state)}`}>{children ?? stateWord(state)}</span>;
 }
 
 const marks = { ok: "✓", warn: "!", bad: "✕", idle: "?" } as const;
@@ -16,7 +20,7 @@ export function StateMark({ state }: { state: string | undefined }) {
   return (
     <span className={`mark ${cls}`}>
       <span aria-hidden="true">{marks[cls]}</span>
-      <span className="sr-only">{(state || "unknown").replace(/_/g, " ")}</span>
+      <span className="sr-only">{stateWord(state)}</span>
     </span>
   );
 }

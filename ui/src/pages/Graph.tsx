@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Badge, Failure, Loading, PageHead, Select, StateMark, useColorMode } from "../components/ui";
-import { plural } from "../lib/format";
+import { plural, waitingWord } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
 import { href } from "../lib/router";
 import type { Account, Graph as GraphT, GraphNode, Health } from "../lib/types";
@@ -17,6 +17,10 @@ type TileData = { node: GraphNode; selected: boolean; dim: boolean; compact: boo
 type GroupData = { account: string; health: Health; jobs: number; targets: number; selected: boolean; section?: boolean };
 type TileNode = Node<TileData, "tile">;
 type GroupNode = Node<GroupData, "group">;
+
+// nodeWord is the state of a node in words: its health, or, for a job that
+// has not run yet, what it waits for.
+export const nodeWord = (n: GraphNode): string => (n.health === "unknown" || n.waiting ? waitingWord(n.waiting) : n.health);
 
 function Tile({ data }: NodeProps<TileNode>) {
   const n = data.node;
@@ -35,7 +39,7 @@ function Tile({ data }: NodeProps<TileNode>) {
       </div>
       {!data.compact && (
         <div className="small muted">
-          {n.health}
+          {nodeWord(n)}
           {n.instances ? `, ${plural(n.instances, "instance")}` : ""}
         </div>
       )}
@@ -63,8 +67,13 @@ function Group({ data }: NodeProps<GroupNode>) {
 
 const nodeTypes = { tile: Tile, group: Group };
 
-const worst = (hs: Health[]): Health =>
-  hs.includes("failing") ? "failing" : hs.includes("degraded") ? "degraded" : hs.length && hs.every((h) => h === "ok") ? "ok" : "unknown";
+// worst is the health of a group of jobs: the worst of the jobs that have
+// run. The jobs that have not run yet are left out (waiting is not
+// failing); unknown when none has run.
+export const worst = (hs: Health[]): Health => {
+  const known = hs.filter((h) => h !== "unknown");
+  return known.includes("failing") ? "failing" : known.includes("degraded") ? "degraded" : known.length ? "ok" : "unknown";
+};
 
 export interface Layout {
   nodes: Node[];
@@ -181,7 +190,7 @@ export function layout(graph: GraphT, opts: Options): Layout {
       groupOf.set(j.id, gid);
       const p = parentJob(j.id);
       nodes.push({
-        id: j.id, type: "tile", parentId: gid, extent: "parent", selected: opts.selected === j.id, ariaLabel: `job ${j.label}, ${j.health}`,
+        id: j.id, type: "tile", parentId: gid, extent: "parent", selected: opts.selected === j.id, ariaLabel: `job ${j.label}, ${nodeWord(j)}`,
         position: { x: gap + (i % cols) * (tileW + gap), y: head + Math.floor(i / cols) * (tileH + gap) },
         data: { node: j, selected: opts.selected === j.id, dim: opts.match ? !opts.match(j) : false, compact: opts.compact, parent: p ? byId.get(p)?.label : undefined },
         style: { width: tileW },
@@ -371,7 +380,7 @@ export function Graph() {
             </div>
             <dl className="kv small" style={{ marginTop: 10 }}>
               <dt>Kind</dt><dd>{sel ? sel.kind : selected?.startsWith("section:") ? "provider section" : "jobs of the account"}</dd>
-              <dt>Health</dt><dd><Badge state={(sel ?? selGroup)!.health} /></dd>
+              <dt>Health</dt><dd>{sel?.kind === "job" && sel.waiting ? <Badge state="unknown">{waitingWord(sel.waiting)}</Badge> : <Badge state={(sel ?? selGroup)!.health} />}</dd>
               {sel?.instances ? (<><dt>Instances</dt><dd>{sel.instances}</dd></>) : null}
             </dl>
             {reasons.length > 0 && (
