@@ -1,0 +1,24 @@
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: fleet }
+spec: { provider: example-sim }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: prometheus }
+spec: { type: prometheus }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: devices }
+spec:
+  account: flet
+  template: example-sim-devices
+  outputs: [prometeus]
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: clients }
+spec:
+  account: nothing-close
+  template: example-sim-devices

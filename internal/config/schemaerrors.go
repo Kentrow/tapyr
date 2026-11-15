@@ -27,7 +27,9 @@ var exactlyOneOf = map[string]string{
 
 // schemaDiagnostics flattens a validation error tree into one diagnostic
 // per failing leaf, with positions and human-readable messages.
-func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex) Diagnostics {
+// properties names the fields an object schema allows, for the "did you
+// mean" of unknown fields; it may be nil.
+func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex, properties func(schemaURL string) []string) Diagnostics {
 	var out Diagnostics
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
@@ -40,7 +42,7 @@ func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex) Diagn
 			return
 		}
 		if len(e.Causes) == 0 {
-			out = append(out, leafDiagnostics(e, idx)...)
+			out = append(out, leafDiagnostics(e, idx, properties)...)
 			return
 		}
 		for _, c := range e.Causes {
@@ -51,7 +53,7 @@ func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex) Diagn
 	return out
 }
 
-func leafDiagnostics(e *jsonschema.ValidationError, idx *positionIndex) Diagnostics {
+func leafDiagnostics(e *jsonschema.ValidationError, idx *positionIndex, properties func(string) []string) Diagnostics {
 	loc := e.InstanceLocation
 	diag := func(tokens []string, preferKey bool, msg string) Diagnostic {
 		return Diagnostic{Pos: idx.position(tokens, preferKey), Path: idx.path(tokens), Message: msg}
@@ -59,8 +61,12 @@ func leafDiagnostics(e *jsonschema.ValidationError, idx *positionIndex) Diagnost
 	switch k := e.ErrorKind.(type) {
 	case *kind.AdditionalProperties:
 		out := make(Diagnostics, 0, len(k.Properties))
+		var allowed []string
+		if properties != nil {
+			allowed = properties(e.SchemaURL)
+		}
 		for _, p := range k.Properties {
-			out = append(out, diag(child(loc, p), true, fmt.Sprintf("unknown field %q", p)))
+			out = append(out, diag(child(loc, p), true, fmt.Sprintf("unknown field %q%s", p, didYouMean(p, allowed))))
 		}
 		return out
 	case *kind.Required:
@@ -72,6 +78,11 @@ func leafDiagnostics(e *jsonschema.ValidationError, idx *positionIndex) Diagnost
 	case *kind.Type:
 		if strings.HasSuffix(e.SchemaURL, "/$defs/SecretRef") {
 			return Diagnostics{diag(loc, false, "secrets are never written inline: use {env: NAME} or {file: /path}")}
+		}
+		if k.Got == "null" && slices.Contains(k.Want, "object") {
+			// "secrets:" with nothing after it: its fields were not
+			// indented under it, and appear next to it.
+			return Diagnostics{diag(loc, false, "is empty: its fields must be indented under it (more than this key)")}
 		}
 		msg := fmt.Sprintf("invalid type: got %s, want %s", k.Got, strings.Join(k.Want, " or "))
 		if slices.Contains(k.Want, "string") && (k.Got == "number" || k.Got == "integer" || k.Got == "boolean") {

@@ -1,0 +1,10 @@
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: notes }
+spec:
+  account: fleet
+  template: devices
+  description: |
+    a block scalar is indented more
+    and is no mistake
+  intervall: 5m

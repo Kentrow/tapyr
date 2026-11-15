@@ -1,0 +1,6 @@
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: demo }
+spec:
+  provider: example-sim
+ secrets: { apiKey: { env: HOME } }

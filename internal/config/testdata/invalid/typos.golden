@@ -1,0 +1,6 @@
+testdata/invalid/typos.yaml:4:19: spec.provider: unknown provider "example-sim"
+testdata/invalid/typos.yaml:15:12: spec.account: unknown account "flet" (did you mean "fleet"?)
+testdata/invalid/typos.yaml:16:13: spec.template: unknown job template "example-sim-devices"
+testdata/invalid/typos.yaml:17:13: spec.outputs[0]: unknown output "prometeus" (did you mean "prometheus"?)
+testdata/invalid/typos.yaml:23:12: spec.account: unknown account "nothing-close"
+testdata/invalid/typos.yaml:24:13: spec.template: unknown job template "example-sim-devices"
