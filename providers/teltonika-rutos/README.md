@@ -30,6 +30,8 @@ Local REST API of Teltonika routers running RutOS: system, mobile modems, interf
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 Give Tapyr the `username` and `password` of the RutOS user as secrets, and the address of each router as the `baseURL` param of its target (see `examples/rutos.yaml`).
 
 `session_login`: `POST /api/login` with the username and password answers a bearer token valid 5 minutes (`api_session_timeout`, 300 seconds by default). Tapyr keeps one session per router (`perTarget`), renews it 30 seconds before it expires and **logs the replaced session out** (`POST /api/logout`), and logs out every session when it stops: RutOS keeps sessions open after their token expires and its memory grows when a client logs in repeatedly ([Teltonika community](https://community.teltonika.lt/t/memory-leak-in-rutm52-with-rutm-r-00-07-24-1/20400)).

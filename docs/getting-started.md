@@ -2,7 +2,7 @@
 
 In about ten minutes, with the `tapyr` binary alone, you will collect metrics from a simulated API, see how Tapyr plans the quota before spending it, and watch it adapt when the quota shrinks. No vendor account, no Docker: every provider package comes with a simulator built into the binary.
 
-For the full demo with VictoriaMetrics and Grafana dashboards, see the [demo compose](../examples/compose/README.md) instead.
+To see Tapyr running first, open the public demo, [demo.tapyr.eu](https://demo.tapyr.eu). For the full demo with VictoriaMetrics and Grafana dashboards on your machine, see the [demo compose](../examples/compose/README.md) instead.
 
 ## 1. Install
 
@@ -132,7 +132,7 @@ The log lines below leave out their time stamp (`ts=...`).
 
 ```console
 $ tapyr run --config . --log-format text
-level=INFO msg="collector started" component=run address=127.0.0.1:9790 instances=2 discovered_instances=0 outputs=1 ledger_entries=0
+level=INFO msg="collector started" component=run address=127.0.0.1:9790 ui=http://127.0.0.1:9790/ui/ metrics=http://127.0.0.1:9790/metrics api=http://127.0.0.1:9790/api/v1/ instances=2 discovered_instances=0 outputs=1 ledger_entries=0
 level=INFO msg="run finished" component=run provider=example-sim account=demo job=devices instance=devices run_id=000001 requests=3 retries=0 pages=3 items=5 samples=16 deduplicated=0 mapping_errors=0 truncated=false
 ```
 
@@ -202,7 +202,7 @@ Stop Tapyr and the simulator with `Ctrl-C` when you are done; `./data` holds the
 
 ## 7. Next steps
 
-- **A real provider.** Pick a package among the [providers](providers.md#built-in-packages): its README lists the credentials it needs (read-only keys are enough, Tapyr never writes), what it collects and its limits. Replace the account of this guide with one for that provider, run `tapyr validate --check-secrets` and `tapyr plan`, then `tapyr run`.
+- **A real provider.** [Configure your accounts](configure-accounts.md) takes you from this guide to your own account. Pick a package among the [providers](providers.md#built-in-packages): its README lists the credentials it needs (read-only keys are enough, Tapyr never writes), what it collects and its limits.
 - **A time series database.** Scrape `/metrics` with Prometheus, or push with a `remote_write` or `otlp` output: see [Outputs](outputs.md).
 - **Dashboards and alerts.** Every package ships a Grafana dashboard, and Tapyr ships one of its own with [alert rules](alerts.md).
 - **Deploy.** [Install](install.md) covers the image, systemd and Kubernetes; [Operations](operations.md) covers the state store, reloads, monitoring and security.

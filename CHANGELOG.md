@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Configuration errors suggest the closest name ("did you mean"), give the description of a missing param or secret, and explain indentation mistakes. `validate`, `plan` and `run` warn about a configuration without any output.
+- `tapyr run` logs the addresses of the web UI, `/metrics` and the status API at start.
 - The Budgets page names its limits in words, with their description and source from the provider definition, and explains its figures.
 - A plan that does not fit says why and what to change, in `tapyr plan`, the web UI and the log (once per change instead of at every replan). `tapyr plan` uses plainer words.
 - Errors say what to do: a sentence, an action and a link to the troubleshooting guide, in the web UI and the status API (`problem`). The Live debug keeps the response of a failed request.

@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bytes"
+	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -50,5 +51,27 @@ func TestWarnRestartSettings(t *testing.T) {
 				t.Errorf("want one warning about %s, got: %s", tt.want, got)
 			}
 		})
+	}
+}
+
+func TestServerURLs(t *testing.T) {
+	off := false
+	for _, tc := range []struct {
+		name       string
+		addr       string
+		server     config.ServerSettings
+		prometheus bool
+		want       string
+	}{
+		{"local", "127.0.0.1:9790", config.ServerSettings{}, true, "[ui http://127.0.0.1:9790/ui/ metrics http://127.0.0.1:9790/metrics api http://127.0.0.1:9790/api/v1/]"},
+		{"wildcard, no prometheus output", "0.0.0.0:9790", config.ServerSettings{}, false, "[ui http://localhost:9790/ui/ api http://localhost:9790/api/v1/]"},
+		{"IPv6 wildcard", "[::]:9790", config.ServerSettings{}, false, "[ui http://localhost:9790/ui/ api http://localhost:9790/api/v1/]"},
+		{"IPv6", "[::1]:9790", config.ServerSettings{}, false, "[ui http://[::1]:9790/ui/ api http://[::1]:9790/api/v1/]"},
+		{"TLS, UI off", "10.0.0.1:443", config.ServerSettings{TLS: &config.ServerTLS{}, UI: config.UISettings{Enabled: &off}}, true, "[metrics https://10.0.0.1:443/metrics api https://10.0.0.1:443/api/v1/]"},
+		{"not an address", "nope", config.ServerSettings{}, true, "[]"},
+	} {
+		if got := fmt.Sprint(serverURLs(tc.addr, tc.server, tc.prometheus)); got != tc.want {
+			t.Errorf("%s: serverURLs() = %s, want %s", tc.name, got, tc.want)
+		}
 	}
 }

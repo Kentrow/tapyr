@@ -20,6 +20,8 @@ Juniper Mist cloud REST API: access points, switches and gateways (WAN edge) of 
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 Mist API tokens are sent as `Authorization: Token <key>` (the `header` auth type with `format: "Token {value}"`).
 
 1. In the Mist portal, Organization > Settings > API Token: create an **organization token** with a read-only role (Observer). It is not bound to a user and only works for its organization.
