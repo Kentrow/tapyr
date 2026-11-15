@@ -66,6 +66,33 @@ func assertNoSecrets(t *testing.T, vars map[string]string, args []string, res re
 	}
 }
 
+// TestPlanSectionsKeepTheirColumns is a regression test: the outputs
+// section of tapyr plan shared the columns of the quota table, so the long
+// list of jobs not measured yet widened every column of it.
+func TestPlanSectionsKeepTheirColumns(t *testing.T) {
+	res := execute(t, nil, "plan", "--config", examples)
+	if res.code != exitOK {
+		t.Fatalf("plan exited with %d: %s", res.code, res.stderr)
+	}
+	header, _, _ := strings.Cut(res.stdout, "\n")
+	if !strings.HasPrefix(header, "QUOTA SCOPE") || len(strings.TrimRight(header, " ")) > 110 {
+		t.Errorf("quota table header is %d characters wide:\n%s", len(header), res.stdout)
+	}
+	for line := range strings.SplitSeq(res.stdout, "\n") {
+		if len(line) > 120 {
+			t.Errorf("line of %d characters:\n%s", len(line), line)
+		}
+	}
+}
+
+func TestWrapList(t *testing.T) {
+	got := wrapList("  prom: ", []string{"demo-devices", "demo-network-devices", "demo-sites", "demo.example-sim-networks"}, 50)
+	want := "  prom: demo-devices, demo-network-devices,\n        demo-sites, demo.example-sim-networks\n"
+	if got != want {
+		t.Errorf("wrapList:\n%q\nwant\n%q", got, want)
+	}
+}
+
 func TestCLI(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -227,10 +254,15 @@ func TestCLI(t *testing.T) {
 			wantStderr: []string{"provider path ./providers/example"},
 		},
 		{
-			name:       "plan examples",
-			args:       []string{"plan", "--config", examples},
-			wantCode:   exitOK,
-			wantStdout: []string{"example-sim/daily", "account=demo", "job demo-devices", "desired 2m", "effective 2m", "720 runs x 3 pages"},
+			name:     "plan examples",
+			args:     []string{"plan", "--config", examples},
+			wantCode: exitOK,
+			wantStdout: []string{
+				"example-sim/daily", "account=demo", "job demo-devices", "desired 2m", "effective 2m", "720 runs x 3 pages",
+				// Before any run, the series of the output are unknown.
+				"prom    unknown  -            -      until its jobs have run once",
+				"Not measured yet (no successful run, their series are not counted):",
+			},
 		},
 		{
 			name:       "plan json",

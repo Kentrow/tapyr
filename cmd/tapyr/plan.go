@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"slices"
 	"strconv"
@@ -184,39 +185,92 @@ func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, ou
 			fmt.Fprintln(w, line+"\t")
 		}
 	}
+	// Each section has its own columns: a long line of one never widens
+	// the columns of another.
+	if err := w.Flush(); err != nil {
+		return err
+	}
 	if len(outputs) > 0 {
-		fmt.Fprintln(w, "\nOUTPUT\tSERIES\tSAMPLES/MIN\tLIMIT\t\t")
-		for _, o := range outputs {
-			limit, note := "-", ""
-			if o.MaxSeries > 0 {
-				limit = strconv.Itoa(o.MaxSeries)
-				if o.Series > o.MaxSeries {
-					note = fmt.Sprintf("about %d new series would be held back", o.Series-o.MaxSeries)
-				}
-			}
-			series := strconv.Itoa(o.Series)
-			if len(o.Unmeasured) > 0 {
-				series = "at least " + series
-			}
-			fmt.Fprintf(w, "%s\t%s\t%.0f\t%s\t%s\t\n", o.Name, series, o.SamplesPerMinute, limit, note)
-			if len(o.Unmeasured) > 0 {
-				fmt.Fprintf(w, "  not measured yet (no successful run): %s\t\t\t\t\t\n", strings.Join(o.Unmeasured, ", "))
-			}
+		if err := printOutputEstimates(e.stdout, outputs); err != nil {
+			return err
 		}
 	}
 	if len(notCollected) > 0 {
-		fmt.Fprintln(w, "\nJOBS NOT COLLECTED\t\t\t\t\t")
+		nw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
+		fmt.Fprintln(nw, "\nJOBS NOT COLLECTED\t\t\t")
 		for _, j := range notCollected {
-			fmt.Fprintf(w, "  job %s\tdesired %s\t%s\t\t\t\n", j.Name, shortDuration(j.Interval), j.NotCollected)
+			fmt.Fprintf(nw, "  job %s\tdesired %s\t%s\t\n", j.Name, shortDuration(j.Interval), j.NotCollected)
 		}
-	}
-	if err := w.Flush(); err != nil {
-		return err
+		if err := nw.Flush(); err != nil {
+			return err
+		}
 	}
 	if !res.Feasible {
 		fmt.Fprintln(e.stdout, "\nThe plan is infeasible: critical jobs alone exceed a quota, or stretching every other job to the maximum is not enough.")
 	}
 	return nil
+}
+
+// printOutputEstimates prints what every output receives (ADR 0014). An
+// output none of whose jobs has run yet says so instead of a count of 0;
+// the jobs not measured yet are listed below the table, wrapped.
+func printOutputEstimates(out io.Writer, outputs []outputEstimate) error {
+	w := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(w, "\nOUTPUT\tSERIES\tSAMPLES/MIN\tLIMIT\t")
+	for _, o := range outputs {
+		series, samples, limit, note := strconv.Itoa(o.Series), fmt.Sprintf("%.0f", o.SamplesPerMinute), "-", ""
+		switch {
+		case o.measured == 0 && len(o.Unmeasured) > 0:
+			series, samples, note = "unknown", "-", "until its jobs have run once"
+		case len(o.Unmeasured) > 0:
+			series, samples = "at least "+series, "at least "+samples
+		}
+		if o.MaxSeries > 0 {
+			limit = strconv.Itoa(o.MaxSeries)
+			if o.Series > o.MaxSeries {
+				note = fmt.Sprintf("about %d new series would be held back", o.Series-o.MaxSeries)
+			}
+		}
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", o.Name, series, samples, limit, note)
+	}
+	if err := w.Flush(); err != nil {
+		return err
+	}
+	header := false
+	for _, o := range outputs {
+		if len(o.Unmeasured) == 0 {
+			continue
+		}
+		if !header {
+			fmt.Fprintln(out, "\nNot measured yet (no successful run, their series are not counted):")
+			header = true
+		}
+		fmt.Fprint(out, wrapList("  "+o.Name+": ", o.Unmeasured, 80))
+	}
+	return nil
+}
+
+// wrapList writes items after prefix, separated by commas, wrapped at
+// width with the continuation lines aligned under the first item.
+func wrapList(prefix string, items []string, width int) string {
+	var b strings.Builder
+	indent := strings.Repeat(" ", len(prefix))
+	line := prefix
+	for i, item := range items {
+		if i < len(items)-1 {
+			item += ","
+		}
+		if len(line) > len(indent) && len(line)+1+len(item) > width {
+			b.WriteString(strings.TrimRight(line, " ") + "\n")
+			line = indent
+		}
+		if len(line) > len(indent) && !strings.HasSuffix(line, " ") {
+			line += " "
+		}
+		line += item
+	}
+	b.WriteString(line + "\n")
+	return b.String()
 }
 
 func pagesLabel(j planner.JobPlan) string {
@@ -263,6 +317,8 @@ type outputEstimate struct {
 	// Unmeasured are the jobs sent to the output without a successful run
 	// yet: Series is then a lower bound.
 	Unmeasured []string `json:"unmeasured_jobs"`
+	// measured counts the jobs with a successful run.
+	measured int
 }
 
 // outputEstimates counts the series every output receives: those of the
@@ -297,6 +353,9 @@ func outputEstimates(ctx context.Context, graph *runtime.Graph, store state.Stor
 		measured := map[string]bool{}
 		for instance, n := range registry.OutputSeriesByInstance(series.Output{Name: name, Processor: proc}, routed) {
 			job, _, _ := strings.Cut(instance, "[")
+			if !measured[job] {
+				est.measured++
+			}
 			measured[job] = true
 			est.Series += n
 			interval := effective[job]
