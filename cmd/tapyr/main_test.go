@@ -577,3 +577,40 @@ func TestShortDuration(t *testing.T) {
 		}
 	}
 }
+
+// TestWarnEmptyConfig checks issue #22: configuration paths without any
+// document (an empty directory, files of another extension) are valid but
+// collect nothing, and validate, plan and run say so.
+func TestWarnEmptyConfig(t *testing.T) {
+	empty := t.TempDir()
+	txt := t.TempDir()
+	if err := os.WriteFile(filepath.Join(txt, "config.txt"), []byte("kind: Account\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	warning := func(dir string) string {
+		return "warning: no configuration document found in " + dir + " (files must end in .yaml or .yml; hidden files are skipped)"
+	}
+	for _, tc := range []struct {
+		name string
+		args []string
+		dir  string
+	}{
+		{"validate, empty directory", []string{"validate", "--config", empty}, empty},
+		{"validate, files of another extension", []string{"validate", "--config", txt}, txt},
+		{"plan", []string{"plan", "--config", empty}, empty},
+	} {
+		res := execute(t, nil, tc.args...)
+		if res.code != exitOK || !strings.Contains(res.stderr, warning(tc.dir)) {
+			t.Errorf("%s: exit %d, stderr:\n%s", tc.name, res.code, res.stderr)
+		}
+	}
+	if res := execute(t, nil, "validate", "--config", examples); strings.Contains(res.stderr, "no configuration document") {
+		t.Errorf("validate warns about the examples:\n%s", res.stderr)
+	}
+	// run starts, and keeps its state store in the working directory.
+	t.Chdir(t.TempDir())
+	_, stop := background(t, nil, "run", "--config", empty)
+	if res := stop(); !strings.Contains(res.stderr, warning(empty)) {
+		t.Errorf("run: exit %d, stderr:\n%s", res.code, res.stderr)
+	}
+}
