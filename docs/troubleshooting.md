@@ -66,15 +66,15 @@ The budget engine is meant to make these impossible: when they happen, one of it
 | `tapyr_budget_limit_mismatch` at 1 | The provider announces another maximum than the definition (another plan, another account size) | Tapyr follows the headers; the definition should use `max: auto` |
 | Consumption above the plan | More fan-out instances or pages than estimated, many retries | Compare `tapyr plan` with the runs (requests, pages, retries per run) |
 | Jobs run slower than their interval | The quota is too small for the desired intervals: the planner stretched them | See below |
-| `tapyr plan` exits with code 3, `TapyrPlanInfeasible` | `critical` jobs alone exceed a quota | Raise their intervals, lower some to `high`, reduce the fan-out |
+| `tapyr plan` exits with code 3, `TapyrPlanInfeasible`, "Plan does not fit" in the UI | `critical` jobs alone exceed a quota, or the other jobs do even slowed down as much as allowed | Its conclusion, the Plan page and the log say which job, by how much to raise its interval, or to lower its priority to `high`; or reduce the fan-out |
 | Requests refused with `quota_exhausted` right after a restart | The state store was lost (no volume): Tapyr restarted from 0 while the provider still counted | Keep the state store on persistent storage ([Operations](operations.md#state-store)) |
 
 ### Jobs run less often than configured
 
-The planner gives every job an **effective interval** that fits the quotas, and stretches the lower priorities first ([Concepts](concepts.md#planner)). It is working as intended; to see why, read the plan: `tapyr plan`, the Plan page of the UI, or `GET /api/v1/plan`. Each stretched job says by how much, why, and which quota constrains it:
+The planner gives every job an **effective interval** that fits the quotas, and stretches the lower priorities first ([Concepts](concepts.md#planner)). It is working as intended; to see why, read the plan: `tapyr plan`, the Plan page of the UI, or `GET /api/v1/plan`. Each job slowed down says by how much, why, and which quota constrains it:
 
 ```text
-job network-devices  desired 5m  effective 1h  24 runs x 1 page = 25  (stretched x12.00, priority normal, quota example-sim/daily account=demo)
+job network-devices  desired 5m  effective 1h  24 runs x 1 page = 25  (slowed down x12, priority normal, to fit the daily quota of account demo)
 ```
 
 To change the outcome: raise the priority of what matters (and lower the rest), raise intervals of jobs that can wait, filter the fan-out (`forEach.filter`), or get a larger quota. The log line `effective interval changed` records every change with its reason.

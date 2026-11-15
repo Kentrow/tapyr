@@ -5,7 +5,7 @@ import { ProblemNote } from "../components/Problem";
 import { count, duration, outputHealth, percent, plural, scopeAccounts, seriesStatus, since, waitingText } from "../lib/format";
 import { useJSON, useList, useLive, type LiveEvent } from "../lib/live";
 import { href } from "../lib/router";
-import type { Account, Budget, Job, Output, Problem, Provider, Status } from "../lib/types";
+import type { Account, Budget, Job, Output, Plan, Problem, Provider, Status } from "../lib/types";
 
 type JobState = "ok" | "bad" | "idle";
 
@@ -42,6 +42,8 @@ export function Overview() {
   const budgets = useList<Budget>("/budgets");
   const jobs = useList<Job>("/jobs");
   const outputs = useList<Output>("/outputs");
+  // The plan exists after the first planning; the Overview does without.
+  const plan = useJSON<Plan>("/plan");
   const activity = useActivity(jobs.data);
   if (status.error && !status.data) return <Failure error={status.error} />;
   if (!status.data || !providers.data || !accounts.data || !budgets.data || !jobs.data || !outputs.data) return <Loading />;
@@ -57,6 +59,7 @@ export function Overview() {
   const reauth = accounts.data.filter((a) => a.auth.reauth_required);
   const unhealthy = unhealthyAccounts(accounts.data);
   const limited = outputs.data.filter((o) => o.series_refused > 0);
+  const unfit = s.plan_feasible ? [] : (plan.data?.scopes ?? []).filter((sc) => !sc.feasible && sc.problem);
   return (
     <>
       <PageHead title="Overview" sub={`Tapyr ${s.version}, up ${duration(s.uptime_seconds)}, configuration ${s.config_hash.slice(0, 8)} loaded ${since(s.last_reload.at)}.`} />
@@ -69,10 +72,10 @@ export function Overview() {
           ok={!tightest || tightest.exhaustion_eta_seconds === undefined}
           hint={tightest ? quotaHint(tightest) : "rate and concurrency limits only"} href={href(["budgets"])} />
         <Kpi icon="plan" label="Plan" value={s.plan_feasible ? "Fits" : "Does not fit"} ok={s.plan_feasible}
-          hint={s.plan_feasible ? "every critical job on schedule" : "a quota would run out before its reset"} href={href(["plan"])} />
+          hint={planHint(plan.data, s.plan_feasible)} href={href(["plan"])} />
       </div>
 
-      {(!s.ready || !s.last_reload.success || reauth.length > 0 || unhealthy.length > 0 || limited.length > 0) && (
+      {(!s.ready || !s.last_reload.success || reauth.length > 0 || unhealthy.length > 0 || limited.length > 0 || unfit.length > 0) && (
         <div className="cells attention">
           {!s.ready && (
             <div className="cell warn">
@@ -94,6 +97,13 @@ export function Overview() {
               <span className="value"><Icon name="alert" />Re-bootstrap required</span>
               {a.problem ? <span className="hint"><ProblemNote problem={a.problem} /></span>
                 : <span className="hint">Account {a.name}: its credentials can no longer be renewed. Generate new ones and reload.</span>}
+            </div>
+          ))}
+          {unfit.map((sc) => (
+            <div className="cell bad" key={`plan-${sc.limit}-${sc.scope}`}>
+              <span className="label"><a href={href(["plan"])}>Plan</a>, {sc.limit}</span>
+              <span className="value"><Icon name="alert" />Plan does not fit</span>
+              <span className="hint"><ProblemNote problem={sc.problem} /></span>
             </div>
           ))}
           {limited.map((o) => (
@@ -205,8 +215,21 @@ export function unhealthyAccounts(accounts: Account[]): { name: string; provider
 // indicator then carries words.
 export function quotaHint(b: Budget, now = Date.now()): string {
   const name = `${b.provider} / ${b.limit}`;
-  if (b.exhaustion_eta_seconds !== undefined) return `${name}, runs out in ${duration(b.exhaustion_eta_seconds)}, resets ${since(b.window_end, now)}`;
+  if (b.exhaustion_eta_seconds !== undefined) return `${name}, runs out in ${duration(b.exhaustion_eta_seconds)} at the current pace, resets ${since(b.window_end, now)}`;
   return `${name}, resets ${since(b.window_end, now)}`;
+}
+
+// planHint says what the plan means: every critical job on schedule, or
+// which quota would run out, and when, with the planned intervals (the
+// projection of the plan, which the quota tile does not show: it follows
+// the pace of the consumption so far, others included).
+export function planHint(plan: Plan | undefined, feasible: boolean, now = Date.now()): string {
+  if (feasible) return "every critical job on schedule";
+  const scope = plan?.scopes.find((s) => !s.feasible);
+  if (!scope) return "a quota would run out before its reset";
+  const name = scope.limit.replace(/^[^/]*\//, "");
+  const when = scope.exhaustion_at ? ` ${since(scope.exhaustion_at, now)}` : "";
+  return `the ${name} quota${scope.scope ? ` of ${scope.scope.replace(/=/g, " ").replace(/,/g, " and ")}` : ""} would run out${when} with the planned intervals`;
 }
 
 function Kpi({ icon, label, value, hint, ok, href: to }: { icon: "graph" | "jobs" | "budgets" | "plan"; label: string; value: string; hint: string; ok: boolean; href: string }) {

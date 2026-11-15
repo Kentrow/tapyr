@@ -24,16 +24,18 @@ Signals for `run`: SIGHUP reloads the configuration (validated first; an invalid
 
 `tapyr plan` reads run history and inventory from the state store when the file exists (read-only); otherwise it uses `estimate.pagesPerRun` and the `--fanout` hints. Quotas are evaluated over a full window from now: plan answers "does this configuration fit", while the running engine replans with the remaining budget of the current window.
 
-Example `tapyr plan` output, for the example configuration of the `aruba-central-classic` package (a job stretched to fit a quota shows its stretch factor and reason):
+Example `tapyr plan` output, for the example configuration of the `aruba-central-classic` package (a job slowed down to fit a quota says by how much and why). The output ends with a conclusion in words: the plan fits as desired, fits by slowing jobs down, or does not fit, with, for every quota it does not fit, why and what to change (the problem `plan_infeasible`, see [Messages](#messages)):
 
 ```
-QUOTA SCOPE                  WINDOW       BUDGET         PROJECTED                RESERVE  STATUS
-aruba-central-classic/daily  24h          4500           529                      500      ok (11.8%)
-  account=campus
+QUOTA                        WINDOW       AVAILABLE      PROJECTED                FOR RETRIES  STATUS
+aruba-central-classic/daily  24h          4500           529                      500          fits (11.8%)
+  account campus
   job aruba-aps              desired 5m   effective 5m   288 runs x 1 page = 302
   job aruba-gateways         desired 15m  effective 15m  96 runs x 1 page = 101
   job aruba-sites            desired 1h   effective 1h   24 runs x 1 page = 25
   job aruba-switches         desired 15m  effective 15m  96 runs x 1 page = 101
+
+The plan fits: every job runs at its desired interval.
 ```
 
 ### Provider catalog output
@@ -121,6 +123,7 @@ In the status API, a run that did not succeed (`last_run`, the runs of a job, th
 | `deadline` | The run gave up waiting for the budget | Jobs run less often than configured |
 | `server_error`, `unreachable`, `circuit_open` | A 5xx, no answer or a timeout, or the circuit open after repeated failures | The provider fails or does not answer |
 | `client` | Another 4xx (404, 400) | Metrics are wrong or missing |
+| `plan_infeasible` | A quota scope the plan does not fit: the title says what its jobs need and what it leaves, the action which critical job to slow down and to which interval (the one with the most calls when it is enough on its own), or to lower its priority | Quota problems |
 | `decode`, `mapping` | A response that cannot be read, or turned into metrics | Metrics are wrong or missing |
 | `unknown` | Anything else | Asking for help |
 
@@ -156,11 +159,11 @@ The UI is built in CI and in `make build`; a binary built without UI assets serv
 
 ### Pages
 
-1. **Overview**: health summary, plan feasibility banner, providers and accounts cards with status, quota gauges (used / projected / limit per window, named by the accounts of their scope), recent errors.
+1. **Overview**: health summary, plan feasibility (an alert per quota the plan does not fit, with its problem; the quota tile tells when the tightest quota runs out at the current pace, the plan tile when it would with the planned intervals), providers and accounts cards with status, quota gauges (used / projected / limit per window, named by the accounts of their scope), recent errors.
 2. **Graph**: provider -> account -> (targets) -> inventory jobs -> metric jobs -> outputs. Node color by health. Click a node to open its detail panel. Fan-out shown as grouped nodes with instance counts.
 3. **Job detail**: effective config (YAML view), desired vs effective interval with stretch reason, instances table, recent runs (result, duration, requests, pages, retries, samples), errors. A job that is not collected says so with its reason, on the jobs list and its detail, and stays out of the counts of the Overview and of the Graph.
 4. **Budgets**: one card per limit and scope: timeline of consumption over the window with projection line, reserve, external usage, window reset time. Rate limits show wait time and 429s.
-5. **Plan**: the plan table, sortable, with stretched jobs highlighted, and the collected jobs the plan does not hold yet (fan-outs without instances) with what they wait for.
+5. **Plan**: the plan table, sortable, with the jobs slowed down highlighted and the reason in words, and the collected jobs the plan does not hold yet (fan-outs without instances) with what they wait for. A plan that does not fit opens with "Why it does not fit" (the problem of every quota it does not fit) and marks the critical jobs of those quotas, which are never slowed down. The plan of the running Tapyr covers what is left of each window; the page says so.
 6. **Outputs**: the series each output receives (against its limit, as a meter, when it has one), in words: within the limit, close to it, at it, or reached with the number of new series held back and samples dropped, and the jobs not counted yet; queue fill, send rate, failures, last success. An output holding series back also shows on the Overview, as an alert and on its chip.
 7. **Live debug** (only when enabled): pick a job instance, see the last raw response (pretty JSON, collapsible) side by side with the samples produced. Refresh on new run (SSE).
 

@@ -7,12 +7,15 @@ package problem
 import (
 	"cmp"
 	"fmt"
+	"math"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/kentrow/tapyr/internal/api"
+	"github.com/kentrow/tapyr/internal/budget/planner"
 	"github.com/kentrow/tapyr/internal/config"
 )
 
@@ -218,4 +221,113 @@ func status(code int) string {
 		return ""
 	}
 	return fmt.Sprintf(" (HTTP %d)", code)
+}
+
+// ClassPlanInfeasible is the class of a quota scope the plan does not fit.
+const ClassPlanInfeasible = "plan_infeasible"
+
+// maxListed bounds the critical jobs an action names.
+const maxListed = 3
+
+// ForPlan says why a quota scope does not fit the plan, and the two levers:
+// slow the critical jobs down (by how much, job by job), or lower their
+// priority so that the planner may. Nil for a scope that fits.
+func ForPlan(s planner.ScopePlan, version string) *api.Problem {
+	sf := s.Shortfall
+	if sf == nil {
+		return nil
+	}
+	p := &api.Problem{Class: ClassPlanInfeasible, DocsURL: DocsURL(version, anchorQuota)}
+	p.Title = fmt.Sprintf("The %s quota%s is too small: its jobs need at least %s calls %s, it leaves %s.",
+		planner.LimitName(s.Limit), planner.ScopeWords(s.Key), count(sf.Needed), period(sf), count(sf.Budget))
+	switch {
+	case sf.FirstFactor > 0:
+		// The job with the most calls can make room on its own: the
+		// simplest change.
+		c := sf.Critical[0]
+		p.Action = fmt.Sprintf("Raise the interval of %s from %s to %s, or lower its priority to high so that Tapyr can slow it down.",
+			c.Name, shortDuration(c.Desired), shortDuration(slower(c.Desired, sf.FirstFactor)))
+		if len(sf.Critical) > 1 && sf.Needed > 0 {
+			p.Action = strings.TrimSuffix(p.Action, ".") + fmt.Sprintf(": it makes %.0f%% of the calls.", 100*c.Calls/sf.Needed)
+		}
+	case sf.Factor > 0:
+		var list []string
+		for _, c := range sf.Critical[:min(maxListed, len(sf.Critical))] {
+			list = append(list, fmt.Sprintf("%s from %s to %s", c.Name, shortDuration(c.Desired), shortDuration(slower(c.Desired, sf.Factor))))
+		}
+		if more := len(sf.Critical) - maxListed; more > 0 {
+			list = append(list, fmt.Sprintf("and %d more", more))
+		}
+		p.Action = fmt.Sprintf("Raise the intervals of the critical jobs about x%.1f (%s), or lower their priority to high so that Tapyr can slow them down.",
+			math.Ceil(sf.Factor*10)/10, strings.Join(list, ", "))
+	default:
+		p.Action = fmt.Sprintf("Even slowed down x%g, the most Tapyr may, the jobs need more: raise their intervals or reduce their fan-out, or let Tapyr slow them down more with settings.budget.maxStretch.", sf.MaxStretch)
+		if len(sf.Critical) > 0 {
+			p.Action += " Critical jobs are never slowed down."
+		}
+	}
+	return p
+}
+
+// slower returns an interval slowed down by a factor, rounded up to the
+// second below a minute and to the minute above.
+func slower(d time.Duration, factor float64) time.Duration {
+	out := time.Duration(math.Ceil(float64(d) * factor))
+	unit := time.Minute
+	if out < time.Minute {
+		unit = time.Second
+	}
+	return (out + unit - 1).Truncate(unit)
+}
+
+// period says over which time the calls count: what is left of the window
+// for a plan of the running Tapyr, a full window for tapyr plan.
+func period(sf *planner.Shortfall) string {
+	if sf.Online {
+		d := sf.Period
+		if d >= time.Minute {
+			d = d.Round(time.Minute)
+		}
+		return "over the next " + shortDuration(d)
+	}
+	switch sf.Period {
+	case time.Minute:
+		return "a minute"
+	case time.Hour:
+		return "an hour"
+	case 24 * time.Hour:
+		return "a day"
+	case 7 * 24 * time.Hour:
+		return "a week"
+	}
+	return "per " + shortDuration(sf.Period)
+}
+
+// shortDuration writes a duration the way the UI and the CLI do: 45s, 2m,
+// 1h30m, 2d.
+func shortDuration(d time.Duration) string {
+	if d <= 0 {
+		return "0s"
+	}
+	d = d.Round(time.Second)
+	var b strings.Builder
+	for _, u := range []struct {
+		unit time.Duration
+		name string
+	}{{24 * time.Hour, "d"}, {time.Hour, "h"}, {time.Minute, "m"}, {time.Second, "s"}} {
+		if n := d / u.unit; n > 0 {
+			fmt.Fprintf(&b, "%d%s", n, u.name)
+			d -= n * u.unit
+		}
+	}
+	return b.String()
+}
+
+// count writes a number of calls, rounded, with thousands separators.
+func count(f float64) string {
+	s := strconv.FormatInt(int64(math.Round(f)), 10)
+	for i := len(s) - 3; i > 0 && s[i-1] != '-'; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
 }

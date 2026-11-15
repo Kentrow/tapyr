@@ -15,6 +15,7 @@ import (
 	"github.com/kentrow/tapyr/internal/budget"
 	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/config"
+	"github.com/kentrow/tapyr/internal/problem"
 	"github.com/kentrow/tapyr/internal/runtime"
 	"github.com/kentrow/tapyr/internal/scheduler"
 	"github.com/kentrow/tapyr/internal/state"
@@ -607,6 +608,7 @@ func (s statusSource) Plan(context.Context) (api.Plan, error) {
 		if !sc.ExhaustionAt.IsZero() {
 			ps.ExhaustionAt = ptr(sc.ExhaustionAt.UTC())
 		}
+		ps.Problem = problem.ForPlan(sc, buildinfo.Get().Version)
 		p.Scopes = append(p.Scopes, ps)
 	}
 	return p, nil

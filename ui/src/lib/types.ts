@@ -212,6 +212,8 @@ export interface PlanScope {
   feasible: boolean;
   exhaustion_at?: string;
   jobs: string[];
+  // Why the scope does not fit and what to change, when it does not.
+  problem?: Problem;
 }
 
 export interface Plan {

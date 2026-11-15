@@ -165,7 +165,7 @@ type RunSummary struct {
 type Problem struct {
 	// Class is auth, forbidden, reauth, rate_limited, penalized,
 	// quota_exhausted, deadline, circuit_open, server_error, unreachable,
-	// client, decode, mapping or unknown.
+	// client, decode, mapping, plan_infeasible or unknown.
 	Class  string `json:"class"`
 	Title  string `json:"title"`
 	Action string `json:"action"`
@@ -290,6 +290,9 @@ type PlanScope struct {
 	Feasible      bool       `json:"feasible"`
 	ExhaustionAt  *time.Time `json:"exhaustion_at,omitempty"`
 	Jobs          []string   `json:"jobs"`
+	// Problem says why the scope does not fit and what to change, when it
+	// does not (class plan_infeasible).
+	Problem *Problem `json:"problem,omitempty"`
 }
 
 // Graph is the configuration as nodes and edges.

@@ -162,6 +162,28 @@ spec:
 		!strings.Contains(res.stderr, `msg="effective interval changed" component=planner provider=example-sim account=shared job=sites`) {
 		t.Errorf("no projection replan stretching the low-priority job:\n%s", grepLines(res.stderr, "component=planner"))
 	}
+	// The plan stops fitting after the second jump: logged once per change,
+	// with what to change, not at every replan.
+	var changes []string
+	for line := range strings.SplitSeq(res.stderr, "\n") {
+		switch {
+		case strings.Contains(line, `msg="plan does not fit a quota"`):
+			changes = append(changes, "does not fit")
+			if !strings.Contains(line, `problem="The daily quota of account shared is too small`) || !strings.Contains(line, `action="`) {
+				t.Errorf("no problem in the log: %s", line)
+			}
+		case strings.Contains(line, `msg="plan fits the quota again"`):
+			changes = append(changes, "fits")
+		}
+	}
+	for i := 1; i < len(changes); i++ {
+		if changes[i] == changes[i-1] {
+			t.Errorf("logged twice in a row: %v\n%s", changes, grepLines(res.stderr, "component=planner"))
+		}
+	}
+	if enabled && (len(changes) == 0 || changes[0] != "does not fit") {
+		t.Errorf("plan changes: %v\n%s", changes, grepLines(res.stderr, "component=planner"))
+	}
 }
 
 // TestTwentyFourHoursQuotaTight checks the budget engine end to end: 24 simulated

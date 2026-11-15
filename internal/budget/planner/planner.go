@@ -61,8 +61,11 @@ type JobPlan struct {
 	Desired   time.Duration
 	Effective time.Duration
 	Stretch   float64
-	// Reason explains a stretch: the scope that required it.
+	// Reason explains a stretch: the scope that required it, as
+	// "quota <limit> <scope>" or "rate <limit> <scope>"; Constraint holds
+	// the same, for Describe.
 	Reason      string
+	Constraint  Constraint
 	CallsPerRun float64
 	Fanout      int
 	PagesPerRun float64
@@ -86,6 +89,52 @@ type ScopePlan struct {
 	// does (infeasible plans only).
 	ExhaustionAt time.Time
 	Jobs         []string
+	// Shortfall says why the scope does not fit, nil when it does.
+	Shortfall *Shortfall
+}
+
+// Constraint is the limit that set the effective interval of a job.
+type Constraint struct {
+	// Kind is quota or rate.
+	Kind  config.LimitKind
+	Limit string
+	Key   string
+}
+
+// Shortfall says why a quota scope does not fit, and what would make it
+// fit: what its jobs need when the planner slows them down as much as it
+// may (the critical jobs at their desired interval, the others stretched
+// to the maximum), and how much the critical jobs would have to slow down.
+type Shortfall struct {
+	// Needed are the calls of the jobs over the period, at the most the
+	// planner may slow them down; Budget is what the scope leaves.
+	Needed float64
+	Budget float64
+	Period time.Duration
+	// Online plans cover what is left of the window, offline plans a full
+	// window.
+	Online bool
+	// Critical are the critical jobs of the scope, most calls first.
+	Critical []CriticalJob
+	// Factor is how much every critical job would have to slow down for
+	// the scope to fit (above 1), or 0 when slowing them down cannot be
+	// enough: the other jobs alone, at the maximum stretch, exceed the
+	// budget, or there is no critical job.
+	Factor float64
+	// FirstFactor is how much the first critical job (the one with the
+	// most calls) would have to slow down, alone, for the scope to fit, or
+	// 0 when slowing it down alone cannot be enough.
+	FirstFactor float64
+	// MaxStretch is the most the planner may slow a job down.
+	MaxStretch float64
+}
+
+// CriticalJob is a critical job of a scope that does not fit.
+type CriticalJob struct {
+	Name    string
+	Desired time.Duration
+	// Calls are its calls over the period, at its desired interval.
+	Calls float64
 }
 
 // Result is a plan.
@@ -113,6 +162,7 @@ func Plan(jobs []Job, opts Options) *Result {
 	}
 	stretch := make([]float64, len(jobs))
 	reason := make([]string, len(jobs))
+	constraint := make([]Constraint, len(jobs))
 	for i := range stretch {
 		stretch[i] = 1
 	}
@@ -132,6 +182,7 @@ func Plan(jobs []Job, opts Options) *Result {
 		for i, k := range need {
 			if k > stretch[i] {
 				stretch[i], reason[i] = k, "quota "+s.plan.Limit+" "+s.plan.Key
+				constraint[i] = Constraint{Kind: config.LimitQuota, Limit: s.plan.Limit, Key: s.plan.Key}
 			}
 		}
 	}
@@ -152,11 +203,12 @@ func Plan(jobs []Job, opts Options) *Result {
 			}
 			if minimum := time.Duration(math.Ceil(calls/ps.Rate)) * time.Second; minimum > eff {
 				eff, reason[i] = minimum, "rate "+ps.Limit+" "+ps.Key
+				constraint[i] = Constraint{Kind: config.LimitRate, Limit: ps.Limit, Key: ps.Key}
 			}
 		}
 		res.Jobs = append(res.Jobs, JobPlan{
 			Name: j.Name, Provider: j.Provider, Account: j.Account, Priority: j.Priority,
-			Desired: j.Desired, Effective: eff, Stretch: float64(eff) / float64(j.Desired), Reason: reason[i],
+			Desired: j.Desired, Effective: eff, Stretch: float64(eff) / float64(j.Desired), Reason: reason[i], Constraint: constraint[i],
 			CallsPerRun: j.callsPerRun(), Fanout: max(1, j.Fanout), PagesPerRun: j.PagesPerRun,
 			Calls: map[string]float64{},
 		})
@@ -176,9 +228,52 @@ func Plan(jobs []Job, opts Options) *Result {
 				s.plan.ExhaustionAt = opts.Now.Add(time.Duration(s.plan.Budget / s.plan.Projected * float64(s.plan.Period)))
 			}
 		}
+		if !s.plan.Feasible {
+			s.plan.Shortfall = shortfall(jobs, s, opts)
+		}
 		res.Scopes = append(res.Scopes, s.plan)
 	}
 	return res
+}
+
+// shortfall says why a scope does not fit (see Shortfall).
+func shortfall(jobs []Job, s *scope, opts Options) *Shortfall {
+	sf := &Shortfall{Budget: s.plan.Budget, Period: s.plan.Period, Online: opts.Online, MaxStretch: opts.MaxStretch}
+	var critical, others float64
+	for _, i := range s.jobs {
+		if jobs[i].Priority != config.PriorityCritical {
+			others += consumption(jobs, s, i, opts.MaxStretch)
+			continue
+		}
+		calls := consumption(jobs, s, i, 1)
+		critical += calls
+		sf.Critical = append(sf.Critical, CriticalJob{Name: jobs[i].Name, Desired: jobs[i].Desired, Calls: calls})
+	}
+	slices.SortStableFunc(sf.Critical, func(a, b CriticalJob) int {
+		if a.Calls != b.Calls {
+			return cmpFloat(b.Calls, a.Calls)
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+	sf.Needed = critical + others
+	if room := sf.Budget - others; critical > 0 && room > 0 {
+		sf.Factor = math.Max(1, critical/room)
+		first := sf.Critical[0].Calls
+		if left := room - (critical - first); left > 0 {
+			sf.FirstFactor = math.Max(1, first/left)
+		}
+	}
+	return sf
+}
+
+func cmpFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	}
+	return 0
 }
 
 // quotaScopes groups the jobs by quota scope, with the calls per run of
@@ -343,10 +438,49 @@ func maxStretchAll(jobs []Job, s *scope, maxStretch float64) map[int]float64 {
 	return k
 }
 
-// Describe returns the reason of a job plan in words.
+// Describe says in words why a job runs less often than desired: the limit
+// it has to fit, named as its provider declares it, with its scope.
 func (j *JobPlan) Describe() string {
 	if j.Effective == j.Desired {
 		return ""
 	}
+	c := j.Constraint
+	switch c.Kind {
+	case config.LimitQuota:
+		return "to fit the " + LimitName(c.Limit) + " quota" + ScopeWords(c.Key)
+	case config.LimitRate:
+		return "for a run to fit the " + LimitName(c.Limit) + " rate limit" + ScopeWords(c.Key)
+	}
 	return strings.TrimSpace(j.Reason)
+}
+
+// LimitName is the name of a limit as its provider declares it, without
+// the provider the budget engine prefixes it with.
+func LimitName(limit string) string {
+	if _, name, ok := strings.Cut(limit, "/"); ok {
+		return name
+	}
+	return limit
+}
+
+// ScopeWords names a scope key in words, as a complement: " of account
+// lab", " of account lab and target eu", or "" for a scope shared by every
+// account of the provider.
+func ScopeWords(key string) string {
+	if key == "" {
+		return ""
+	}
+	var parts []string
+	for part := range strings.SplitSeq(key, ",") {
+		dim, value, ok := strings.Cut(part, "=")
+		if !ok {
+			if part == "instance" {
+				part = "each instance"
+			}
+			parts = append(parts, part)
+			continue
+		}
+		parts = append(parts, dim+" "+value)
+	}
+	return " of " + strings.Join(parts, " and ")
 }

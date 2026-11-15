@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -227,7 +228,7 @@ func TestPlanDetails(t *testing.T) {
 	j.RetryOverhead = DefaultRetryOverhead
 	res := Plan([]Job{j}, Options{MaxStretch: 12, Now: now})
 	p := res.Jobs[0]
-	if p.CallsPerRun != 31.5 || p.Reason != "quota p/daily account=a" || p.Describe() == "" {
+	if p.CallsPerRun != 31.5 || p.Reason != "quota p/daily account=a" || p.Describe() != "to fit the daily quota of account a" {
 		t.Errorf("plan = %+v", p)
 	}
 	s := res.Scopes[0]
@@ -304,3 +305,89 @@ func TestEvaluate(t *testing.T) {
 }
 
 func approx(a, b float64) bool { return a-b < 1e-6 && b-a < 1e-6 }
+
+// TestShortfall checks what the planner says of a scope that does not fit:
+// what its jobs need at the most it may slow them down, its critical jobs
+// (most calls first), and how much they would have to slow down.
+func TestShortfall(t *testing.T) {
+	q := daily("daily", 5000, 500) // budget 4500 per day
+	opts := Options{MaxStretch: 12, Now: now}
+	for _, tc := range []struct {
+		name     string
+		jobs     []Job
+		needed   float64
+		critical []string
+		factor   float64
+		first    float64
+	}{
+		{
+			// devices 1440 runs x 4 = 5760; clients at x12: 288 x 30 / 12 = 720.
+			// The critical jobs have 4500 - 720 = 3780: x1.52.
+			name: "critical jobs too fast",
+			jobs: []Job{
+				job("clients", config.PriorityLow, 5*time.Minute, 30, q),
+				job("devices", config.PriorityCritical, time.Minute, 4, q),
+				job("sites", config.PriorityCritical, time.Hour, 1, q),
+			},
+			// devices alone has 3780 - 24: x1.53.
+			needed: 5760 + 24 + 720, critical: []string{"devices", "sites"}, factor: (5760 + 24) / 3780.0, first: 5760 / 3756.0,
+		},
+		{
+			// sites alone cannot make room: devices needs 5760 of 3780.
+			name: "the first job alone is not enough",
+			jobs: []Job{
+				job("devices", config.PriorityCritical, time.Minute, 4, q),
+				job("dev2", config.PriorityCritical, time.Minute, 4, q),
+			},
+			needed: 11520, critical: []string{"dev2", "devices"}, factor: 11520 / 4500.0,
+		},
+		{
+			// clients at x12: 1440 x 60 / 12 = 7200, more than the budget alone.
+			name:   "the other jobs alone exceed it",
+			jobs:   []Job{job("clients", config.PriorityLow, time.Minute, 60, q), job("sites", config.PriorityCritical, time.Hour, 1, q)},
+			needed: 7200 + 24, critical: []string{"sites"},
+		},
+		{
+			name:   "no critical job",
+			jobs:   []Job{job("clients", config.PriorityLow, time.Minute, 60, q)},
+			needed: 7200,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res := Plan(tc.jobs, opts)
+			sf := res.Scopes[0].Shortfall
+			if res.Feasible || sf == nil {
+				t.Fatalf("plan = %+v", res)
+			}
+			var names []string
+			for _, c := range sf.Critical {
+				names = append(names, c.Name)
+			}
+			if !approx(sf.Needed, tc.needed) || sf.Budget != 4500 || sf.Period != 24*time.Hour || sf.Online || sf.MaxStretch != 12 ||
+				fmt.Sprint(names) != fmt.Sprint(tc.critical) || !approx(sf.Factor, tc.factor) || !approx(sf.FirstFactor, tc.first) {
+				t.Errorf("shortfall = %+v, critical %v", sf, names)
+			}
+		})
+	}
+	if sf := Plan([]Job{job("a", config.PriorityLow, time.Hour, 1, q)}, opts).Scopes[0].Shortfall; sf != nil {
+		t.Errorf("a scope that fits has a shortfall: %+v", sf)
+	}
+}
+
+func TestDescribe(t *testing.T) {
+	for _, tc := range []struct {
+		plan JobPlan
+		want string
+	}{
+		{JobPlan{Desired: time.Minute, Effective: time.Minute}, ""},
+		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitQuota, Limit: "p/daily", Key: "account=lab"}}, "to fit the daily quota of account lab"},
+		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitQuota, Limit: "p/hourly", Key: "instance"}}, "to fit the hourly quota of each instance"},
+		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitRate, Limit: "p/rate", Key: "account=lab,target=eu"}}, "for a run to fit the rate rate limit of account lab and target eu"},
+		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitQuota, Limit: "global"}}, "to fit the global quota"},
+		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Reason: " legacy "}, "legacy"},
+	} {
+		if got := tc.plan.Describe(); got != tc.want {
+			t.Errorf("Describe(%+v) = %q, want %q", tc.plan.Constraint, got, tc.want)
+		}
+	}
+}

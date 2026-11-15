@@ -75,7 +75,7 @@ func TestPlanSectionsKeepTheirColumns(t *testing.T) {
 		t.Fatalf("plan exited with %d: %s", res.code, res.stderr)
 	}
 	header, _, _ := strings.Cut(res.stdout, "\n")
-	if !strings.HasPrefix(header, "QUOTA SCOPE") || len(strings.TrimRight(header, " ")) > 110 {
+	if !strings.HasPrefix(header, "QUOTA") || len(strings.TrimRight(header, " ")) > 110 {
 		t.Errorf("quota table header is %d characters wide:\n%s", len(header), res.stdout)
 	}
 	for line := range strings.SplitSeq(res.stdout, "\n") {
@@ -258,10 +258,11 @@ func TestCLI(t *testing.T) {
 			args:     []string{"plan", "--config", examples},
 			wantCode: exitOK,
 			wantStdout: []string{
-				"example-sim/daily", "account=demo", "job demo-devices", "desired 2m", "effective 2m", "720 runs x 3 pages",
+				"example-sim/daily", "  account demo", "job demo-devices", "desired 2m", "effective 2m", "720 runs x 3 pages",
 				// Before any run, the series of the output are unknown.
 				"prom    unknown  -            -      until its jobs have run once",
 				"Not measured yet (no successful run, their series are not counted):",
+				"The plan fits: every job runs at its desired interval.",
 			},
 		},
 		{
@@ -271,10 +272,14 @@ func TestCLI(t *testing.T) {
 			wantStdout: []string{`"feasible": true`, `"name": "demo-sites"`, `"effective_seconds": 300`},
 		},
 		{
-			name:       "plan infeasible",
-			args:       []string{"plan", "--config", examples, "--config", filepath.Join("testdata", "infeasible.yaml")},
-			wantCode:   exitInfeasible,
-			wantStdout: []string{"INFEASIBLE", "job too-often", "The plan is infeasible"},
+			name:     "plan infeasible",
+			args:     []string{"plan", "--config", examples, "--config", filepath.Join("testdata", "infeasible.yaml")},
+			wantCode: exitInfeasible,
+			wantStdout: []string{
+				"DOES NOT FIT", "job too-often", "The plan does not fit:",
+				"Raise the interval of too-often from 10s to 3m, or lower its priority to high so that Tapyr can",
+				"How to fix: https://docs.tapyr.eu/dev/troubleshooting/#quota-problems",
+			},
 		},
 		{
 			name:       "plan of a package that is not built in",

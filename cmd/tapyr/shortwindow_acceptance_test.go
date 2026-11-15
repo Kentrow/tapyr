@@ -110,7 +110,7 @@ spec:
 	if results < 66 || agents < 7 {
 		t.Errorf("%d network results requests (want about 72), %d agents requests (want about 8)", results, agents)
 	}
-	if lines := grepLines(res.stderr, `msg="plan infeasible`); lines != "" {
+	if lines := grepLines(res.stderr, `msg="plan does not fit`); lines != "" {
 		t.Errorf("the plan became infeasible:\n%s", lines)
 	}
 	if t.Failed() {

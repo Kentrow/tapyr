@@ -84,30 +84,44 @@ configuration is valid: 5 providers, 21 job templates, 1 account, 2 jobs, 1 outp
 
 ```console
 $ tapyr plan --config . --fanout example-sim-sites=3 --fanout example-sim-networks=5
-QUOTA SCOPE                      WINDOW       BUDGET         PROJECTED                   RESERVE  STATUS
-example-sim/daily                24h          4500           4679                        500      INFEASIBLE (104.0%)
-  account=demo
+QUOTA                            WINDOW       AVAILABLE      PROJECTED                   FOR RETRIES  STATUS
+example-sim/daily                24h          4500           4679                        500          DOES NOT FIT (104.0%)
+  account demo
   job devices                    desired 1m   effective 1m   1440 runs x 3 pages = 4536
-  job network-devices            desired 5m   effective 1h   24 runs x 5 x 1 page = 126  (stretched x12.00, priority normal, quota example-sim/daily account=demo)
-  job demo.example-sim-networks  desired 30m  effective 6h   4 runs x 3 x 1 page = 13    (stretched x12.00, priority low, quota example-sim/daily account=demo)
-  job demo.example-sim-sites     desired 1h   effective 12h  2 runs x 2 pages = 4        (stretched x12.00, priority low, quota example-sim/daily account=demo)
+  job network-devices            desired 5m   effective 1h   24 runs x 5 x 1 page = 126  (slowed down x12, priority normal, to fit the daily quota of account demo)
+  job demo.example-sim-networks  desired 30m  effective 6h   4 runs x 3 x 1 page = 13    (slowed down x12, priority low, to fit the daily quota of account demo)
+  job demo.example-sim-sites     desired 1h   effective 12h  2 runs x 2 pages = 4        (slowed down x12, priority low, to fit the daily quota of account demo)
 
-The plan is infeasible: critical jobs alone exceed a quota, or stretching every other job to the maximum is not enough.
+OUTPUT      SERIES   SAMPLES/MIN  LIMIT
+prometheus  unknown  -            -      until its jobs have run once
+
+Not measured yet (no successful run, their series are not counted):
+  prometheus: demo.example-sim-networks, demo.example-sim-sites, devices,
+              network-devices
+
+The plan does not fit:
+  The daily quota of account demo is too small: its jobs need at least 4,679 calls a day, it leaves
+  4,500.
+  Raise the interval of devices from 1m to 2m, or lower its priority to high so that Tapyr can slow
+  it down.
+  How to fix: https://docs.tapyr.eu/0.5/troubleshooting/#quota-problems
 ```
 
-Read it from the top. The daily quota is 5000 calls; 500 are kept in reserve for retries, which leaves a budget of 4500. Listing 5 devices takes 3 pages, so polling them every minute costs 4320 calls a day, 4536 with the 5% the planner adds for retries: more than the budget on its own. The planner stretched every other job 12 times, the most it allows, and it is still not enough. A critical job is never slowed down, so the plan is infeasible, and `tapyr plan` exits with code 3: a CI would have caught it before deployment.
+Read it from the top. The daily quota is 5000 calls; 500 are kept for retries, which leaves 4500 available. Listing 5 devices takes 3 pages, so polling them every minute costs 4320 calls a day, 4536 with the 5% the planner adds for retries: more than what is available on its own. The planner slowed every other job down 12 times, the most it allows, and it is still not enough. A critical job is never slowed down, so the plan does not fit, and `tapyr plan` exits with code 3: a CI would have caught it before deployment. The conclusion says what to change. The series of the output are unknown until the jobs have run once.
 
 Poll the devices every 2 minutes instead (`interval: 2m` in `config.yaml`) and plan again:
 
 ```console
 $ tapyr plan --config . --fanout example-sim-sites=3 --fanout example-sim-networks=5
-QUOTA SCOPE                      WINDOW       BUDGET         PROJECTED                     RESERVE  STATUS
-example-sim/daily                24h          4500           3982                          500      ok (88.5%)
-  account=demo
+QUOTA                            WINDOW       AVAILABLE      PROJECTED                     FOR RETRIES  STATUS
+example-sim/daily                24h          4500           3982                          500          fits (88.5%)
+  account demo
   job devices                    desired 2m   effective 2m   720 runs x 3 pages = 2268
   job network-devices            desired 5m   effective 5m   288 runs x 5 x 1 page = 1512
   job demo.example-sim-networks  desired 30m  effective 30m  48 runs x 3 x 1 page = 151
   job demo.example-sim-sites     desired 1h   effective 1h   24 runs x 2 pages = 50
+...
+The plan fits: every job runs at its desired interval.
 ```
 
 Every job now runs at the interval it asked for, within 89% of the budget.
@@ -159,14 +173,14 @@ tapyr sim --provider example-sim --scenario quota-tight
 The provider declares its daily quota as `max: auto`: Tapyr takes the real maximum from the quota headers of every response. At the next run of `devices`, it learns that the quota is now 600, and the planner replans at once, spreading what is left of the quota over what is left of the day until the reset at midnight UTC. Until about 18:00 UTC, there is too much day left for 600 calls, and you see this:
 
 ```text
-level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=demo.example-sim-sites desired=1h0m0s previous=1h0m0s effective=12h0m0s reason="quota example-sim/daily account=demo"
-level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=demo.example-sim-networks desired=30m0s previous=30m0s effective=6h0m0s reason="quota example-sim/daily account=demo"
-level=WARN msg="plan infeasible: critical jobs alone exceed the remaining quota" component=planner limit=example-sim/daily scope="account=demo" budget=523 projected=1056.3525101437106
+level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=demo.example-sim-sites desired=1h0m0s previous=1h0m0s effective=12h0m0s reason="to fit the daily quota of account demo"
+level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=demo.example-sim-networks desired=30m0s previous=30m0s effective=6h0m0s reason="to fit the daily quota of account demo"
+level=WARN msg="plan does not fit a quota" component=planner limit=example-sim/daily scope="account=demo" budget=523 needed=1056 problem="The daily quota of account demo is too small: its jobs need at least 1,056 calls over the next 10h31m, it leaves 523." action="Raise the interval of devices from 2m to 5m, or lower its priority to high so that Tapyr can slow it down."
 ```
 
 Later in the day, what is left of the 600 calls is enough for the few hours before the reset: Tapyr learns the new limit (`tapyr_budget_limit` drops to 600, the Budgets page shows it) and keeps every interval, which is the right decision. The rest of this step needs more than about 6 hours before midnight UTC.
 
-The low-priority discovery jobs are stretched 12 times. `devices` keeps running every 2 minutes, because a critical job is never slowed down: at this pace, it would spend the rest of the quota before the daily reset, and every request after that would be refused until midnight UTC. The Overview page of the UI shows the warning, and the Budgets page the new limit.
+The low-priority discovery jobs are slowed down 12 times. `devices` keeps running every 2 minutes, because a critical job is never slowed down: at this pace, it would spend the rest of the quota before the daily reset, and every request after that would be refused until midnight UTC. Tapyr logs it once, when the plan stops fitting, with what to change. The Overview page of the UI shows it as an alert, the Plan page says why it does not fit and marks `devices`, and the Budgets page shows the new limit.
 
 Whether polling the devices every 2 minutes is worth the quota is your decision, not Tapyr's: say so with the priority. Set `priority: high` on `devices` in `config.yaml`, and reload the configuration without stopping Tapyr:
 
@@ -177,11 +191,12 @@ kill -HUP "$(pgrep -f 'tapyr run')"
 (`pgrep` comes with `procps`, missing from minimal systems: `kill -HUP` with the process ID of `tapyr run` does the same.)
 
 ```text
-level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=devices desired=2m0s previous=2m0s effective=4m6s reason="quota example-sim/daily account=demo"
+level=INFO msg="effective interval changed" component=planner provider=example-sim account=demo job=devices desired=2m0s previous=2m0s effective=4m6s reason="to fit the daily quota of account demo"
+level=INFO msg="plan fits the quota again" component=planner limit=example-sim/daily scope="account=demo"
 level=INFO msg="configuration reloaded" component=run instances=10 discovered_instances=8 retired_instances=0 outputs=1
 ```
 
-The plan is feasible again: `devices` now runs every 4 minutes or so, which fits what is left of the quota until the reset. The exact figures depend on the time left before midnight UTC, since the planner replans from the remaining budget and the remaining time. When the quota resets, or when you restart the simulator without the scenario, the intervals come back to the ones you asked for.
+The plan fits again: `devices` now runs every 4 minutes or so, which fits what is left of the quota until the reset. The exact figures depend on the time left before midnight UTC, since the planner replans from the remaining budget and the remaining time. When the quota resets, or when you restart the simulator without the scenario, the intervals come back to the ones you asked for.
 
 Stop Tapyr and the simulator with `Ctrl-C` when you are done; `./data` holds the state of this guide and can be deleted.
 
