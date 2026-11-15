@@ -214,8 +214,13 @@ func (c *Collector) Run(ctx context.Context, cfg *config.Config, graph *runtime.
 	c.metrics.ConfigLoaded(c.clock.Now(), true)
 	c.recordLoad(cfg, nil)
 	active, dynamic := g.disc.counts()
-	c.logger.Info("collector started", "component", "run", "address", ln.Addr().String(),
-		"instances", active, "discovered_instances", dynamic, "outputs", len(c.outputs), "ledger_entries", restored)
+	c.omu.RLock()
+	prometheus := c.prom != nil
+	c.omu.RUnlock()
+	attrs := []any{"component", "run", "address", ln.Addr().String()}
+	attrs = append(attrs, serverURLs(ln.Addr().String(), graph.Settings.Server, prometheus)...)
+	c.logger.Info("collector started", append(attrs,
+		"instances", active, "discovered_instances", dynamic, "outputs", len(c.outputs), "ledger_entries", restored)...)
 
 	loops := sync.WaitGroup{}
 	loops.Go(func() { c.flushLoop(ctx) })
@@ -260,6 +265,33 @@ func (c *Collector) serverHandler(s config.ServerSettings) (http.Handler, error)
 		return nil, fmt.Errorf("server.basicAuth.password: %w", err)
 	}
 	return basicAuth(c.mux, user.Reveal(), pass.Reveal(), ba.ProtectMetrics), nil
+}
+
+// serverURLs returns the addresses to open, as log attributes: the web UI
+// when it is enabled, /metrics with a prometheus output, and the status
+// API. A wildcard address (0.0.0.0, ::) is shown as localhost, which a
+// browser on the same host can open.
+func serverURLs(addr string, s config.ServerSettings, prometheus bool) []any {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil
+	}
+	if ip := net.ParseIP(host); ip != nil && ip.IsUnspecified() {
+		host = "localhost"
+	}
+	scheme := "http"
+	if s.TLS != nil {
+		scheme = "https"
+	}
+	base := scheme + "://" + net.JoinHostPort(host, port)
+	var out []any
+	if s.UI.Enabled == nil || *s.UI.Enabled {
+		out = append(out, "ui", base+"/ui/")
+	}
+	if prometheus {
+		out = append(out, "metrics", base+"/metrics")
+	}
+	return append(out, "api", base+"/api/v1/")
 }
 
 // serveMetrics serves the exposition of the prometheus output, if any.

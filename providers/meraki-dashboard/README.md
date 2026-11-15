@@ -23,6 +23,8 @@ All metric jobs use **organization-wide endpoints**: one request per organizatio
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 Create an API key in the Dashboard (My profile > API access), ideally for a read-only administrator of the organizations to monitor, and give it to Tapyr as the `apiKey` secret. It is sent as `Authorization: Bearer` ([authorization](https://developer.cisco.com/meraki/api-v1/authorization/)). For regional Dashboards, set the `baseURL` param (`https://api.meraki.ca/api/v1`, `https://api.meraki.cn/api/v1`, `https://api.meraki.in/api/v1`, `https://api.gov-meraki.com/api/v1`). The Dashboard may redirect a request to the shard of the organization (`n123.meraki.com`): the package allows redirects to the hosts of the Meraki domains (`redirects.hosts`), and Tapyr sends the key there too, each redirect being a request reserved in the budget.
 
 ## Limits

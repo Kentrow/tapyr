@@ -20,6 +20,8 @@ Teltonika [Remote Management System](https://rms.teltonika-networks.com) (RMS) c
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 1. In RMS, enable two-factor authentication on the account (required for tokens).
 2. Account settings > API > Access tokens: create a personal access token with the `devices:read` scope. It is shown once.
 3. Give it to Tapyr as the `token` secret, for example from an environment variable (see `examples/rms.yaml`).

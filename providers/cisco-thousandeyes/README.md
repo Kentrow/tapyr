@@ -21,6 +21,8 @@ Cisco ThousandEyes API v7: the network results of the tests (latency, loss, jitt
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 API v7 authenticates with a bearer token (`Authorization: Bearer <token>`).
 
 1. In ThousandEyes, create an API token for a user whose role can read the tests and the agents of the account group (the user API tokens of the user settings).

@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="https://tapyr.eu">Website</a> ·
+  <a href="https://demo.tapyr.eu">Live demo</a> ·
   <a href="#quick-start">Quick start</a> ·
   <a href="docs/install.md">Install</a> ·
   <a href="https://docs.tapyr.eu">Documentation</a> ·
@@ -25,6 +26,8 @@
 Tapyr is an open source, self-hosted **API-to-metrics gateway**. It collects data from the REST APIs of cloud-managed network gear (Aruba Central, Cisco Meraki, Teltonika...), turns it into clean metrics, and exposes or pushes them to Prometheus, VictoriaMetrics, Mimir or any OTLP backend. One declarative definition per API, no code to write. Network gear is the first use case, not the limit: the engine knows nothing about networks, and any API that serves metrics can be described the same way.
 
 Vendor APIs ration their calls: per second, per day, per month, per organization. Tapyr treats that quota as a budget it plans and spends deliberately, retries included, so that your monitoring never runs the quota of your account dry.
+
+**See it running**: the public demo, [demo.tapyr.eu](https://demo.tapyr.eu), runs Tapyr against the simulators of the built-in providers. Its web UI is read-only, like every Tapyr's.
 
 <p align="center">
   <img src="docs/assets/overview-light.svg#gh-light-mode-only" width="900" alt="Cloud APIs of SD-WAN, SD-LAN, Wi-Fi, 4G and 5G routers and any other platform feed Tapyr, which polls, paginates and retries, normalizes labels and units, and spends the API quota on a budget, then exposes or pushes the metrics as Prometheus and OTLP.">
@@ -83,7 +86,7 @@ Each package README lists what it collects, the credentials it needs, and its li
 
 ## Quick start
 
-The demo runs Tapyr against the simulators of the built-in providers, with VictoriaMetrics and Grafana. It needs Docker with Compose, and no vendor account.
+To look before installing anything, open the public demo, [demo.tapyr.eu](https://demo.tapyr.eu). To run it yourself, the demo compose runs Tapyr against the simulators of the built-in providers, with VictoriaMetrics and Grafana. It needs Docker with Compose, and no vendor account.
 
 ```sh
 git clone https://github.com/kentrow/tapyr.git
@@ -106,18 +109,23 @@ The first samples arrive within a minute. [`examples/compose/README.md`](example
 
 ## Install
 
-Releases ship static binaries for Linux, macOS and Windows (amd64, arm64), and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root):
+| Platform | Install |
+|---|---|
+| macOS | `brew install kentrow/tap/tapyr` |
+| Debian, Ubuntu | `curl -LO https://github.com/kentrow/tapyr/releases/download/v0.4.0/tapyr_0.4.0_linux_amd64.deb && sudo dpkg -i tapyr_0.4.0_linux_amd64.deb` |
+| Fedora, RHEL | `sudo rpm -i https://github.com/kentrow/tapyr/releases/download/v0.4.0/tapyr_0.4.0_linux_amd64.rpm` |
+| Container | `docker run --rm ghcr.io/kentrow/tapyr:0.4.0 version` |
+| Kubernetes | `helm install tapyr oci://ghcr.io/kentrow/charts/tapyr --namespace tapyr --values my-values.yaml` |
+| Any platform | the static binaries of the [releases page](https://github.com/kentrow/tapyr/releases), Linux, macOS and Windows, amd64 and arm64 |
 
-```sh
-docker run --rm ghcr.io/kentrow/tapyr:0.4.0 version
-```
-
-The binaries are on the [releases page](https://github.com/kentrow/tapyr/releases) with their SBOM. The checksums and the image are signed with cosign in keyless mode: [`docs/install.md`](docs/install.md) shows how to verify them, run the image, deploy with [systemd](examples/systemd/README.md) or on [Kubernetes](examples/kubernetes/README.md), and build from source.
+The packages are for amd64 and arm64 (replace `amd64`), and run Tapyr as a systemd service. Every artifact is signed with cosign in keyless mode and has its SBOM: [`docs/install.md`](docs/install.md) shows how to verify them, run the image, deploy with [systemd](examples/systemd/README.md) or on [Kubernetes](examples/kubernetes/README.md), and build from source.
 
 ## Use it with your own accounts
 
+[Configure your accounts](docs/configure-accounts.md) walks through it: the credentials, the account, its jobs, an output, and the checks before the first request. In short:
+
 1. Pick a provider in [`providers/`](providers/): its README gives the credentials it needs and an example configuration.
-2. Write the accounts, the jobs and an output (see [`examples/config`](examples/config), [`docs/outputs.md`](docs/outputs.md) and [`docs/spec/03-configuration.md`](docs/spec/03-configuration.md)). Secrets come from environment variables or files, never from the configuration files. In a container, set `settings.server.listen` to `0.0.0.0:9790`.
+2. Write the accounts, the jobs and an output. Secrets come from environment variables or files, never from the configuration files. In a container, set `settings.server.listen` to `0.0.0.0:9790`.
 
    ```yaml
    apiVersion: tapyr/v1alpha1
@@ -163,6 +171,7 @@ The documentation is published on [docs.tapyr.eu](https://docs.tapyr.eu): the de
 | Guide | |
 |---|---|
 | [Getting started](docs/getting-started.md) | A first configuration against a simulator, its plan, its run, a shrinking quota |
+| [Configure your accounts](docs/configure-accounts.md) | From the simulator to your own account: credentials, account, jobs, output, checks |
 | [Concepts](docs/concepts.md) | Providers, accounts, jobs, discovery, the budget engine and the planner |
 | [Install](docs/install.md) | Binaries, image, systemd, Kubernetes, signature verification, build from source |
 | [Outputs](docs/outputs.md) | Prometheus exposition, remote write, OTLP |

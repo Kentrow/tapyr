@@ -19,6 +19,8 @@ HPE Aruba Networking Central, **classic platform**, REST API: access points, swi
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 Aruba Central (classic) uses OAuth access tokens valid 2 hours and **rotating refresh tokens** valid 15 days: every refresh returns a new refresh token, and the previous one must not be used again ([access token management](https://developer.arubanetworks.com/central/docs/access-token-management)). The `aruba_central_classic` auth plugin handles it:
 
 1. In Central, API Gateway > System Apps & Tokens (or My Apps & Tokens): add an application, note its client ID and secret, then generate and download a token pair.

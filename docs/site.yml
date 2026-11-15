@@ -12,6 +12,7 @@ sources:
 
 nav:
   - docs/getting-started.md
+  - docs/configure-accounts.md
   - docs/concepts.md
   - Guides:
       - docs/install.md

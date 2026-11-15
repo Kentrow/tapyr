@@ -26,6 +26,8 @@ Not covered: the local API of the consoles, and the old session API of the UniFi
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 The API authenticates with an API key in the `X-API-Key` header.
 
 1. Sign in to [unifi.ui.com](https://unifi.ui.com) with an account that owns or administers the consoles.

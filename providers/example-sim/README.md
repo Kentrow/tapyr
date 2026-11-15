@@ -18,6 +18,8 @@ A vendor-neutral example provider, used for development, tests and demos, and th
 
 ## Auth setup
 
+[Configure your accounts](../../docs/configure-accounts.md) walks through a configuration of your own: the account, its jobs, an output and the checks before the first request.
+
 Bearer token from the `apiKey` secret. The simulator accepts `sim-api-key`.
 
 ## Limits
