@@ -20,6 +20,8 @@ describe("format", () => {
       long: "Waiting for sites, which fails: HTTP 401 (2m ago). Next try in 1h.",
     });
     expect(waitingText({ ...failing, parent: "networks" }, now).long).toBe("Waiting for networks, whose parent sites fails: HTTP 401 (2m ago). Next try in 1h.");
+    const problem = { class: "auth", title: "The provider rejected the credentials of lab.", action: "Check it.", docs_url: "u" };
+    expect(waitingText({ ...failing, problem }, now).long).toBe("Waiting for sites, which fails (2m ago). Next try in 1h.");
     expect(waitingWord("parent_failing")).toBe("waiting, parent failing");
     expect(waitingWord(undefined)).toBe("no run yet");
   });

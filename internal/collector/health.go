@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/kentrow/tapyr/internal/api"
 )
 
 // Health values of the status API: ok, degraded, failing, or unknown
@@ -43,6 +45,8 @@ type lastRun struct {
 	Result string
 	// Error is the redacted summary of the run, empty on success.
 	Error string
+	// Problem says it in words, nil on success.
+	Problem *api.Problem
 }
 
 // circuit is the state of a circuit breaker of an account: the account
@@ -154,4 +158,35 @@ func worseHealth(a, b string) string {
 		return b
 	}
 	return a
+}
+
+// accountProblem picks the problem an account shows first: credentials to
+// renew, then the problem of a failing run, then of a degraded one; among
+// them, rejected credentials first, since nothing works until they are
+// fixed. Nil when no run has a problem.
+func accountProblem(runs []lastRun) *api.Problem {
+	rank := func(r lastRun) int {
+		n := 0
+		if runHealth(r.Result) != healthFailing {
+			n += 10
+		}
+		if c := r.Problem.Class; c != "auth" && c != "forbidden" {
+			n++
+		}
+		return n
+	}
+	var best *lastRun
+	for i := range runs {
+		r := &runs[i]
+		if r.Problem == nil {
+			continue
+		}
+		if best == nil || rank(*r) < rank(*best) || rank(*r) == rank(*best) && r.Job < best.Job {
+			best = r
+		}
+	}
+	if best == nil {
+		return nil
+	}
+	return best.Problem
 }

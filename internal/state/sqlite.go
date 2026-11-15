@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -53,6 +54,13 @@ var schema = []string{
 		items INTEGER NOT NULL,
 		samples INTEGER NOT NULL,
 		error TEXT NOT NULL)`,
+	// Columns added after the first schema: added in place when missing,
+	// with defaults, so that the schema version does not change and an
+	// earlier Tapyr still reads and writes the store.
+	`ALTER TABLE runs ADD COLUMN error_class TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE runs ADD COLUMN error_status INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE runs ADD COLUMN error_subject TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE runs ADD COLUMN error_until INTEGER NOT NULL DEFAULT 0`,
 	`CREATE INDEX IF NOT EXISTS runs_by_instance ON runs (job, instance, id)`,
 	`CREATE TABLE IF NOT EXISTS inventory (
 		instance TEXT NOT NULL,
@@ -92,7 +100,13 @@ type SQLite struct {
 	// successful save, so that the next one writes only what changed.
 	ledgerMu sync.Mutex
 	saved    map[ledgerKey]LedgerEntry
+
+	// runErrors selects the error details of a run: the columns, or their
+	// defaults in a store written by an earlier Tapyr and opened read-only.
+	runErrors string
 }
+
+const runErrorColumns = "error_class, error_status, error_subject, error_until"
 
 // ledgerKey identifies a ledger entry (a limit and a scope key).
 type ledgerKey struct{ limit, scope string }
@@ -119,18 +133,28 @@ func OpenSQLite(ctx context.Context, path string, readOnly bool) (*SQLite, error
 		return nil, fmt.Errorf("opening state %s: %w", path, err)
 	}
 	db.SetMaxOpenConns(1) // SQLite allows one writer; serialize access
-	s := &SQLite{db: db}
+	s := &SQLite{db: db, runErrors: runErrorColumns}
 	if !readOnly {
 		if err := s.migrate(ctx); err != nil {
 			_ = db.Close()
 			return nil, fmt.Errorf("initializing state %s: %w", path, err)
 		}
+	} else if has, err := s.hasColumn(ctx, "runs", "error_class"); err == nil && !has {
+		s.runErrors = "'', 0, '', 0"
 	}
 	return s, nil
 }
 
 func (s *SQLite) migrate(ctx context.Context) error {
 	for _, stmt := range schema {
+		if table, column, ok := addedColumn(stmt); ok {
+			if has, err := s.hasColumn(ctx, table, column); err != nil || has {
+				if err != nil {
+					return err
+				}
+				continue
+			}
+		}
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
 			return err
 		}
@@ -145,6 +169,26 @@ func (s *SQLite) migrate(ctx context.Context) error {
 		return fmt.Errorf("unsupported state schema version %s (want %s)", v, schemaVersion)
 	}
 	return nil
+}
+
+// addedColumn returns the table and the column of an ALTER TABLE ... ADD
+// COLUMN statement of the schema.
+func addedColumn(stmt string) (table, column string, ok bool) {
+	f := strings.Fields(stmt)
+	if len(f) < 6 || f[0] != "ALTER" || f[3] != "ADD" || f[4] != "COLUMN" {
+		return "", "", false
+	}
+	return f[2], f[5], true
+}
+
+// hasColumn reports whether a table has a column.
+func (s *SQLite) hasColumn(ctx context.Context, table, column string) (bool, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, table, column).Scan(&n)
+	if err != nil {
+		return false, fmt.Errorf("reading the columns of %s: %w", table, err)
+	}
+	return n > 0, nil
 }
 
 // Close implements Store.
@@ -351,10 +395,15 @@ func (s *SQLite) AddRun(ctx context.Context, r RunRecord) error {
 		return fmt.Errorf("recording the run: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
+	until := int64(0)
+	if !r.ErrorUntil.IsZero() {
+		until = millis(r.ErrorUntil)
+	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO runs (job, instance, run_id, started, ended, result, requests,
-		retries, pages, items, samples, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		retries, pages, items, samples, error, error_class, error_status, error_subject, error_until)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		r.Job, r.Instance, r.RunID, millis(r.Started), millis(r.Ended), r.Result, r.Requests, r.Retries,
-		r.Pages, r.Items, r.Samples, r.Error); err != nil {
+		r.Pages, r.Items, r.Samples, r.Error, r.ErrorClass, r.ErrorStatus, r.ErrorSubject, until); err != nil {
 		return fmt.Errorf("recording the run: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM runs WHERE job = ? AND instance = ? AND id NOT IN (
@@ -371,13 +420,13 @@ func (s *SQLite) AddRun(ctx context.Context, r RunRecord) error {
 // Runs implements Store.
 func (s *SQLite) Runs(ctx context.Context, job, instance string, limit int) ([]RunRecord, error) {
 	return s.queryRuns(ctx, `SELECT job, instance, run_id, started, ended, result, requests, retries,
-		pages, items, samples, error FROM runs WHERE job = ? AND instance = ? ORDER BY id DESC LIMIT ?`, job, instance, limit)
+		pages, items, samples, error, `+s.runErrors+` FROM runs WHERE job = ? AND instance = ? ORDER BY id DESC LIMIT ?`, job, instance, limit)
 }
 
 // RunsOfJob implements Store.
 func (s *SQLite) RunsOfJob(ctx context.Context, job string, limit int) ([]RunRecord, error) {
 	return s.queryRuns(ctx, `SELECT job, instance, run_id, started, ended, result, requests, retries,
-		pages, items, samples, error FROM runs WHERE job = ? ORDER BY id DESC LIMIT ?`, job, limit)
+		pages, items, samples, error, `+s.runErrors+` FROM runs WHERE job = ? ORDER BY id DESC LIMIT ?`, job, limit)
 }
 
 func (s *SQLite) queryRuns(ctx context.Context, query string, args ...any) ([]RunRecord, error) {
@@ -389,12 +438,15 @@ func (s *SQLite) queryRuns(ctx context.Context, query string, args ...any) ([]Ru
 	var out []RunRecord
 	for rows.Next() {
 		var r RunRecord
-		var started, ended int64
+		var started, ended, until int64
 		if err := rows.Scan(&r.Job, &r.Instance, &r.RunID, &started, &ended, &r.Result, &r.Requests, &r.Retries,
-			&r.Pages, &r.Items, &r.Samples, &r.Error); err != nil {
+			&r.Pages, &r.Items, &r.Samples, &r.Error, &r.ErrorClass, &r.ErrorStatus, &r.ErrorSubject, &until); err != nil {
 			return nil, fmt.Errorf("reading the run history: %w", err)
 		}
 		r.Started, r.Ended = fromMillis(started), fromMillis(ended)
+		if until != 0 {
+			r.ErrorUntil = fromMillis(until)
+		}
 		out = append(out, r)
 	}
 	return out, rows.Err()

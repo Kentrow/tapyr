@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -46,10 +47,18 @@ func (d *debugCaptures) configure(enabled bool, maxBody int) {
 	}
 }
 
+// debugFailure is what the live debug shows of a run that did not
+// succeed: its problem in words, and the request that failed.
+type debugFailure struct {
+	problem *api.Problem
+	request *collect.Error
+}
+
 // keep records the last run of an instance: its pages (redacted bodies,
-// truncated, with the headers of interest) and its samples.
+// truncated, with the headers of interest), the response that failed, and
+// its samples.
 func (d *debugCaptures) keep(job *runtime.Job, runID string, at time.Time, result, errMsg string,
-	res *collect.Result, samples []model.Sample, headers []string,
+	res *collect.Result, samples []model.Sample, headers []string, failure debugFailure,
 ) {
 	d.mu.Lock()
 	enabled, maxBody := d.enabled, d.maxBody
@@ -59,27 +68,35 @@ func (d *debugCaptures) keep(job *runtime.Job, runID string, at time.Time, resul
 	}
 	c := &api.Debug{
 		Job: job.Name, Instance: job.Instance, RunID: runID, Time: at.UTC(), Result: result, Error: d.redact(errMsg),
-		Pages: []api.DebugPage{}, Samples: make([]api.DebugSample, 0, len(samples)),
+		Problem: failure.problem, Pages: []api.DebugPage{}, Samples: make([]api.DebugSample, 0, len(samples)),
+	}
+	page := func(status int, header http.Header, body string) api.DebugPage {
+		p := api.DebugPage{Status: status, Headers: map[string]string{}}
+		for _, h := range headers {
+			if v := header.Get(h); v != "" {
+				p.Headers[h] = v
+			}
+		}
+		text := d.redact(body)
+		if maxBody > 0 && len(text) > maxBody {
+			text, p.Truncated = text[:maxBody], true
+		}
+		p.Body = text
+		return p
 	}
 	if res != nil {
 		for _, p := range res.Pages {
-			page := api.DebugPage{Status: p.Status, Headers: map[string]string{}}
-			for _, h := range headers {
-				if v := p.Headers.Get(h); v != "" {
-					page.Headers[h] = v
-				}
-			}
 			body, err := json.MarshalIndent(p.Body, "", "  ")
 			if err != nil {
 				body = []byte("<unprintable body>")
 			}
-			text := d.redact(string(body))
-			if maxBody > 0 && len(text) > maxBody {
-				text, page.Truncated = text[:maxBody], true
-			}
-			page.Body = text
-			c.Pages = append(c.Pages, page)
+			c.Pages = append(c.Pages, page(p.Status, p.Headers, string(body)))
 		}
+	}
+	// The response that failed (an error status, a body that does not
+	// decode) is not a page of the result: shown as received, redacted.
+	if f := failure.request; f != nil && f.Status != 0 {
+		c.Pages = append(c.Pages, page(f.Status, f.Header, indentJSON(f.Body)))
 	}
 	for _, s := range samples {
 		labels := make(map[string]string, len(s.Labels))
@@ -144,6 +161,16 @@ func (d *debugCaptures) get(_ context.Context, job, instance string) (api.Debug,
 // debugHeaders are the response headers shown by the live debug endpoint,
 // besides the quota headers of the provider.
 var debugHeaders = []string{"Content-Type", "Link", "X-Next-Cursor", http.CanonicalHeaderKey("Retry-After")}
+
+// indentJSON indents a JSON body for reading, and returns any other body
+// as it is.
+func indentJSON(body []byte) string {
+	var out bytes.Buffer
+	if json.Indent(&out, body, "", "  ") == nil {
+		return out.String()
+	}
+	return string(body)
+}
 
 // KeptHeaders returns the response headers recorded per provider: the
 // quota headers of its limits and the rate-limit header, never others.

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
 import { Icon } from "../components/Icon";
+import { ProblemNote } from "../components/Problem";
 import { count, duration, outputHealth, percent, plural, scopeAccounts, seriesStatus, since, waitingText } from "../lib/format";
 import { useJSON, useList, useLive, type LiveEvent } from "../lib/live";
 import { href } from "../lib/router";
-import type { Account, Budget, Job, Output, Provider, Status } from "../lib/types";
+import type { Account, Budget, Job, Output, Problem, Provider, Status } from "../lib/types";
 
 type JobState = "ok" | "bad" | "idle";
 
@@ -91,7 +92,8 @@ export function Overview() {
             <div className="cell bad" key={a.name}>
               <span className="label">{a.provider}</span>
               <span className="value"><Icon name="alert" />Re-bootstrap required</span>
-              <span className="hint">Account {a.name}: its credentials can no longer be renewed. Generate new ones and reload.</span>
+              {a.problem ? <span className="hint"><ProblemNote problem={a.problem} /></span>
+                : <span className="hint">Account {a.name}: its credentials can no longer be renewed. Generate new ones and reload.</span>}
             </div>
           ))}
           {limited.map((o) => (
@@ -105,7 +107,7 @@ export function Overview() {
             <div className={`cell ${a.health === "failing" ? "bad" : "warn"}`} key={`health-${a.name}`}>
               <span className="label">{a.provider} / {a.name}</span>
               <span className="value"><Icon name="alert" />Account {a.health}</span>
-              <span className="hint mono">{a.reasons.join("; ")}</span>
+              <span className="hint"><ProblemNote problem={a.problem} detail={a.reasons.join("; ")} /></span>
             </div>
           ))}
         </div>
@@ -132,7 +134,7 @@ export function Overview() {
                   <div>
                     <strong>{a.title}</strong>
                     <span className="muted small"> {since(a.at)}</span>
-                    <div className="small muted mono">{a.ok ? a.detail : `failed: ${a.detail}`}</div>
+                    <div className="small muted">{a.detail}</div>
                   </div>
                 </li>
               ))}
@@ -147,7 +149,7 @@ export function Overview() {
                   <li key={j.name}>
                     <a href={href(["jobs", j.name])}><strong>{j.name}</strong></a>
                     <span className="muted small"> {since(j.last_run?.ended_at)}</span>
-                    {j.last_run?.error && <div className="mono small muted">{j.last_run.error}</div>}
+                    <div className="small"><ProblemNote problem={j.last_run?.problem} detail={j.last_run?.error} /></div>
                   </li>
                 ))}
               </ol>
@@ -182,7 +184,7 @@ export function Overview() {
 // unhealthyAccounts are the accounts that need a look, failing first, with
 // their reasons. A re-bootstrap has its own cell: the reasons that name it
 // are left out, and the account too when no other reason is left.
-export function unhealthyAccounts(accounts: Account[]): { name: string; provider: string; health: Account["health"]; reasons: string[] }[] {
+export function unhealthyAccounts(accounts: Account[]): { name: string; provider: string; health: Account["health"]; reasons: string[]; problem?: Problem }[] {
   const rank = (h: string) => (h === "failing" ? 0 : 1);
   return accounts
     .filter((a) => a.health === "failing" || a.health === "degraded")
@@ -191,6 +193,8 @@ export function unhealthyAccounts(accounts: Account[]): { name: string; provider
       provider: a.provider,
       health: a.health,
       reasons: a.auth.reauth_required ? (a.health_reasons ?? []).filter((r) => !r.includes("re-bootstrap")) : a.health_reasons ?? [],
+      // The re-bootstrap has its own cell, with its problem.
+      problem: a.auth.reauth_required ? undefined : a.problem,
     }))
     .filter((a) => a.reasons.length > 0)
     .sort((a, b) => rank(a.health) - rank(b.health) || a.name.localeCompare(b.name));
@@ -310,10 +314,10 @@ function useActivity(jobs: Job[] | undefined, max = 14): Activity[] {
         let a: Activity;
         switch (e.type) {
           case "run_finished":
-            a = { key: `${d.instance}-${d.run_id}`, at, ok: d.result === "success", title: String(d.job), detail: d.result === "success" ? `${d.samples} samples in ${d.duration_ms} ms` : String(d.result) };
+            a = { key: `${d.instance}-${d.run_id}`, at, ok: d.result === "success", title: String(d.job), detail: d.result === "success" ? `${d.samples} samples in ${d.duration_ms} ms` : d.problem ? String(d.problem) : `failed: ${d.result}` };
             break;
           case "config_reloaded":
-            a = { key: `reload-${at}`, at, ok: d.result === "success", title: "Configuration reloaded", detail: String(d.error ?? d.result) };
+            a = { key: `reload-${at}`, at, ok: d.result === "success", title: d.result === "success" ? "Configuration reloaded" : "Reload rejected", detail: d.result === "success" ? "success" : `${d.error ?? d.result}. The previous configuration keeps running.` };
             break;
           case "plan_changed":
             a = { key: `plan-${at}`, at, ok: d.feasible !== false, title: "Plan changed", detail: d.feasible === false ? "does not fit the quotas" : "fits the quotas" };
@@ -327,7 +331,7 @@ function useActivity(jobs: Job[] | undefined, max = 14): Activity[] {
   );
   const initial: Activity[] = (jobs ?? [])
     .filter((j) => j.last_run)
-    .map((j) => ({ key: `${j.last_run!.instance}-${j.last_run!.run_id}`, at: j.last_run!.ended_at, ok: j.last_run!.result === "success", title: j.name, detail: j.last_run!.result === "success" ? "succeeded" : (j.last_run!.error ?? j.last_run!.result) }))
+    .map((j) => ({ key: `${j.last_run!.instance}-${j.last_run!.run_id}`, at: j.last_run!.ended_at, ok: j.last_run!.result === "success", title: j.name, detail: j.last_run!.result === "success" ? "succeeded" : (j.last_run!.problem?.title ?? `failed: ${j.last_run!.error ?? j.last_run!.result}`) }))
     .sort((a, b) => b.at.localeCompare(a.at));
   const seen = new Set(live.map((a) => a.key));
   return [...live, ...initial.filter((a) => !seen.has(a.key))].slice(0, max);

@@ -162,4 +162,4 @@ Per account (per target for multi-target accounts):
 
 ## Run outcome
 
-Each run records: start, end, duration, requests (by class), pages, retries, items, samples produced, result (`success`, `partial`, `failed`, `skipped_budget`, `skipped_overlap`, `skipped_circuit`), error summary (redacted). Runs are kept in the state store (last 50 per job instance) and exposed in the status API.
+Each run records: start, end, duration, requests (by class), pages, retries, items, samples produced, result (`success`, `partial`, `failed`, `skipped_budget`, `skipped_overlap`, `skipped_circuit`), error summary (redacted), and the details of the error: its class (the class of the failed request, `mapping` for a response that does not map, or the reason of a budget refusal: `quota_exhausted`, `penalized`, `circuit_open`, `deadline`), the HTTP status, the templated endpoint or the limit that refused, and when a refusal should end. Runs are kept in the state store (last 50 per job instance) and exposed in the status API, where the details become a problem in words ([09](09-cli-api-ui.md#messages)).

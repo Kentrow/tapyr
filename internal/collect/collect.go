@@ -55,6 +55,11 @@ type Error struct {
 	Endpoint string
 	Status   int
 	Err      error
+	// Body and Header are the response that failed, when one was received
+	// (an error status, a body that does not decode), kept for the live
+	// debug: raw, to redact before showing.
+	Body   []byte
+	Header http.Header
 }
 
 func (e *Error) Error() string {
@@ -658,7 +663,7 @@ func (r *run) attempt(u *url.URL, method string, body []byte, retry bool) (*mapp
 	job := r.job
 	outcome := budget.Outcome{}
 	var observed Class
-	fail := func(class Class, status int, err error) error {
+	fail := func(class Class, status int, err error) *Error {
 		observed = class
 		outcome.Transient = class == ClassTransient
 		return &Error{Class: class, Endpoint: job.Request.Path, Status: status, Err: err}
@@ -751,13 +756,18 @@ func (r *run) attempt(u *url.URL, method string, body []byte, retry bool) (*mapp
 	if resp.StatusCode >= 300 && resp.StatusCode < 400 && resp.StatusCode != http.StatusNotModified {
 		return nil, r.redirectOf(u, method, body, resp)
 	}
+	failed := func(class Class, err error) error {
+		e := fail(class, resp.StatusCode, err)
+		e.Body, e.Header = data, resp.Header
+		return e
+	}
 	if class := classify(job.Errors, resp.StatusCode); class != "" {
-		return nil, fail(class, resp.StatusCode, fmt.Errorf("response: %s", excerpt(data)))
+		return nil, failed(class, fmt.Errorf("response: %s", excerpt(data)))
 	}
 	page := &mapping.Page{Status: resp.StatusCode, Headers: resp.Header, ReceivedAt: received}
 	if len(bytes.TrimSpace(data)) > 0 {
 		if page.Body, err = mapping.DecodeJSON(data); err != nil {
-			return nil, fail(ClassDecode, resp.StatusCode, err)
+			return nil, failed(ClassDecode, err)
 		}
 	}
 	r.res.Pages = append(r.res.Pages, *page)

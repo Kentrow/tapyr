@@ -2,6 +2,7 @@ import { Fragment, useMemo } from "react";
 import { Badge, Failure, Loading, PageHead, Select, Table } from "../components/ui";
 import { JsonTree } from "../components/JsonTree";
 import { CodeBlock, CopyButton } from "../components/Code";
+import { ProblemNote } from "../components/Problem";
 import { absolute, since } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
@@ -68,11 +69,15 @@ function Capture({ capture: c }: { capture: DebugT }) {
         <span className="mono">{c.instance}</span>
         <span className="muted" title={absolute(c.time)}>run {c.run_id}, {since(c.time)}</span>
       </div>
-      {c.error && <div className="banner bad mono small">{c.error}</div>}
+      {(c.problem || c.error) && (
+        <div className={`banner ${c.result === "failed" ? "bad" : "warn"} small`}>
+          <ProblemNote problem={c.problem} detail={c.error} />
+        </div>
+      )}
       <div className="debug-grid">
         <div className="stack">
           <h2>Response {pages.length > 1 ? `(${pages.length} pages)` : ""}</h2>
-          {pages.length === 0 && <div className="muted small">No response received.</div>}
+          {pages.length === 0 && <div className="muted small">{noResponse(c)}</div>}
           {pages.map((p, i) => (
             <div className="card" key={i}>
               <div className="row small" style={{ marginBottom: 8 }}>
@@ -102,7 +107,7 @@ function Capture({ capture: c }: { capture: DebugT }) {
             rows={c.samples}
             rowKey={(s) => s.name + JSON.stringify(s.labels)}
             initialSort={{ key: "name" }}
-            empty="No sample: check the mapping errors in the logs."
+            empty={noSamples(c)}
             columns={[
               { key: "name", label: "Metric", sort: (s) => s.name, render: (s) => <span className="mono small">{s.name}</span> },
               { key: "value", label: "Value", num: true, sort: (s) => s.value, render: (s) => <span className="num">{s.value}</span> },
@@ -113,4 +118,19 @@ function Capture({ capture: c }: { capture: DebugT }) {
       </div>
     </div>
   );
+}
+
+// noResponse says why a capture holds no response: the run was refused
+// before any request, or the request got no answer.
+export function noResponse(c: DebugT): string {
+  if (c.result.startsWith("skipped")) return "No request sent: the run was skipped before it (see above).";
+  if (c.result === "success") return "No response: the job made no request.";
+  return "No response received: the request got no answer (see the error above).";
+}
+
+// noSamples says why a capture holds no sample, from what the run did.
+export function noSamples(c: DebugT): string {
+  if (c.problem?.class === "mapping") return "No sample: the response could not be turned into metrics (see the error above).";
+  if (c.result !== "success" && c.result !== "partial") return "No sample: the run did not get its data (see the error above).";
+  return "No sample: the response held no item, or the mapping kept none. The mapping errors, if any, are in the logs.";
 }

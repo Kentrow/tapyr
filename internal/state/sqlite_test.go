@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -266,6 +267,73 @@ func TestRunsOfJob(t *testing.T) {
 
 // TestSchemaVersion refuses a state store written by another schema
 // version, instead of reading it wrongly.
+// TestRunErrorDetails checks the error details of a run: kept and read
+// back, added in place to a store written before them (keeping its runs
+// and its schema version), and read as defaults from such a store opened
+// read-only.
+func TestRunErrorDetails(t *testing.T) {
+	ctx := context.Background()
+	at := time.Date(2026, time.November, 3, 9, 0, 0, 0, time.UTC)
+	failed := RunRecord{
+		Job: "devices", Instance: "devices", RunID: "2", Started: at, Ended: at.Add(time.Second), Result: "skipped_budget",
+		Error: "budget refused: quota_exhausted", ErrorClass: "quota_exhausted", ErrorSubject: "daily", ErrorUntil: at.Add(15 * time.Hour),
+	}
+
+	// A store of the first schema, with one run.
+	path := filepath.Join(t.TempDir(), "tapyr.db")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stmt := range []string{
+		`CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+		`INSERT INTO meta VALUES ('schema_version', '1')`,
+		`CREATE TABLE runs (id INTEGER PRIMARY KEY AUTOINCREMENT, job TEXT NOT NULL, instance TEXT NOT NULL,
+			run_id TEXT NOT NULL, started INTEGER NOT NULL, ended INTEGER NOT NULL, result TEXT NOT NULL,
+			requests INTEGER NOT NULL, retries INTEGER NOT NULL, pages INTEGER NOT NULL, items INTEGER NOT NULL,
+			samples INTEGER NOT NULL, error TEXT NOT NULL)`,
+		`INSERT INTO runs (job, instance, run_id, started, ended, result, requests, retries, pages, items, samples, error)
+			VALUES ('devices', 'devices', '1', 0, 0, 'failed', 1, 0, 0, 0, 0, 'auth /sites: HTTP 401')`,
+	} {
+		if _, err := db.ExecContext(ctx, stmt); err != nil {
+			t.Fatalf("%s: %v", stmt, err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	ro, err := OpenSQLite(ctx, path, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runs, err := ro.Runs(ctx, "devices", "devices", 5); err != nil || len(runs) != 1 || runs[0].Error != "auth /sites: HTTP 401" || runs[0].ErrorClass != "" {
+		t.Fatalf("read-only, before the new columns: %+v, %v", runs, err)
+	}
+	_ = ro.Close()
+
+	s := open(t, path)
+	if err := s.AddRun(ctx, failed); err != nil {
+		t.Fatal(err)
+	}
+	runs, err := s.Runs(ctx, "devices", "devices", 5)
+	if err != nil || len(runs) != 2 {
+		t.Fatalf("runs = %+v, %v", runs, err)
+	}
+	if diff := cmp.Diff(failed, runs[0]); diff != "" {
+		t.Errorf("run read back (-want +got):\n%s", diff)
+	}
+	if runs[1].ErrorClass != "" || runs[1].ErrorStatus != 0 || !runs[1].ErrorUntil.IsZero() {
+		t.Errorf("earlier run: %+v", runs[1])
+	}
+	if v, _, _ := s.Meta(ctx, "schema_version"); v != schemaVersion {
+		t.Errorf("schema_version = %q", v)
+	}
+	// Opening again leaves the columns as they are.
+	_ = s.Close()
+	open(t, path)
+}
+
 func TestSchemaVersion(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "tapyr.db")

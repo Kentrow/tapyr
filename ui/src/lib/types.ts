@@ -53,6 +53,8 @@ export interface Account {
   // Why the account is not ok (redacted job errors, a re-bootstrap required,
   // open circuits); empty when ok.
   health_reasons: string[];
+  // The first thing to fix when the account is not ok.
+  problem?: Problem;
 }
 
 export interface RunSummary {
@@ -62,6 +64,20 @@ export interface RunSummary {
   started_at: string;
   ended_at: string;
   error?: string;
+  // The error in words, with what to do, when the run did not succeed.
+  problem?: Problem;
+}
+
+// Problem says what went wrong in words and what to do (spec 09,
+// "Messages"); the technical error is shown next to it.
+export interface Problem {
+  class: string;
+  title: string;
+  action: string;
+  // When it should end on its own (a quota reset, the end of a pause).
+  until?: string;
+  // The section of the troubleshooting guide of the running version.
+  docs_url: string;
 }
 
 export interface Job {
@@ -104,6 +120,7 @@ export interface Waiting {
   failing_job?: string;
   error?: string;
   failed_at?: string;
+  problem?: Problem;
 }
 
 export interface Instance {
@@ -262,6 +279,7 @@ export interface Debug {
   time: string;
   result: string;
   error?: string;
+  problem?: Problem;
   pages: DebugPage[];
   samples: DebugSample[];
   instances: string[];
