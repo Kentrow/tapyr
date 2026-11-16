@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-16
+
 ### Added
 
 - Series per output ([ADR 0014](docs/adr/0014-output-series.md)): `tapyr plan`, the status API, the Outputs page and the self-metric `tapyr_output_series` show how many series each output receives.
@@ -148,7 +150,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/kentrow/tapyr/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kentrow/tapyr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kentrow/tapyr/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/kentrow/tapyr/compare/v0.2.0...v0.2.1
