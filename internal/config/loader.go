@@ -14,7 +14,9 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
+	"github.com/goccy/go-yaml/lexer"
 	"github.com/goccy/go-yaml/parser"
+	"github.com/goccy/go-yaml/token"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/kentrow/tapyr/schemas"
@@ -247,13 +249,13 @@ func fileError(err error) string {
 // parseDocuments splits a file into documents, validates and decodes them.
 // Only the kinds in allowed are accepted.
 func (l *Loader) parseDocuments(file string, data []byte, allowed map[Kind]bool) ([]envelope, Diagnostics) {
-	f, err := parser.ParseBytes(data, 0)
+	parsed, err := parseYAMLDocuments(data)
 	if err != nil {
 		return nil, Diagnostics{yamlDiagnostic(file, data, err)}
 	}
 	var docs []envelope
 	var diags Diagnostics
-	for i, doc := range f.Docs {
+	for i, doc := range parsed {
 		if doc.Body == nil {
 			continue
 		}
@@ -281,6 +283,54 @@ func (l *Loader) parseDocuments(file string, data []byte, allowed map[Kind]bool)
 		}
 	}
 	return docs, diags
+}
+
+// parseYAMLDocuments parses the documents of a YAML stream. The parser
+// (goccy/go-yaml v1.19.2) drops every document after an empty one, a
+// document of comments only (a document commented out) or two document
+// markers in a row: the stream is split at the document markers the lexer
+// finds at the start of a line, and every part is parsed on its own,
+// after as many empty lines as come before it, so that the positions stay
+// those of the file.
+func parseYAMLDocuments(data []byte) ([]*ast.DocumentNode, error) {
+	var lines []int // the lines that start with a document marker
+	for _, tk := range lexer.Tokenize(string(data)) {
+		if tk.Type == token.DocumentHeaderType && tk.Position.Column == 1 {
+			lines = append(lines, tk.Position.Line)
+		}
+	}
+	// The byte offset of the start of every line.
+	starts := []int{0}
+	for i, c := range data {
+		if c == '\n' {
+			starts = append(starts, i+1)
+		}
+	}
+	var docs []*ast.DocumentNode
+	from := 0 // the offset of the part being parsed
+	for i := 0; i <= len(lines); i++ {
+		to := len(data)
+		if i < len(lines) && lines[i]-1 < len(starts) {
+			to = starts[lines[i]-1]
+		}
+		if to <= from && i < len(lines) {
+			continue // a marker on the first line
+		}
+		part := data[from:to]
+		line := bytes.Count(data[:from], []byte("\n"))
+		f, err := parser.ParseBytes(append(bytes.Repeat([]byte("\n"), line), part...), 0)
+		if err != nil {
+			return nil, err
+		}
+		for _, d := range f.Docs {
+			// Comments before the first marker are not a document.
+			if i > 0 || d.Body != nil || len(lines) == 0 {
+				docs = append(docs, d)
+			}
+		}
+		from = to
+	}
+	return docs, nil
 }
 
 func yamlDiagnostic(file string, data []byte, err error) Diagnostic {

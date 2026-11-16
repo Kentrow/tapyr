@@ -24,22 +24,9 @@ func newProviderListCmd(e *env, flags *globalFlags) *cobra.Command {
 			if format != "table" && format != "json" {
 				return &exitError{code: exitFailure, err: fmt.Errorf("invalid --output %q (want table or json)", format)}
 			}
-			loader, builtin, err := newLoader()
+			listed, err := listPackages(e, flags)
 			if err != nil {
 				return err
-			}
-			var pkgs []*config.Package
-			if paths := configPaths(e, flags); len(paths) > 0 {
-				if pkgs, err = userPackages(loader, paths); err != nil {
-					return err
-				}
-			}
-			listed := make([]listedPackage, 0, len(pkgs)+len(builtin))
-			seen := map[config.Name]bool{}
-			for i, p := range append(pkgs, builtin...) {
-				name := p.Provider.Metadata.Name
-				listed = append(listed, listedPackage{pkg: p, builtin: i >= len(pkgs), overridden: seen[name]})
-				seen[name] = true
 			}
 			if format == "json" {
 				return printCatalogJSON(e, listed)
@@ -58,11 +45,47 @@ func newProviderListCmd(e *env, flags *globalFlags) *cobra.Command {
 				fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\n", l.pkg.Provider.Metadata.Name, l.pkg.Provider.Metadata.Version,
 					len(l.pkg.JobTemplates), sim, status, l.pkg.Origin)
 			}
-			return w.Flush()
+			if err := w.Flush(); err != nil {
+				return err
+			}
+			fmt.Fprintln(e.stdout, "\nDetails of a package: tapyr provider show <name>")
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&format, "output", "table", "output format: table or json")
+	addProviderPathFlag(cmd, flags)
 	return cmd
+}
+
+// listPackages returns the provider packages a command can show, in
+// precedence order: those of the providerPaths of the configuration, then
+// of --provider-path, then the built-in ones.
+func listPackages(e *env, flags *globalFlags) ([]listedPackage, error) {
+	loader, builtin, err := newLoader()
+	if err != nil {
+		return nil, err
+	}
+	var pkgs []*config.Package
+	if paths := configPaths(e, flags); len(paths) > 0 {
+		if pkgs, err = userPackages(loader, paths); err != nil {
+			return nil, err
+		}
+	}
+	for _, dir := range flags.providerPaths {
+		found, err := provider.FromPath(loader, dir)
+		if err != nil {
+			return nil, &exitError{code: exitInvalidConfig, err: err}
+		}
+		pkgs = append(pkgs, found...)
+	}
+	listed := make([]listedPackage, 0, len(pkgs)+len(builtin))
+	seen := map[config.Name]bool{}
+	for i, p := range append(pkgs, builtin...) {
+		name := p.Provider.Metadata.Name
+		listed = append(listed, listedPackage{pkg: p, builtin: i >= len(pkgs), overridden: seen[name]})
+		seen[name] = true
+	}
+	return listed, nil
 }
 
 // userPackages loads the packages of the providerPaths of a configuration.

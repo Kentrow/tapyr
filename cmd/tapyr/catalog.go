@@ -127,16 +127,28 @@ type catalogProvider struct {
 	Readme      string             `json:"readme,omitempty"`
 	Simulator   bool               `json:"simulator"`
 	Auth        string             `json:"auth"`
+	Params      []catalogParam     `json:"params"`
+	Secrets     []catalogParam     `json:"secrets"`
 	Templates   []catalogTemplate  `json:"templates"`
 	Limits      []catalogLimit     `json:"limits"`
 }
 
+// catalogParam is a param or a secret of a package.
+type catalogParam struct {
+	Name        config.Identifier `json:"name"`
+	Required    bool              `json:"required"`
+	Description string            `json:"description,omitempty"`
+}
+
 type catalogTemplate struct {
-	Name            config.Name `json:"name"`
-	Description     string      `json:"description,omitempty"`
-	Path            string      `json:"path,omitempty"`
-	DefaultInterval string      `json:"defaultInterval"`
-	Metrics         []string    `json:"metrics"`
+	Name            config.Name     `json:"name"`
+	Description     string          `json:"description,omitempty"`
+	Path            string          `json:"path,omitempty"`
+	DefaultInterval string          `json:"defaultInterval"`
+	DefaultPriority config.Priority `json:"defaultPriority"`
+	Role            config.JobRole  `json:"role"`
+	ForEach         config.Name     `json:"forEach,omitempty"`
+	Metrics         []string        `json:"metrics"`
 }
 
 type catalogLimit struct {
@@ -182,6 +194,7 @@ func catalogEntry(l listedPackage) catalogProvider {
 		Name: m.Name, Version: m.Version, DisplayName: m.DisplayName, Description: m.Description, Docs: m.Docs,
 		Categories: m.Categories, Maintainers: m.Maintainers, Tier: m.Tier, Validation: m.Validation,
 		Origin: l.pkg.Origin, Status: "active", Simulator: l.pkg.Simulation != nil, Auth: "none",
+		Params: catalogParams(p.Spec.Params), Secrets: catalogParams(p.Spec.Secrets),
 		Templates: []catalogTemplate{}, Limits: []catalogLimit{},
 	}
 	if l.builtin {
@@ -206,7 +219,17 @@ func catalogEntry(l listedPackage) catalogProvider {
 	for _, t := range templates {
 		ct := catalogTemplate{
 			Name: t.Metadata.Name, Description: t.Metadata.Description,
-			DefaultInterval: shortDuration(t.Spec.DefaultInterval.Std()), Metrics: templateMetrics(t),
+			DefaultInterval: shortDuration(t.Spec.DefaultInterval.Std()), DefaultPriority: t.Spec.DefaultPriority,
+			Role: t.Spec.Role, Metrics: templateMetrics(t),
+		}
+		if ct.DefaultPriority == "" {
+			ct.DefaultPriority = config.PriorityNormal
+		}
+		if ct.Role == "" {
+			ct.Role = config.RoleMetrics
+		}
+		if t.Spec.ForEach != nil {
+			ct.ForEach = t.Spec.ForEach.Template
 		}
 		if t.Spec.Request != nil {
 			ct.Path = t.Spec.Request.Path
@@ -222,6 +245,16 @@ func catalogEntry(l listedPackage) catalogProvider {
 		c.Limits = append(c.Limits, cl)
 	}
 	return c
+}
+
+// catalogParams returns the params or the secrets of a package, in its
+// order.
+func catalogParams(specs []config.ParamSpec) []catalogParam {
+	out := make([]catalogParam, 0, len(specs))
+	for _, p := range specs {
+		out = append(out, catalogParam{Name: p.Name, Required: p.Required, Description: p.Description})
+	}
+	return out
 }
 
 // templateMetrics returns the sorted metric names of a template.

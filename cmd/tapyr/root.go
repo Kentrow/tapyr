@@ -44,7 +44,8 @@ type globalFlags struct {
 	logLevel    string
 	logFormat   string
 	// providerPaths are the --provider-path directories of the commands
-	// that load a configuration offline (validate, plan, record).
+	// that load provider packages (validate, plan, record, provider list
+	// and show).
 	providerPaths []string
 }
 
@@ -133,6 +134,7 @@ func newProviderCmd(e *env, flags *globalFlags) *cobra.Command {
 	}
 	cmd.AddCommand(
 		newProviderListCmd(e, flags),
+		newProviderShowCmd(e, flags),
 		newProviderLintCmd(e),
 	)
 	return cmd

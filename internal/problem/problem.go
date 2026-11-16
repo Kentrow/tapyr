@@ -154,11 +154,18 @@ var release = regexp.MustCompile(`^v?(\d+)\.(\d+)\.\d+$`)
 // release candidate or a development build, which may describe what no
 // release has yet (ADR 0010).
 func DocsURL(version, anchor string) string {
+	return DocsPage(version, "troubleshooting/#"+anchor)
+}
+
+// DocsPage returns the link to a page of the documentation of a version
+// (page "configure-accounts/", with an anchor if needed): /X.Y/ for a
+// release, /dev/ for any other build.
+func DocsPage(version, page string) string {
 	path := "dev"
 	if m := release.FindStringSubmatch(version); m != nil {
 		path = m[1] + "." + m[2]
 	}
-	return "https://docs.tapyr.eu/" + path + "/troubleshooting/#" + anchor
+	return "https://docs.tapyr.eu/" + path + "/" + page
 }
 
 // secrets names the secrets to check, by their references.

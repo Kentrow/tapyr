@@ -16,6 +16,9 @@ func didYouMean(name string, candidates []string) string {
 	return ""
 }
 
+// DidYouMean is didYouMean for the commands: " (did you mean "x"?)" or "".
+func DidYouMean(name string, candidates []string) string { return didYouMean(name, candidates) }
+
 // closest returns the candidate most likely meant by name: the same name
 // in another case, else one within a few typos (an edit distance of a
 // third of the length, for names of 4 characters or more), else one that
