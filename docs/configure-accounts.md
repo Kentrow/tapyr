@@ -4,13 +4,13 @@
 
 ## 1. Pick a provider package
 
-`tapyr provider list` lists the packages Tapyr knows, and [Providers](providers.md) has them all with their validation status. The README of a package says:
+`tapyr provider list` lists the packages Tapyr knows, and [Providers](providers.md) has them all with their validation status. `tapyr provider show <name>` describes one: its secrets and params with what they are, its templates with their interval and metrics, its limits with their sources; `tapyr provider show <name> --example` prints its example configuration, ready to copy. The README of a package says more:
 
 - what it collects, template by template, and what each template costs in requests;
 - the credentials it needs and the permissions to give them (read-only is always enough: Tapyr never writes);
 - its params (a regional base URL, an organization ID...), and its limits with their sources.
 
-For Meraki, that is the [`meraki-dashboard` README](../providers/meraki-dashboard/README.md): an API key of a read-only administrator, and nothing else.
+For Meraki, that is `tapyr provider show meraki-dashboard` and the [`meraki-dashboard` README](../providers/meraki-dashboard/README.md): an API key of a read-only administrator, and nothing else.
 
 ## 2. Keep the credentials out of the configuration
 

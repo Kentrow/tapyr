@@ -52,6 +52,21 @@ tapyr provider list [flags]
 | Flag | Default | Description |
 |---|---|---|
 | `--output string` | `table` | output format: table or json |
+| `--provider-path string` |  | directory of provider packages, repeatable, after the providerPaths of the configuration |
+
+## tapyr provider show
+
+Describe a provider package: what it is and how it was validated, the secrets and params an account gives it, its templates (interval, role, metrics) and its limits with their sources. --example prints the example configuration of the package, to copy and adapt; --output json its entry of the provider catalog (see tapyr provider list --output json).
+
+```text
+tapyr provider show <name> [flags]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--example` |  | print the example configuration of the package |
+| `--output string` | `text` | output format: text or json |
+| `--provider-path string` |  | directory of provider packages, repeatable, after the providerPaths of the configuration |
 
 ## tapyr record
 

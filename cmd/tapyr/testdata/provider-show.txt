@@ -1,0 +1,59 @@
+meraki-dashboard 0.1.0 - Cisco Meraki Dashboard
+Cisco Meraki Dashboard API v1
+
+Validation:  on a real platform (Dashboard API v1, 2026-11-07) and the simulator
+API docs:    https://developer.cisco.com/meraki/api-v1/
+Origin:      built in
+Simulator:   tapyr sim --provider meraki-dashboard
+Auth:        bearer
+
+Secrets, on the account as secrets: { NAME: { env: VAR } }:
+  apiKey  required  Dashboard API key (read-only administrator recommended)
+
+Params, on the account as params: { NAME: VALUE }:
+  baseURL  optional  Base URL of the Dashboard API:
+                     https://api.meraki.com/api/v1 (default), or a regional one
+                     (api.meraki.ca, api.meraki.cn, api.meraki.in,
+                     api.gov-meraki.com)
+
+Templates, named by a job as template: NAME (parents first):
+  meraki-organizations
+    every 1h, priority low, also lists items for other templates
+    metrics: meraki_organization_api_enabled, meraki_organization_info
+  meraki-appliance-uplink-statuses
+    every 5m, for each item of meraki-organizations
+    metrics: meraki_appliance_uplink_active, meraki_appliance_uplink_up
+  meraki-device-availabilities
+    every 5m, priority high, for each item of meraki-organizations
+    metrics: meraki_device_alerting, meraki_device_up
+  meraki-devices
+    every 1h, priority low, for each item of meraki-organizations
+    metrics: meraki_device_info
+  meraki-networks
+    every 1h, priority low, for each item of meraki-organizations
+    metrics: meraki_network_info
+  meraki-wireless-client-counts
+    every 5m, for each item of meraki-organizations
+    metrics: meraki_wireless_device_clients
+
+Limits, which Tapyr keeps to:
+  org-rate
+    10/s, burst 20, per organizationId
+    10 requests per second per organization, plus 10 more in the first second
+    (token bucket), shared by every application of the organization
+    (developer.cisco.com/meraki/api-v1/rate-limit)
+    source: vendor documentation (2026-11),
+            https://developer.cisco.com/meraki/api-v1/rate-limit/
+  ip-rate
+    100/s, burst 100, for the whole Tapyr process
+    100 requests per second per source IP address
+    (developer.cisco.com/meraki/api-v1/rate-limit)
+    source: vendor documentation (2026-11),
+            https://developer.cisco.com/meraki/api-v1/rate-limit/
+  ip-concurrency
+    10 concurrent requests, for the whole Tapyr process
+    Concurrent requests per source IP (assumed; not documented officially, 10 is
+    community knowledge)
+    source: assumed, not documented
+
+Example configuration: tapyr provider show meraki-dashboard --example

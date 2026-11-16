@@ -14,11 +14,12 @@ Common exit codes: `0` success, `1` usage error or internal error, `2` invalid c
 | `tapyr sim ...` | Run provider simulators (see `08-simulator.md`) | |
 | `tapyr record --job J [--job ...] --out DIR [--anonymize FILE] [--provider-path DIR ...]` | Run jobs once and record their responses, anonymized (see `08-simulator.md`) | 0 ok, 1 error, 2 invalid configuration |
 | `tapyr schema [--kind K] [--out dir]` | Print or write the JSON Schemas embedded in the binary | |
-| `tapyr provider list [--output table\|json]` | List built-in and user provider packages with versions; `json` is the [provider catalog output](#provider-catalog-output) | |
+| `tapyr provider list [--output table\|json] [--provider-path DIR ...]` | List built-in and user provider packages with versions; `json` is the [provider catalog output](#provider-catalog-output) | |
+| `tapyr provider show <name> [--example] [--output text\|json] [--provider-path DIR ...]` | Describe a provider package: what it is and its validation, its secrets and params, its templates, its limits ([example](#provider-show)); `--example` prints its example configuration, `json` its entry of the [provider catalog output](#provider-catalog-output) | 0 ok, 1 unknown provider |
 | `tapyr provider lint <dir> [--update] [--catalog]` | Validate a provider package, lint its dashboards and run its contract tests (`--update` rewrites `tests/expected.prom`, `--catalog` also requires the catalog metadata) | 0 ok, 2 errors |
 | `tapyr version` | Version, revision, Go version | |
 
-`--provider-path` (validate, plan, record, and sim) loads the provider packages of a directory in addition to the built-in ones and to the `providerPaths` of the configuration, after the latter: it serves a package being written, before it is built in or referenced by a configuration.
+`--provider-path` (validate, plan, record, sim, provider list and provider show) loads the provider packages of a directory in addition to the built-in ones and to the `providerPaths` of the configuration, after the latter: it serves a package being written, before it is built in or referenced by a configuration.
 
 Signals for `run`: SIGHUP reloads the configuration (validated first; an invalid config is rejected and the running config kept); SIGINT/SIGTERM trigger graceful shutdown.
 
@@ -38,6 +39,44 @@ aruba-central-classic/daily  24h          4500           529                    
 The plan fits: every job runs at its desired interval.
 ```
 
+### Provider show
+
+`tapyr provider show <name>` describes a package for the person writing an account: what it is and how it was validated, the secrets and params of its accounts with their descriptions, its templates (default interval, priority when not `normal`, the template whose items a fan-out runs for, the role of a template that lists items for others, the metrics), and its limits (value, scope, description, source), in the words of the [status API](#messages): no scope keys, no internal names. Templates come parents first. It ends with the command of the example configuration. The text of the built-in package `meraki-dashboard` is kept in `cmd/tapyr/testdata/provider-show.txt`; an excerpt:
+
+```
+meraki-dashboard 0.1.0 - Cisco Meraki Dashboard
+Cisco Meraki Dashboard API v1
+
+Validation:  on a real platform (Dashboard API v1, 2026-11-07) and the simulator
+API docs:    https://developer.cisco.com/meraki/api-v1/
+Origin:      built in
+Simulator:   tapyr sim --provider meraki-dashboard
+Auth:        bearer
+
+Secrets, on the account as secrets: { NAME: { env: VAR } }:
+  apiKey  required  Dashboard API key (read-only administrator recommended)
+
+Templates, named by a job as template: NAME (parents first):
+  meraki-organizations
+    every 1h, priority low, also lists items for other templates
+    metrics: meraki_organization_api_enabled, meraki_organization_info
+  meraki-device-availabilities
+    every 5m, priority high, for each item of meraki-organizations
+    metrics: meraki_device_alerting, meraki_device_up
+
+Limits, which Tapyr keeps to:
+  org-rate
+    10/s, burst 20, per organizationId
+    10 requests per second per organization, plus 10 more in the first second
+    (token bucket), shared by every application of the organization
+    source: vendor documentation (2026-11),
+            https://developer.cisco.com/meraki/api-v1/rate-limit/
+
+Example configuration: tapyr provider show meraki-dashboard --example
+```
+
+`--example` prints the example configuration of the package (`examples/*.yaml`, the files one after the other) as it is, comments included, to copy and adapt. When it declares no `Output`, it ends with a commented one (a Prometheus endpoint) and the link to [Configure your accounts](../configure-accounts.md): without an output, its jobs collect nothing ([ADR 0013](../adr/0013-unconsumed-jobs.md)). For every built-in package, that example with its output uncommented passes `tapyr validate` (`TestProviderShowExample`).
+
 ### Provider catalog output
 
 `tapyr provider list --output json` describes the packages the command lists, in precedence order, for the provider catalog of tapyr.eu ([ADR 0011](../adr/0011-provider-ecosystem.md)): the site repository builds the catalog from the output of a tagged release, as it builds the documentation from `docsite export` ([ADR 0010](../adr/0010-documentation-site.md)). It is an interface of the site repository. The keys are the camelCase names of the configuration fields they come from; an optional field without a value is left out.
@@ -50,8 +89,11 @@ The plan fits: every job runs at its desired interval.
   - `origin`: `builtin`, or the directory of a user package; `status`: `active`, or `overridden` by a package of the same name listed before it;
   - `readme`: for a built-in package, the path of its README in this repository (`providers/<name>/README.md`); the site maps it to the page of the documentation version it publishes;
   - `simulator`: whether the package has one; `auth`: the auth type, `plugin:<name>` for an auth plugin;
-  - `templates`: `name`, `description`, the request `path`, `defaultInterval` (`5m`, `1h`) and the sorted `metrics` names it produces;
+  - `params` and `secrets`: `name`, `required` and `description`, in the order of the package;
+  - `templates`: `name`, `description`, the request `path`, `defaultInterval` (`5m`, `1h`), `defaultPriority` (`normal` when the template sets none), `role` (`metrics` when the template sets none), `forEach` (the template whose items it runs for, for a fan-out) and the sorted `metrics` names it produces;
   - `limits`: `name`, `kind`, `value` (for humans, defaults applied: `10/s, burst 20`, `4 concurrent requests`, `100000 per month, reset on day 1 at 00:00 UTC`, `auto (5000 until learned) per day, reset at 00:00 UTC`), `scope` (the dimensions of `scope.by`), `description` and `source` (`kind`, `url`, `date`).
+
+`tapyr provider show <name> --output json` prints the entry of one package, as an object of the same shape (the active package of that name).
 
 The output of the built-in packages is kept in `cmd/tapyr/testdata/provider-list.json` (`go test ./cmd/tapyr -run TestProviderListJSON -update`), so that a change of the interface shows in the diff of a pull request.
 

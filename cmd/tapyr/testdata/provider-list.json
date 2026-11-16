@@ -85,11 +85,42 @@
       "readme": "providers/aruba-central-classic/README.md",
       "simulator": true,
       "auth": "plugin:aruba_central_classic",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": true,
+          "description": "API gateway of the Central cluster, for example https://apigw-eucentral3.central.arubanetworks.com"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "clientId",
+          "required": true,
+          "description": "Client ID of the API Gateway application"
+        },
+        {
+          "name": "clientSecret",
+          "required": true,
+          "description": "Client secret of the API Gateway application"
+        },
+        {
+          "name": "refreshToken",
+          "required": true,
+          "description": "Bootstrap refresh token (API Gateway \u003e My Apps \u0026 Tokens \u003e Download Token)"
+        },
+        {
+          "name": "accessToken",
+          "required": false,
+          "description": "Bootstrap access token, used until the first refresh (optional)"
+        }
+      ],
       "templates": [
         {
           "name": "aruba-aps",
           "path": "/monitoring/v2/aps",
           "defaultInterval": "5m",
+          "defaultPriority": "high",
+          "role": "metrics",
           "metrics": [
             "aruba_ap_clients",
             "aruba_ap_info",
@@ -101,6 +132,8 @@
           "name": "aruba-gateways",
           "path": "/monitoring/v1/gateways",
           "defaultInterval": "15m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "aruba_gateway_info",
             "aruba_gateway_up"
@@ -110,6 +143,8 @@
           "name": "aruba-sites",
           "path": "/central/v2/sites",
           "defaultInterval": "1h",
+          "defaultPriority": "low",
+          "role": "metrics",
           "metrics": [
             "aruba_site_info"
           ]
@@ -118,6 +153,8 @@
           "name": "aruba-switches",
           "path": "/monitoring/v1/switches",
           "defaultInterval": "15m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "aruba_switch_info",
             "aruba_switch_up"
@@ -178,11 +215,32 @@
       "readme": "providers/cisco-thousandeyes/README.md",
       "simulator": true,
       "auth": "bearer",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": false,
+          "description": "Base URL of API v7 (default https://api.thousandeyes.com/v7)"
+        },
+        {
+          "name": "accountGroupId",
+          "required": false,
+          "description": "Account group to read (the aid parameter); without it, the default account group of the user of the token"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "apiToken",
+          "required": true,
+          "description": "API bearer token of a user with read access to the tests and agents"
+        }
+      ],
       "templates": [
         {
           "name": "thousandeyes-agents",
           "path": "/agents",
           "defaultInterval": "15m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "thousandeyes_agent_info",
             "thousandeyes_agent_up"
@@ -192,6 +250,9 @@
           "name": "thousandeyes-network-results",
           "path": "/test-results/{testId}/network",
           "defaultInterval": "5m",
+          "defaultPriority": "high",
+          "role": "metrics",
+          "forEach": "thousandeyes-tests",
           "metrics": [
             "thousandeyes_network_health_score",
             "thousandeyes_network_jitter_seconds",
@@ -206,6 +267,8 @@
           "name": "thousandeyes-tests",
           "path": "/tests",
           "defaultInterval": "1h",
+          "defaultPriority": "low",
+          "role": "both",
           "metrics": [
             "thousandeyes_test_enabled",
             "thousandeyes_test_info",
@@ -252,11 +315,27 @@
       "readme": "providers/example-sim/README.md",
       "simulator": true,
       "auth": "bearer",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": false,
+          "description": "Base URL of the API, for example the address of tapyr sim"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "apiKey",
+          "required": true,
+          "description": "API key sent as a bearer token (the simulator accepts sim-api-key)"
+        }
+      ],
       "templates": [
         {
           "name": "example-sim-devices",
           "path": "/devices",
           "defaultInterval": "5m",
+          "defaultPriority": "high",
+          "role": "metrics",
           "metrics": [
             "example_device_clients",
             "example_device_info",
@@ -269,6 +348,9 @@
           "name": "example-sim-network-devices",
           "path": "/sites/{siteId}/networks/{networkId}/devices",
           "defaultInterval": "5m",
+          "defaultPriority": "normal",
+          "role": "metrics",
+          "forEach": "example-sim-networks",
           "metrics": [
             "example_network_device_up"
           ]
@@ -277,6 +359,9 @@
           "name": "example-sim-networks",
           "path": "/sites/{siteId}/networks",
           "defaultInterval": "30m",
+          "defaultPriority": "low",
+          "role": "both",
+          "forEach": "example-sim-sites",
           "metrics": [
             "example_network_info"
           ]
@@ -285,6 +370,8 @@
           "name": "example-sim-sites",
           "path": "/sites",
           "defaultInterval": "1h",
+          "defaultPriority": "low",
+          "role": "both",
           "metrics": [
             "example_site_devices",
             "example_site_info"
@@ -353,11 +440,32 @@
       "readme": "providers/juniper-mist/README.md",
       "simulator": true,
       "auth": "header",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": false,
+          "description": "API host of the Mist cloud of the organization: https://api.mist.com (default, Global 01), or a regional one such as https://api.eu.mist.com or https://api.gc1.mist.com (see the README)"
+        },
+        {
+          "name": "orgId",
+          "required": true,
+          "description": "Organization ID (Organization \u003e Settings in the Mist portal)"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "apiToken",
+          "required": true,
+          "description": "Organization API token with a read-only role (Organization \u003e Settings \u003e API Token)"
+        }
+      ],
       "templates": [
         {
           "name": "mist-alarms",
           "path": "/api/v1/orgs/{orgId}/alarms/count",
           "defaultInterval": "15m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "mist_alarms_last_day"
           ]
@@ -366,6 +474,8 @@
           "name": "mist-devices",
           "path": "/api/v1/orgs/{orgId}/stats/devices",
           "defaultInterval": "5m",
+          "defaultPriority": "high",
+          "role": "metrics",
           "metrics": [
             "mist_device_clients",
             "mist_device_cpu_usage_ratio",
@@ -379,6 +489,8 @@
           "name": "mist-sites",
           "path": "/api/v1/orgs/{orgId}/stats/sites",
           "defaultInterval": "15m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "mist_site_clients",
             "mist_site_devices",
@@ -430,11 +542,28 @@
       "readme": "providers/meraki-dashboard/README.md",
       "simulator": true,
       "auth": "bearer",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": false,
+          "description": "Base URL of the Dashboard API: https://api.meraki.com/api/v1 (default), or a regional one (api.meraki.ca, api.meraki.cn, api.meraki.in, api.gov-meraki.com)"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "apiKey",
+          "required": true,
+          "description": "Dashboard API key (read-only administrator recommended)"
+        }
+      ],
       "templates": [
         {
           "name": "meraki-appliance-uplink-statuses",
           "path": "/organizations/{organizationId}/appliance/uplink/statuses",
           "defaultInterval": "5m",
+          "defaultPriority": "normal",
+          "role": "metrics",
+          "forEach": "meraki-organizations",
           "metrics": [
             "meraki_appliance_uplink_active",
             "meraki_appliance_uplink_up"
@@ -444,6 +573,9 @@
           "name": "meraki-device-availabilities",
           "path": "/organizations/{organizationId}/devices/availabilities",
           "defaultInterval": "5m",
+          "defaultPriority": "high",
+          "role": "metrics",
+          "forEach": "meraki-organizations",
           "metrics": [
             "meraki_device_alerting",
             "meraki_device_up"
@@ -453,6 +585,9 @@
           "name": "meraki-devices",
           "path": "/organizations/{organizationId}/devices",
           "defaultInterval": "1h",
+          "defaultPriority": "low",
+          "role": "metrics",
+          "forEach": "meraki-organizations",
           "metrics": [
             "meraki_device_info"
           ]
@@ -461,6 +596,9 @@
           "name": "meraki-networks",
           "path": "/organizations/{organizationId}/networks",
           "defaultInterval": "1h",
+          "defaultPriority": "low",
+          "role": "metrics",
+          "forEach": "meraki-organizations",
           "metrics": [
             "meraki_network_info"
           ]
@@ -469,6 +607,8 @@
           "name": "meraki-organizations",
           "path": "/organizations",
           "defaultInterval": "1h",
+          "defaultPriority": "low",
+          "role": "both",
           "metrics": [
             "meraki_organization_api_enabled",
             "meraki_organization_info"
@@ -478,6 +618,9 @@
           "name": "meraki-wireless-client-counts",
           "path": "/organizations/{organizationId}/wireless/clients/overview/byDevice",
           "defaultInterval": "5m",
+          "defaultPriority": "normal",
+          "role": "metrics",
+          "forEach": "meraki-organizations",
           "metrics": [
             "meraki_wireless_device_clients"
           ]
@@ -551,11 +694,28 @@
       "readme": "providers/teltonika-rms/README.md",
       "simulator": true,
       "auth": "bearer",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": false,
+          "description": "Base URL of the RMS API (default https://api.rms.teltonika-networks.com)"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "token",
+          "required": true,
+          "description": "Personal access token with the devices:read scope (Account settings \u003e API \u003e Access tokens)"
+        }
+      ],
       "templates": [
         {
           "name": "rms-device-data-usage",
           "path": "/devices/{deviceId}/data-usage",
           "defaultInterval": "6h",
+          "defaultPriority": "low",
+          "role": "metrics",
+          "forEach": "rms-devices",
           "metrics": [
             "rms_device_mobile_received_bytes_today",
             "rms_device_mobile_transmitted_bytes_today"
@@ -565,6 +725,8 @@
           "name": "rms-devices",
           "path": "/devices",
           "defaultInterval": "5m",
+          "defaultPriority": "high",
+          "role": "both",
           "metrics": [
             "rms_device_info",
             "rms_device_last_connection_timestamp_seconds",
@@ -649,11 +811,32 @@
       "readme": "providers/teltonika-rutos/README.md",
       "simulator": true,
       "auth": "session_login",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": true,
+          "description": "Address of the router, for example https://192.168.1.1"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "username",
+          "required": true,
+          "description": "RutOS user, ideally in a group with read access only"
+        },
+        {
+          "name": "password",
+          "required": true,
+          "description": "Password of the RutOS user"
+        }
+      ],
       "templates": [
         {
           "name": "rutos-device",
           "path": "/system/device/status",
           "defaultInterval": "30m",
+          "defaultPriority": "low",
+          "role": "metrics",
           "metrics": [
             "rutos_device_info"
           ]
@@ -662,6 +845,8 @@
           "name": "rutos-failover",
           "path": "/failover/status",
           "defaultInterval": "1m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "rutos_failover_interface_enabled",
             "rutos_failover_interface_lost_probes",
@@ -673,6 +858,8 @@
           "name": "rutos-interfaces",
           "path": "/interfaces/status",
           "defaultInterval": "1m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "rutos_interface_info",
             "rutos_interface_received_bytes_total",
@@ -687,6 +874,8 @@
           "name": "rutos-modems",
           "path": "/modems/status",
           "defaultInterval": "1m",
+          "defaultPriority": "high",
+          "role": "metrics",
           "metrics": [
             "rutos_modem_active_sim",
             "rutos_modem_connected",
@@ -708,6 +897,8 @@
           "name": "rutos-system",
           "path": "/system/device/usage/status",
           "defaultInterval": "1m",
+          "defaultPriority": "high",
+          "role": "metrics",
           "metrics": [
             "rutos_flash_free_bytes",
             "rutos_flash_total_bytes",
@@ -772,11 +963,27 @@
       "readme": "providers/unifi-site-manager/README.md",
       "simulator": true,
       "auth": "header",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": false,
+          "description": "API host (default https://api.ui.com)"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "apiKey",
+          "required": true,
+          "description": "API key of the UI account (unifi.ui.com, Settings \u003e API Keys), with the Site Manager scope only"
+        }
+      ],
       "templates": [
         {
           "name": "unifi-devices",
           "path": "/v1/devices",
           "defaultInterval": "5m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "unifi_device_boot_timestamp_seconds",
             "unifi_device_info",
@@ -788,6 +995,8 @@
           "name": "unifi-hosts",
           "path": "/v1/hosts",
           "defaultInterval": "15m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "unifi_host_blocked",
             "unifi_host_connected",
@@ -800,6 +1009,8 @@
           "name": "unifi-isp-metrics",
           "path": "/v1/isp-metrics/5m",
           "defaultInterval": "5m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "unifi_isp_expected_download_bits_per_second",
             "unifi_isp_expected_upload_bits_per_second",
@@ -813,6 +1024,8 @@
           "name": "unifi-isp-metrics-hourly",
           "path": "/v1/isp-metrics/1h",
           "defaultInterval": "1h",
+          "defaultPriority": "low",
+          "role": "metrics",
           "metrics": [
             "unifi_isp_expected_download_bits_per_second",
             "unifi_isp_expected_upload_bits_per_second",
@@ -826,6 +1039,8 @@
           "name": "unifi-sites",
           "path": "/v1/sites",
           "defaultInterval": "5m",
+          "defaultPriority": "normal",
+          "role": "metrics",
           "metrics": [
             "unifi_site_clients",
             "unifi_site_critical_notifications",

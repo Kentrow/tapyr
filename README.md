@@ -161,7 +161,7 @@ The packages are for amd64 and arm64 (replace `amd64`), and run Tapyr as a syste
 | `tapyr plan` | Project the consumption of every quota and the effective interval of every job |
 | `tapyr sim` | Serve the simulator of a provider, or of all of them (`--all`) |
 | `tapyr record` | Record real responses, anonymized, to build fixtures |
-| `tapyr provider list`, `tapyr provider lint` | List the provider packages, check one with its contract test |
+| `tapyr provider list`, `show`, `lint` | List the provider packages, describe one with an example configuration, check one with its contract test |
 | `tapyr schema` | Print the JSON Schemas of the configuration, for editors |
 
 ## Documentation
