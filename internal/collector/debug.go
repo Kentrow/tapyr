@@ -47,6 +47,13 @@ func (d *debugCaptures) configure(enabled bool, maxBody int) {
 	}
 }
 
+// on reports whether the live debug endpoint is enabled.
+func (d *debugCaptures) on() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.enabled
+}
+
 // debugFailure is what the live debug shows of a run that did not
 // succeed: its problem in words, and the request that failed.
 type debugFailure struct {

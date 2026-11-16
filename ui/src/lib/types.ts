@@ -23,6 +23,9 @@ export interface Status {
   readiness_reasons: string[];
   plan_feasible: boolean;
   instances: number;
+  // Whether the live debug endpoint is enabled; absent from a Tapyr older
+  // than 0.6.
+  debug_enabled?: boolean;
 }
 
 export type Health = "ok" | "degraded" | "failing" | "unknown";

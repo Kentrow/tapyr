@@ -7,18 +7,21 @@ import { absolute, since } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
 import { href, useRoute } from "../lib/router";
-import type { Debug as DebugT, DebugSample, Job } from "../lib/types";
+import type { Debug as DebugT, DebugSample, Job, Status } from "../lib/types";
 
 export function Debug() {
   const route = useRoute();
   const jobs = useList<Job>("/jobs");
+  const status = useJSON<Status>("/status");
   const job = route.query.get("job") ?? "";
   const instance = route.query.get("instance") ?? "";
   const capture = useJSON<DebugT>(job ? `/debug/jobs/${encodeURIComponent(job)}/last${instance ? `?instance=${encodeURIComponent(instance)}` : ""}` : null);
   const go = (q: Record<string, string>) => {
     window.location.hash = href(["debug"], Object.fromEntries(Object.entries(q).filter(([, v]) => v)));
   };
-  const disabled = capture.error instanceof HttpError && capture.error.code === "debug_disabled";
+  // Disabled says so as the page opens (the status), or once a job is
+  // chosen for a Tapyr that does not tell (older than 0.6).
+  const disabled = status.data?.debug_enabled === false || (capture.error instanceof HttpError && capture.error.code === "debug_disabled");
   return (
     <>
       <PageHead title="Live debug" sub="The last raw response of a job instance, side by side with the samples it produced. Refreshed after every run.">
@@ -32,7 +35,7 @@ export function Debug() {
           </Select>
         )}
       </PageHead>
-      {!job && <div className="muted">Choose a job to see the last response of one of its instances.</div>}
+      {!job && !disabled && <div className="muted">Choose a job to see the last response of one of its instances.</div>}
       {disabled && (
         <div className="card">
           <h3>The live debug endpoint is disabled</h3>

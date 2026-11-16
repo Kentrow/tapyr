@@ -262,7 +262,7 @@ components:
     Status:
       type: object
       additionalProperties: false
-      required: [version, revision, go_version, started_at, uptime_seconds, config_hash, last_reload, ready, readiness_reasons, plan_feasible, instances]
+      required: [version, revision, go_version, started_at, uptime_seconds, config_hash, last_reload, ready, readiness_reasons, plan_feasible, instances, debug_enabled]
       properties:
         version: { type: string }
         revision: { type: string }
@@ -282,6 +282,7 @@ components:
         readiness_reasons: { type: array, items: { type: string } }
         plan_feasible: { type: boolean }
         instances: { type: integer, minimum: 0 }
+        debug_enabled: { type: boolean, description: Whether the live debug endpoint is enabled (settings.server.debug.enabled) }
     Provider:
       type: object
       additionalProperties: false

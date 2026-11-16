@@ -61,6 +61,7 @@ func (s statusSource) Status(ctx context.Context) api.Status {
 	st := api.Status{
 		Version: info.Version, Revision: info.Revision, GoVersion: info.GoVersion, StartedAt: c.started.UTC(),
 		UptimeSeconds: now.Sub(c.started).Seconds(), ConfigHash: c.configHash, LastReload: c.lastReload,
+		DebugEnabled: c.debug.on(),
 	}
 	c.smu.Unlock()
 	st.ReadinessReasons = c.notReady(ctx)

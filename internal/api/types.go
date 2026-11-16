@@ -22,6 +22,9 @@ type Status struct {
 	ReadinessReasons []string  `json:"readiness_reasons"`
 	PlanFeasible     bool      `json:"plan_feasible"`
 	Instances        int       `json:"instances"`
+	// DebugEnabled reports whether the live debug endpoint is enabled
+	// (settings.server.debug.enabled).
+	DebugEnabled bool `json:"debug_enabled"`
 }
 
 // Reload is the last configuration load or reload.
