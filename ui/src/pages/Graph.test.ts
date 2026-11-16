@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jobAccounts, layout, nodeWord, selectionAfter, worst } from "./Graph";
+import { initialViewport, jobAccounts, layout, layoutBounds, nodeWord, readableZoom, selectionAfter, tileHint, worst } from "./Graph";
 import type { Graph } from "../lib/types";
 
 const n = (id: string, kind: string) => ({ id, kind, label: id, health: "ok" as const });
@@ -114,5 +114,53 @@ describe("waiting jobs", () => {
     expect(nodeWord({ id: "job/n", kind: "job", label: "n", health: "unknown", waiting: "parent" })).toBe("waiting for its parent");
     expect(nodeWord({ id: "account/a", kind: "account", label: "a", health: "unknown" })).toBe("no run yet");
     expect(nodeWord({ id: "job/d", kind: "job", label: "d", health: "failing" })).toBe("failing");
+  });
+});
+
+describe("graph readability", () => {
+  const pane = { width: 1100, height: 700 };
+  it("opens a small graph whole, centered, never enlarged", () => {
+    const v = initialViewport({ x: 0, y: 0, width: 600, height: 200 }, pane);
+    expect(v.zoom).toBe(1);
+    expect(v.x).toBe(250);
+    expect(v.y).toBe(250);
+  });
+  it("fits a graph that reads at the readable zoom or more", () => {
+    const v = initialViewport({ x: 0, y: 0, width: 1170, height: 400 }, pane);
+    expect(v.zoom).toBeCloseTo(1052 / 1170);
+    expect(v.zoom).toBeGreaterThanOrEqual(readableZoom);
+  });
+  it("opens a large graph at the readable zoom on its top left corner", () => {
+    const v = initialViewport({ x: -10, y: 20, width: 2400, height: 3000 }, pane);
+    expect(v).toEqual({ x: 24 + 10 * readableZoom, y: 24 - 20 * readableZoom, zoom: readableZoom });
+    // Wide but short: from its start across, centered down.
+    const w = initialViewport({ x: 0, y: 0, width: 2400, height: 300 }, pane);
+    expect(w.x).toBe(24);
+    expect(w.y).toBe((700 - 300 * readableZoom) / 2);
+  });
+  it("bounds the layout from the sizes it sets", () => {
+    const { nodes } = layout(sample(4), { compact: false });
+    const b = layoutBounds(nodes);
+    for (const node of nodes.filter((x) => !x.parentId)) {
+      expect(node.position.x).toBeGreaterThanOrEqual(b.x);
+      expect(node.position.y).toBeGreaterThanOrEqual(b.y);
+      expect(node.position.x + Number(node.style?.width ?? 0)).toBeLessThanOrEqual(b.x + b.width);
+    }
+    expect(layoutBounds([])).toEqual({ x: 0, y: 0, width: 1, height: 1 });
+  });
+  it("leaves out the column of the targets when no account shown has one", () => {
+    const g = sample(2);
+    const withTargets = layout(g, { compact: false }).nodes.find((x) => x.id === "group:a1")!.position.x;
+    const without = layout({ nodes: g.nodes.filter((x) => x.kind !== "target"), edges: g.edges.filter((e) => e.to !== "t1") }, { compact: false }).nodes.find((x) => x.id === "group:a1")!.position.x;
+    expect(without).toBeLessThan(withTargets);
+  });
+  it("names the tiles for people, with the full name on hover", () => {
+    const names = (x: { label: string }) => (x.label === "j0" ? { title: "Sites", detail: "listed for child" } : { title: x.label });
+    const { nodes } = layout(sample(2), { compact: false, names });
+    const j0 = nodes.find((x) => x.id === "j0")!.data as { title?: string; kind?: string };
+    expect(j0).toMatchObject({ title: "Sites", kind: "listed for child" });
+    expect((nodes.find((x) => x.id === "child")!.data as { parent?: string }).parent).toBe("Sites");
+    expect(tileHint({ node: n("a.p-sites", "job"), title: "Sites", kind: "listed for child" })).toBe("Sites, listed for child (job a.p-sites)");
+    expect(tileHint({ node: n("child", "job"), title: "child", parent: "Sites" })).toBe("child, one instance per item of Sites");
   });
 });
