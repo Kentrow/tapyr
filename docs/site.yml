@@ -14,6 +14,7 @@ nav:
   - docs/getting-started.md
   - docs/configure-accounts.md
   - docs/concepts.md
+  - docs/glossary.md
   - Guides:
       - docs/install.md
       - docs/outputs.md
