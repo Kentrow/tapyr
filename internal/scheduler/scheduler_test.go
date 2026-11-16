@@ -83,6 +83,19 @@ func settle(t *testing.T, clk *clock.Fake, n int) {
 	}
 }
 
+// armed waits until n scheduler loops wait on their timer. Unlike settle,
+// it leaves out the deadline timers of the runs in flight: right after a
+// run starts, its deadline can stand in for the timer of a loop that has
+// not been armed yet, which an Advance would then arm from the new time.
+func armed(t *testing.T, clk *clock.Fake, n int) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), waitTimeout)
+	defer cancel()
+	if err := clk.BlockUntilTimers(ctx, n); err != nil {
+		t.Fatalf("waiting for %d loop timers: %v", n, err)
+	}
+}
+
 func TestRunsAtPhasePlusIntervals(t *testing.T) {
 	clk := clock.NewFake(epoch)
 	rec := newRecorder()
@@ -325,6 +338,10 @@ func TestSetInterval(t *testing.T) {
 	if s.Interval("j") != 5*time.Minute {
 		t.Fatalf("Interval() = %v", s.Interval("j"))
 	}
+	// The loop replaces its timer of one minute with one at the new
+	// interval. Until it has, the old timer would pass for the new one, and
+	// an Advance would arm the new one from the advanced time.
+	waitFor(t, func() bool { return s.Next()["j"].Equal(epoch.Add(5 * time.Minute)) })
 	idle(t, s, clk, "j")
 	clk.Advance(time.Minute)
 	rec.none(t)
@@ -471,12 +488,14 @@ func TestResume(t *testing.T) {
 	if ids := []string{got["b"].ID, got["c"].ID}; !slices.Contains(ids, "000003") || !slices.Contains(ids, "000004") {
 		t.Errorf("run IDs = %v", ids)
 	}
-	settle(t, clk, 4)
+	// The runs of b and c may still hold their deadline timers: wait for
+	// the four loops, d's included.
+	armed(t, clk, 4)
 	clk.Advance(time.Minute)
 	if run := rec.next(t); run.Job.Name != "d" || !run.Scheduled.Equal(now.Add(time.Minute)) {
 		t.Fatalf("capped run = %+v", run)
 	}
-	settle(t, clk, 4)
+	armed(t, clk, 4)
 	clk.Advance(39 * time.Minute)
 	for range 39 {
 		if run := rec.next(t); run.Job.Name == "a" {
