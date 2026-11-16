@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The self-metric `tapyr_budget_scope_info{provider,limit,scope,accounts}` names the accounts of every quota scope, so that a scope keyed by a credential hash reads `fleet-north, fleet-south` in Grafana.
 - `tapyr provider show <name>` describes a provider package: its secrets and params, its templates with their interval and metrics, its limits with their sources; `--example` prints its example configuration, ready to copy. `tapyr provider list --output json` gains the params, secrets, roles and parents of the templates.
 - Documentation: a [glossary](docs/glossary.md) of the terms of the configuration, the CLI, the web UI and the metrics (scope, stretch, retry reserve, fan-out, implicit job, instance...), with the labels the web UI shows them under.
 

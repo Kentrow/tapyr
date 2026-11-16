@@ -30,7 +30,7 @@ func (c *Collector) selfState() selfobs.State {
 	}
 	now := c.clock.Now()
 	st := selfobs.State{
-		Quotas: quotaGauges(g.engine.Quotas(), now),
+		Quotas: quotaGauges(g.engine.Quotas(), now, g.graph.Jobs),
 		Plan:   planGauges(g.lastPlan()),
 		Tokens: tokenGauges(c.tokens.Sessions()),
 	}
@@ -125,8 +125,10 @@ func scopeLabel(key string) (label string, aggregated bool) {
 }
 
 // quotaGauges turns quota states into gauges: one per bounded scope key, and
-// for scopes partitioned by a variable the most constrained key.
-func quotaGauges(quotas []budget.QuotaState, now time.Time) []selfobs.QuotaGauge {
+// for scopes partitioned by a variable the most constrained key, with the
+// accounts of the jobs whose requests count in the scope (in any of its
+// keys).
+func quotaGauges(quotas []budget.QuotaState, now time.Time, jobs []*runtime.Job) []selfobs.QuotaGauge {
 	var out []selfobs.QuotaGauge
 	index := map[string]int{}
 	for _, q := range quotas {
@@ -136,15 +138,18 @@ func quotaGauges(quotas []budget.QuotaState, now time.Time) []selfobs.QuotaGauge
 			Max: q.Max, Used: q.Used, Remaining: q.Remaining, ObservedRemaining: q.ObservedRemaining,
 			ExternalUsage: q.ExternalUsage, ReserveRemaining: min(q.Reserve, max(0, q.Usable-q.Used)),
 			WindowEnd: q.WindowEnd, ExhaustionETA: exhaustionETA(q, now), Mismatch: q.Mismatch,
+			Accounts: scopeAccounts(q.Provider, q.Scope, jobs),
 		}
 		id := q.Provider + "/" + q.Limit + "|" + label
 		if i, seen := index[id]; seen {
+			accounts := slices.Compact(slices.Sorted(slices.Values(slices.Concat(out[i].Accounts, qg.Accounts))))
 			if remainingFraction(qg) < remainingFraction(out[i]) {
 				qg.Mismatch = qg.Mismatch || out[i].Mismatch
 				out[i] = qg
 			} else {
 				out[i].Mismatch = out[i].Mismatch || qg.Mismatch
 			}
+			out[i].Accounts = accounts
 			continue
 		}
 		index[id] = len(out)

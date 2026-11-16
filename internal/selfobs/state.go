@@ -1,6 +1,7 @@
 package selfobs
 
 import (
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -34,6 +35,9 @@ type QuotaGauge struct {
 	ExhaustionETA time.Duration
 	// Mismatch reports headers disagreeing with the declared max.
 	Mismatch bool
+	// Accounts are the accounts whose requests count in the scope, sorted
+	// (for a scope partitioned by a variable, in any of its keys).
+	Accounts []string
 }
 
 // PlanGauge is the feasibility of one quota scope in the last plan.
@@ -105,7 +109,10 @@ var (
 	descBudgetETA       = desc("tapyr_budget_exhaustion_eta_seconds",
 		"Projected time to quota exhaustion, when it comes before the window ends.", quotaLabels...)
 	descBudgetMismatch = desc("tapyr_budget_limit_mismatch", "1 when the quota headers disagree with the declared max.", "provider", "limit")
-	descPlanFeasible   = desc("tapyr_plan_feasible", "1 when the critical jobs fit in the remaining quota.", quotaLabels...)
+	descBudgetScope    = desc("tapyr_budget_scope_info",
+		"1 for every quota scope, with the accounts whose requests count in it (comma separated), to name a scope keyed by a credential hash.",
+		"provider", "limit", "scope", "accounts")
+	descPlanFeasible = desc("tapyr_plan_feasible", "1 when the critical jobs fit in the remaining quota.", quotaLabels...)
 
 	descJobLastSuccess = desc("tapyr_job_last_success_timestamp_seconds", "Oldest last successful run across the instances.", jobLabels...)
 	descJobDesired     = desc("tapyr_job_desired_interval_seconds", "Configured interval of the job.", jobLabels...)
@@ -134,7 +141,7 @@ type stateCollector struct {
 func (c *stateCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, d := range []*prometheus.Desc{
 		descBudgetLimit, descBudgetUsed, descBudgetRemaining, descBudgetObserved, descBudgetExternal, descBudgetReserve,
-		descBudgetWindowEnd, descBudgetETA, descBudgetMismatch, descPlanFeasible,
+		descBudgetWindowEnd, descBudgetETA, descBudgetMismatch, descBudgetScope, descPlanFeasible,
 		descJobLastSuccess, descJobDesired, descJobEffective, descJobLag, descJobInstances, descJobSeries, descJobCollected,
 		descTokenExpiry, descReauth, descCircuit, descOutputQueue, descOutputLastSuccess, descOutputSeries, descOutputSeriesLimit,
 	} {
@@ -159,6 +166,7 @@ func (c *stateCollector) Collect(ch chan<- prometheus.Metric) {
 		gauge(descBudgetExternal, float64(q.ExternalUsage), l...)
 		gauge(descBudgetReserve, float64(q.ReserveRemaining), l...)
 		gauge(descBudgetWindowEnd, seconds(q.WindowEnd), l...)
+		gauge(descBudgetScope, 1, q.Provider, q.Limit, q.Scope, strings.Join(q.Accounts, ", "))
 		if q.ExhaustionETA > 0 {
 			gauge(descBudgetETA, q.ExhaustionETA.Seconds(), l...)
 		}

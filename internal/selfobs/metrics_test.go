@@ -181,8 +181,10 @@ func TestStateGauges(t *testing.T) {
 			{
 				Provider: "meraki", Limit: "daily", Scope: "account=acme", Max: 1000, Used: 400, Remaining: 600,
 				ObservedRemaining: 590, ExternalUsage: 10, ReserveRemaining: 100, WindowEnd: at, ExhaustionETA: time.Hour,
+				Accounts: []string{"acme"},
 			},
 			{Provider: "meraki", Limit: "daily", Scope: "account=beta", Max: 1000, ObservedRemaining: -1, WindowEnd: at, Mismatch: true},
+			{Provider: "rms", Limit: "monthly", Scope: "credential=c6bffccbc9dad4d1", Max: 100000, ObservedRemaining: -1, WindowEnd: at, Accounts: []string{"fleet-north", "fleet-south"}},
 		},
 		Plan: []PlanGauge{{Provider: "meraki", Limit: "daily", Scope: "account=acme", Feasible: true}},
 		Jobs: []JobGauge{
@@ -214,12 +216,19 @@ tapyr_budget_exhaustion_eta_seconds{limit="daily",provider="meraki",scope="accou
 # TYPE tapyr_budget_limit gauge
 tapyr_budget_limit{limit="daily",provider="meraki",scope="account=acme"} 1000
 tapyr_budget_limit{limit="daily",provider="meraki",scope="account=beta"} 1000
+tapyr_budget_limit{limit="monthly",provider="rms",scope="credential=c6bffccbc9dad4d1"} 100000
 # HELP tapyr_budget_limit_mismatch 1 when the quota headers disagree with the declared max.
 # TYPE tapyr_budget_limit_mismatch gauge
 tapyr_budget_limit_mismatch{limit="daily",provider="meraki"} 1
+tapyr_budget_limit_mismatch{limit="monthly",provider="rms"} 0
 # HELP tapyr_budget_remaining_observed Remaining quota reported by the provider headers.
 # TYPE tapyr_budget_remaining_observed gauge
 tapyr_budget_remaining_observed{limit="daily",provider="meraki",scope="account=acme"} 590
+# HELP tapyr_budget_scope_info 1 for every quota scope, with the accounts whose requests count in it (comma separated), to name a scope keyed by a credential hash.
+# TYPE tapyr_budget_scope_info gauge
+tapyr_budget_scope_info{accounts="",limit="daily",provider="meraki",scope="account=beta"} 1
+tapyr_budget_scope_info{accounts="acme",limit="daily",provider="meraki",scope="account=acme"} 1
+tapyr_budget_scope_info{accounts="fleet-north, fleet-south",limit="monthly",provider="rms",scope="credential=c6bffccbc9dad4d1"} 1
 # HELP tapyr_circuit_state Circuit breaker state: 0 closed, 1 half-open, 2 open.
 # TYPE tapyr_circuit_state gauge
 tapyr_circuit_state{account="acme",provider="meraki",target=""} 2
@@ -259,7 +268,7 @@ tapyr_plan_feasible{limit="daily",provider="meraki",scope="account=acme"} 1
 `
 	names := []string{
 		"tapyr_auth_reauth_required", "tapyr_auth_token_expiry_timestamp_seconds", "tapyr_budget_exhaustion_eta_seconds",
-		"tapyr_budget_limit", "tapyr_budget_limit_mismatch", "tapyr_budget_remaining_observed", "tapyr_circuit_state",
+		"tapyr_budget_limit", "tapyr_budget_limit_mismatch", "tapyr_budget_remaining_observed", "tapyr_budget_scope_info", "tapyr_circuit_state",
 		"tapyr_job_collected", "tapyr_job_effective_interval_seconds", "tapyr_job_last_success_timestamp_seconds", "tapyr_job_instances",
 		"tapyr_output_last_success_timestamp_seconds", "tapyr_output_queue_samples", "tapyr_output_series",
 		"tapyr_output_series_limit", "tapyr_plan_feasible",
@@ -268,8 +277,8 @@ tapyr_plan_feasible{limit="daily",provider="meraki",scope="account=acme"} 1
 		t.Error(err)
 	}
 	for name, want := range map[string]int{
-		"tapyr_budget_used": 2, "tapyr_budget_remaining": 2, "tapyr_budget_external_usage": 2, "tapyr_budget_reserve_remaining": 2,
-		"tapyr_budget_window_end_timestamp_seconds": 2, "tapyr_job_desired_interval_seconds": 2, "tapyr_job_lag_seconds": 2,
+		"tapyr_budget_used": 3, "tapyr_budget_remaining": 3, "tapyr_budget_external_usage": 3, "tapyr_budget_reserve_remaining": 3,
+		"tapyr_budget_window_end_timestamp_seconds": 3, "tapyr_job_desired_interval_seconds": 2, "tapyr_job_lag_seconds": 2,
 		"tapyr_job_series": 2,
 	} {
 		if got, err := testutil.GatherAndCount(m.reg, name); err != nil || got != want {
