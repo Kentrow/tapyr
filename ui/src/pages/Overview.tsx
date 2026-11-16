@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { ProblemNote } from "../components/Problem";
-import { count, duration, outputHealth, percent, plural, scopeAccounts, seriesStatus, since, waitingText } from "../lib/format";
+import { JobName } from "../components/JobName";
+import { count, duration, jobLabels, jobWords, outputHealth, percent, plural, scopeAccounts, seriesStatus, since, waitingText } from "../lib/format";
 import { useJSON, useList, useLive, type LiveEvent } from "../lib/live";
 import { href } from "../lib/router";
 import type { Account, Budget, Job, Output, Plan, Problem, Provider, Status } from "../lib/types";
@@ -45,6 +46,7 @@ export function Overview() {
   // The plan exists after the first planning; the Overview does without.
   const plan = useJSON<Plan>("/plan");
   const activity = useActivity(jobs.data);
+  const label = jobLabels(jobs.data);
   if (status.error && !status.data) return <Failure error={status.error} />;
   if (!status.data || !providers.data || !accounts.data || !budgets.data || !jobs.data || !outputs.data) return <Loading />;
   const s = status.data;
@@ -142,7 +144,7 @@ export function Overview() {
                 <li key={a.key} className={a.ok ? "ok" : "bad"}>
                   <span className="dot" aria-hidden="true" />
                   <div>
-                    <strong>{a.title}</strong>
+                    <strong>{label(a.title)}</strong>
                     <span className="muted small"> {since(a.at)}</span>
                     <div className="small muted">{a.detail}</div>
                   </div>
@@ -157,7 +159,7 @@ export function Overview() {
               <ol className="errors">
                 {failing.map((j) => (
                   <li key={j.name}>
-                    <a href={href(["jobs", j.name])}><strong>{j.name}</strong></a>
+                    <JobName strong compact name={j.name} job={j} />
                     <span className="muted small"> {since(j.last_run?.ended_at)}</span>
                     <div className="small"><ProblemNote problem={j.last_run?.problem} detail={j.last_run?.error} /></div>
                   </li>
@@ -286,24 +288,26 @@ function ProviderCard({ provider: p, accounts, jobs, quotas }: { provider: Provi
 
 // squareWord says what a square stands for: the last run of the job, or
 // what it waits for.
-export function squareWord(j: Job, now = Date.now()): string {
+export function squareWord(j: Job, now = Date.now(), words?: (job: string) => string): string {
   const st = jobState(j);
   if (st === "ok") return "succeeded";
   if (st === "bad") return "failed";
-  return j.waiting ? waitingText(j.waiting, now).short : "no run yet";
+  return j.waiting ? waitingText(j.waiting, now, words).short : "no run yet";
 }
 
 // Squares are the jobs as small squares colored by their last run; a
 // failed one also carries a cross and a waiting one a dashed border, so
 // that the color is not the only sign. The legend names the states shown.
 function Squares({ jobs }: { jobs: Job[] }) {
+  const label = jobLabels(jobs);
+  const words = jobWords(jobs);
   const states = new Set(jobs.map(jobState));
   const legend = ([["ok", "succeeded"], ["bad", "failed"], ["idle", "waiting"]] as const).filter(([st]) => states.has(st));
   return (
     <>
       <div className="squares">
         {jobs.map((j) => {
-          const word = `${j.name}: ${squareWord(j)}`;
+          const word = `${label(j.name)}: ${squareWord(j, undefined, words)}`;
           return <a key={j.name} href={href(["jobs", j.name])} className={`sq ${jobState(j)}`} title={word} aria-label={word} />;
         })}
       </div>

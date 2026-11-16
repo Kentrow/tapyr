@@ -88,7 +88,11 @@ type Job struct {
 	Role     string `json:"role"`
 	Priority string `json:"priority"`
 	// Implicit marks a parent instantiated for a forEach.template.
-	Implicit                 bool              `json:"implicit"`
+	Implicit bool `json:"implicit"`
+	// Items names what an implicit job lists ("networks"), and
+	// DiscoveryFor the configured jobs it lists them for.
+	Items                    string            `json:"items,omitempty"`
+	DiscoveryFor             []string          `json:"discovery_for,omitempty"`
 	Parent                   string            `json:"parent,omitempty"`
 	DesiredIntervalSeconds   float64           `json:"desired_interval_seconds"`
 	EffectiveIntervalSeconds float64           `json:"effective_interval_seconds"`

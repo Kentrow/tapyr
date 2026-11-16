@@ -363,7 +363,12 @@ components:
         template: { type: string }
         role: { type: string, enum: [metrics, inventory, both] }
         priority: { type: string, enum: [critical, high, normal, low] }
-        implicit: { type: boolean }
+        implicit: { type: boolean, description: A parent of a fan-out that no job of the configuration declares, run for the jobs of discovery_for }
+        items: { type: string, description: 'What an implicit job lists, in words, such as "networks"' }
+        discovery_for:
+          type: array
+          items: { type: string }
+          description: The jobs of the configuration an implicit job lists its items for, sorted
         parent: { type: string, description: The job whose inventory drives the fan-out }
         desired_interval_seconds: { type: number }
         effective_interval_seconds: { type: number }

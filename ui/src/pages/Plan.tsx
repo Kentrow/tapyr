@@ -1,15 +1,13 @@
 import { Badge, Failure, Loading, PageHead, Table } from "../components/ui";
 import { ProblemNote } from "../components/Problem";
-import { absolute, count, duration, percent, scopeWords, since, waitingText } from "../lib/format";
+import { JobName } from "../components/JobName";
+import { absolute, count, duration, jobWords, percent, scopeWords, since, waitingText } from "../lib/format";
+import { terms } from "../lib/terms";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
 import { href } from "../lib/router";
 import type { Job, Plan as PlanT, PlanJob, PlanScope } from "../lib/types";
 
-// unplanned are the collected jobs the plan does not hold yet: fan-outs
-// without instances, waiting for their parent or whose parent listed no
-// item. The planner counts instances, so they join the plan once their
-// parent has listed its items.
 // blocking returns the critical jobs of the quotas the plan does not fit:
 // they are never slowed down, so they are what to change.
 export function blocking(plan: PlanT): Set<string> {
@@ -17,15 +15,27 @@ export function blocking(plan: PlanT): Set<string> {
   return new Set(plan.scopes.filter((s) => !s.feasible).flatMap((s) => s.jobs.filter((j) => critical.has(j))));
 }
 
-export function unplanned(plan: PlanT, jobs: Job[]): { name: string; why: string }[] {
+// unplanned are the collected jobs the plan does not hold yet: fan-outs
+// without instances, waiting for their parent or whose parent listed no
+// item. The planner counts instances, so they join the plan once their
+// parent has listed its items.
+export function unplanned(plan: PlanT, jobs: Job[], now = Date.now()): { name: string; why: string }[] {
   const planned = new Set(plan.jobs.map((j) => j.name.replace(/\[.*$/, "")));
+  const words = jobWords(jobs);
   return jobs
     .filter((j) => j.collected && !planned.has(j.name))
     .map((j) => ({
       name: j.name,
-      why: j.waiting ? waitingText(j.waiting).long : j.parent && j.instances === 0 ? `${j.parent} listed no item in its last run.` : "Not planned yet.",
+      why: j.waiting ? waitingText(j.waiting, now, words).long : j.parent && j.instances === 0 ? `${subject(words, j.parent)} listed no item in its last run.` : "Not planned yet.",
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// subject starts a sentence with a job: "The job listing the sites" for an
+// implicit one, the name as it is of the others.
+function subject(words: (job: string) => string, name: string): string {
+  const w = words(name);
+  return w === name ? w : w.charAt(0).toUpperCase() + w.slice(1);
 }
 
 export function Plan() {
@@ -72,13 +82,13 @@ export function Plan() {
           highlight={(s) => !s.feasible}
           empty="No quota limit applies to the configured jobs."
           columns={[
-            { key: "limit", label: "Quota", sort: (s) => s.limit, render: (s) => <strong>{s.limit}</strong> },
-            { key: "scope", label: "Of", render: (s) => <span className="small" title={s.scope}>{scopeWords(s.scope)}</span> },
-            { key: "period", label: "Until reset", num: true, sort: (s) => s.period_seconds, render: (s) => duration(s.period_seconds) },
-            { key: "budget", label: "Available", num: true, sort: (s) => s.budget, render: (s) => <span title="What the quota leaves to Tapyr until its reset, the calls kept for retries left out">{count(s.budget)}</span> },
-            { key: "projected", label: "Projected", num: true, sort: (s) => s.projected, render: (s) => <span title="What the jobs will spend until the reset with the planned intervals">{count(s.projected)}</span> },
-            { key: "reserve", label: "For retries", num: true, render: (s) => <span title="Calls kept for retries and critical jobs">{count(s.reserve)}</span> },
-            { key: "use", label: "Use", num: true, sort: (s) => s.projected / (s.budget || 1), render: (s) => percent(s.projected, s.budget) },
+            { key: "limit", label: "Quota", help: terms.quota, sort: (s) => s.limit, render: (s) => <strong>{s.limit}</strong> },
+            { key: "scope", label: "Of", help: terms.scope, render: (s) => <span className="small" title={s.scope}>{scopeWords(s.scope)}</span> },
+            { key: "period", label: "Until reset", help: terms.untilReset, num: true, sort: (s) => s.period_seconds, render: (s) => duration(s.period_seconds) },
+            { key: "budget", label: "Available", help: terms.available, num: true, sort: (s) => s.budget, render: (s) => count(s.budget) },
+            { key: "projected", label: "Projected", help: terms.projected, num: true, sort: (s) => s.projected, render: (s) => count(s.projected) },
+            { key: "reserve", label: "For retries", help: terms.reserve, num: true, render: (s) => count(s.reserve) },
+            { key: "use", label: "Use", help: terms.use, num: true, sort: (s) => s.projected / (s.budget || 1), render: (s) => percent(s.projected, s.budget) },
             {
               key: "status", label: "Status", sort: (s) => (s.feasible ? 1 : 0),
               render: (s) => (s.feasible ? <Badge state="ok">fits</Badge> : (
@@ -96,17 +106,17 @@ export function Plan() {
           initialSort={{ key: "stretch", desc: true }}
           highlight={(j) => j.stretch > 1 || culprits.has(j.name)}
           columns={[
-            { key: "name", label: "Job", sort: (j) => j.name, render: (j) => <a href={href(["jobs", j.name.replace(/\[.*$/, "")])}>{j.name}</a> },
+            { key: "name", label: "Job", sort: (j) => j.name, render: (j) => <PlanJobName name={j.name} jobs={jobs.data} /> },
             { key: "account", label: "Account", sort: (j) => j.account, render: (j) => j.account },
             {
-              key: "priority", label: "Priority", sort: (j) => ["critical", "high", "normal", "low"].indexOf(j.priority),
+              key: "priority", label: "Priority", help: terms.priority, sort: (j) => ["critical", "high", "normal", "low"].indexOf(j.priority),
               render: (j) => (culprits.has(j.name) ? <span title="Critical jobs are never slowed down: this one does not fit its quota."><Badge state="failing">critical</Badge></span> : j.priority),
             },
-            { key: "desired", label: "Desired", num: true, sort: (j) => j.desired_interval_seconds, render: (j) => duration(j.desired_interval_seconds) },
-            { key: "effective", label: "Effective", num: true, sort: (j) => j.effective_interval_seconds, render: (j) => duration(j.effective_interval_seconds) },
-            { key: "stretch", label: "Slowed down", num: true, sort: (j) => (culprits.has(j.name) ? Infinity : j.stretch), render: (j) => (j.stretch > 1 ? <strong>x{+j.stretch.toFixed(2)}</strong> : "no") },
-            { key: "instances", label: "Instances", num: true, sort: (j) => j.instances, render: (j) => count(j.instances) },
-            { key: "pages", label: "Pages per run", num: true, sort: (j) => j.pages_per_run, render: (j) => +j.pages_per_run.toFixed(2) },
+            { key: "desired", label: "Desired", help: terms.desired, num: true, sort: (j) => j.desired_interval_seconds, render: (j) => duration(j.desired_interval_seconds) },
+            { key: "effective", label: "Effective", help: terms.effective, num: true, sort: (j) => j.effective_interval_seconds, render: (j) => duration(j.effective_interval_seconds) },
+            { key: "stretch", label: "Slowed down", help: terms.stretch, num: true, sort: (j) => (culprits.has(j.name) ? Infinity : j.stretch), render: (j) => (j.stretch > 1 ? <strong>x{+j.stretch.toFixed(2)}</strong> : "no") },
+            { key: "instances", label: "Instances", help: terms.instances, num: true, sort: (j) => j.instances, render: (j) => count(j.instances) },
+            { key: "pages", label: "Pages per run", help: terms.pages, num: true, sort: (j) => j.pages_per_run, render: (j) => +j.pages_per_run.toFixed(2) },
             { key: "reason", label: "Reason", render: (j) => <span className="small muted">{culprits.has(j.name) ? "critical, never slowed down: does not fit its quota" : j.reason ?? ""}</span> },
           ]}
         />
@@ -117,11 +127,20 @@ export function Plan() {
           <p className="small muted">Fan-outs without instances: the plan counts them once their parent has listed its items.</p>
           <ul className="small">
             {missing.map((m) => (
-              <li key={m.name}><a href={href(["jobs", m.name])}>{m.name}</a>: {m.why}</li>
+              <li key={m.name}><JobName compact name={m.name} job={jobs.data?.find((j) => j.name === m.name)} />: {m.why}</li>
             ))}
           </ul>
         </section>
       )}
     </>
   );
+}
+
+// PlanJobName names a job of the plan, whose name can carry the target
+// of its group (devices[target=north]).
+function PlanJobName({ name, jobs }: { name: string; jobs?: Job[] }) {
+  const base = name.replace(/\[.*$/, "");
+  const job = jobs?.find((j) => j.name === base);
+  if (base !== name || !job) return <a href={href(["jobs", base])}>{name}</a>;
+  return <JobName name={name} job={job} />;
 }

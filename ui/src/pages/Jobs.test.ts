@@ -34,6 +34,17 @@ describe("jobs without instances", () => {
       { name: "clients", why: "sites listed no item in its last run." },
       { name: "networks", why: "Waiting for sites to list its items: one instance per item." },
     ]);
+    // An implicit parent is named by what it lists.
+    const implicit = [
+      job("a.p-sites", { implicit: true, items: "sites", discovery_for: ["clients"], instances: 1 }),
+      job("clients", { parent: "a.p-sites" }),
+      job("networks", { parent: "a.p-sites", waiting: { reason: "parent", parent: "a.p-sites" } }),
+    ];
+    expect(unplanned({ ...plan, jobs: [] }, implicit).filter((u) => u.name !== "a.p-sites")).toEqual([
+      { name: "clients", why: "The job listing the sites listed no item in its last run." },
+      { name: "networks", why: "Waiting for the job listing the sites: one instance per item." },
+    ]);
+    expect(instancesEmpty(implicit[2]!, (n) => (n === "a.p-sites" ? "the job listing the sites" : n))).toBe("No instance yet: the job listing the sites has not listed its items.");
   });
 });
 
@@ -54,7 +65,8 @@ describe("scope words", () => {
   it("names a scope key in words", () => {
     expect(scopeWords("account=demo")).toBe("account demo");
     expect(scopeWords("account=lab,target=eu")).toBe("account lab and target eu");
-    expect(scopeWords("instance")).toBe("each instance");
+    expect(scopeWords("instance")).toBe("the whole Tapyr process");
+    expect(scopeWords("instance,endpoint=/devices")).toBe("the Tapyr process and endpoint /devices");
     expect(scopeWords("")).toBe("all accounts");
   });
 });

@@ -105,7 +105,7 @@ func newPlanCmd(e *env, flags *globalFlags) *cobra.Command {
 			if format == "json" {
 				err = printPlanJSON(e, res, notCollected, outputs)
 			} else {
-				err = printPlanTable(e, res, notCollected, outputs)
+				err = printPlanTable(e, res, notCollected, outputs, implicitJobs(graph.Jobs))
 			}
 			if err != nil {
 				return err
@@ -144,7 +144,7 @@ func newEngine(e *env, cfg *config.Config, graph *runtime.Graph) (*budget.Engine
 	}, e.clock, e.logger)
 }
 
-func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, outputs []outputEstimate) error {
+func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, outputs []outputEstimate, implicit []*runtime.Job) error {
 	w := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintln(w, "QUOTA\tWINDOW\tAVAILABLE\tPROJECTED\tFOR RETRIES\tSTATUS")
 	planned := map[string]bool{}
@@ -196,6 +196,16 @@ func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, ou
 	if err := w.Flush(); err != nil {
 		return err
 	}
+	if len(implicit) > 0 {
+		iw := tabwriter.NewWriter(e.stdout, 0, 4, 2, ' ', 0)
+		fmt.Fprintln(iw, "\nImplicit jobs, run at priority low to list the items of a fan-out that no job declares:")
+		for _, j := range implicit {
+			fmt.Fprintf(iw, "  %s\tlists the %s for %s\n", j.Name, j.Items, strings.Join(j.DiscoveryFor, ", "))
+		}
+		if err := iw.Flush(); err != nil {
+			return err
+		}
+	}
 	if len(outputs) > 0 {
 		if err := printOutputEstimates(e.stdout, outputs); err != nil {
 			return err
@@ -213,6 +223,18 @@ func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, ou
 	}
 	_, err := fmt.Fprint(e.stdout, planConclusion(res))
 	return err
+}
+
+// implicitJobs returns the collected implicit jobs, one per name.
+func implicitJobs(jobs []*runtime.Job) []*runtime.Job {
+	var out []*runtime.Job
+	for _, j := range jobs {
+		if j.Implicit && !slices.ContainsFunc(out, func(o *runtime.Job) bool { return o.Name == j.Name }) {
+			out = append(out, j)
+		}
+	}
+	slices.SortFunc(out, func(a, b *runtime.Job) int { return strings.Compare(a.Name, b.Name) })
+	return out
 }
 
 // planConclusion says what the plan means, in words: it fits as desired,

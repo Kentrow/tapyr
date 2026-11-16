@@ -78,9 +78,14 @@ type Job struct {
 	// Implicit marks a parent instantiated for a forEach.template that no
 	// job of the account uses.
 	Implicit bool
-	Role     config.JobRole
-	Interval time.Duration
-	Priority config.Priority
+	// Items names what an implicit job lists, in words ("networks"), and
+	// DiscoveryFor the jobs of the configuration it lists them for, sorted.
+	// Both are empty for the other jobs.
+	Items        string
+	DiscoveryFor []string
+	Role         config.JobRole
+	Interval     time.Duration
+	Priority     config.Priority
 	// Outputs receiving the samples; empty means all outputs.
 	Outputs []string
 	BaseURL *url.URL
@@ -326,6 +331,7 @@ func Compile(cfg *config.Config, opts Options) (*Graph, error) {
 	if len(c.diags) > 0 {
 		return nil, c.diags.Sorted()
 	}
+	c.describeImplicit()
 	c.splitCollected()
 	return c.graph, nil
 }

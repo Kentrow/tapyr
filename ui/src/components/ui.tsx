@@ -88,9 +88,18 @@ export function Sparkline({ values, width = 120, height = 28, color = "var(--cya
 export interface Column<T> {
   key: string;
   label: string;
+  // help explains the column, one hover away (dotted underline).
+  help?: string;
   num?: boolean;
   sort?: (row: T) => number | string;
   render: (row: T) => ReactNode;
+}
+
+// Help marks a term that has an explanation: dotted underline, the text as
+// a tooltip and for screen readers. Without a text, the term alone.
+export function Help({ text, children }: { text?: string; children: ReactNode }) {
+  if (!text) return <>{children}</>;
+  return <abbr className="help" title={text}>{children}</abbr>;
 }
 
 // Table renders rows, sortable by the columns that define sort.
@@ -124,11 +133,11 @@ export function Table<T>({ rows, columns, rowKey, initialSort, highlight, empty 
               <th key={c.key} className={c.num ? "num" : undefined} aria-sort={sort?.key === c.key ? (sort.desc ? "descending" : "ascending") : undefined}>
                 {c.sort ? (
                   <button onClick={() => setSort({ key: c.key, desc: sort?.key === c.key ? !sort.desc : false })}>
-                    {c.label}
+                    <Help text={c.help}>{c.label}</Help>
                     <span aria-hidden="true">{sort?.key === c.key ? (sort.desc ? "▾" : "▴") : ""}</span>
                   </button>
                 ) : (
-                  c.label
+                  <Help text={c.help}>{c.label}</Help>
                 )}
               </th>
             ))}
