@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
-import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeChange, type NodeProps } from "@xyflow/react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { Background, Controls, Handle, Position, ReactFlow, useReactFlow, useStore, type Edge, type Node, type NodeChange, type NodeProps, type Rect, type Viewport } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { Badge, Failure, Loading, PageHead, Select, StateMark, useColorMode } from "../components/ui";
-import { plural, waitingWord } from "../lib/format";
+import { jobTitle, plural, waitingWord } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
 import { href } from "../lib/router";
-import type { Account, Graph as GraphT, GraphNode, Health } from "../lib/types";
+import type { Account, Graph as GraphT, GraphNode, Health, Job } from "../lib/types";
 
 // The graph shows providers, accounts and their targets on the left, the
 // jobs of each account grouped in a box laid out as a grid (there are many
@@ -13,7 +13,10 @@ import type { Account, Graph as GraphT, GraphNode, Health } from "../lib/types";
 // links an account to its box and a box to the outputs its jobs feed;
 // inside a box, wires link fan-out parents to their children.
 
-type TileData = { node: GraphNode; selected: boolean; dim: boolean; compact: boolean; parent?: string };
+// title is the name of the tile for people, kind its first line (an
+// implicit job reads "Networks", "listed for network-devices"), parent the
+// title of the parent of a fan-out.
+type TileData = { node: GraphNode; selected: boolean; dim: boolean; compact: boolean; title?: string; kind?: string; parent?: string };
 type GroupData = { account: string; health: Health; jobs: number; targets: number; selected: boolean; section?: boolean };
 type TileNode = Node<TileData, "tile">;
 type GroupNode = Node<GroupData, "group">;
@@ -28,14 +31,14 @@ function Tile({ data }: NodeProps<TileNode>) {
     <div
       className={`tnode-box ${n.health}${data.selected ? " selected" : ""}${data.compact ? " compact" : ""}`}
       style={{ opacity: data.dim ? 0.25 : 1 }}
-      title={data.parent ? `${n.label}, one instance per item of ${data.parent}` : n.label}
+      title={tileHint(data)}
     >
       <Handle type="target" position={Position.Left} />
-      {!data.compact && <div className="kind">{data.parent ? `↳ fan-out of ${data.parent}` : n.kind}</div>}
+      {!data.compact && <div className="kind">{data.parent ? `↳ fan-out of ${data.parent}` : data.kind ?? n.kind}</div>}
       <div className="tlabel">
         {data.compact && <StateMark state={n.health} />}
         {data.parent && data.compact && <span className="muted">↳ </span>}
-        {n.label}
+        {data.title ?? n.label}
       </div>
       {!data.compact && (
         <div className="small muted">
@@ -46,6 +49,13 @@ function Tile({ data }: NodeProps<TileNode>) {
       <Handle type="source" position={Position.Right} />
     </div>
   );
+}
+
+// tileHint is the tooltip of a tile: its full name, which the tile may
+// cut, the technical name of an implicit job and the parent of a fan-out.
+export function tileHint(d: Pick<TileData, "node" | "title" | "kind" | "parent">): string {
+  const name = d.title && d.title !== d.node.label ? `${d.title}${d.kind ? `, ${d.kind}` : ""} (job ${d.node.label})` : d.node.label;
+  return d.parent ? `${name}, one instance per item of ${d.parent}` : name;
 }
 
 function Group({ data }: NodeProps<GroupNode>) {
@@ -83,12 +93,18 @@ export interface Layout {
 
 interface Options {
   compact: boolean;
+  // names gives the title and the first line of a job tile, for people.
+  names?: (n: GraphNode) => { title: string; detail?: string };
   keep?: (n: GraphNode) => boolean;
   match?: (n: GraphNode) => boolean;
   selected?: string | null;
 }
 
 const gap = 12;
+// The width of a detailed tile: room for the longest names of the
+// built-in packages (meraki-appliance-uplink-statuses) at the zoom the
+// graph opens at.
+const tileWidth = 232;
 // Minimum widths, so that the heads keep their names next to their state.
 const minGroupW = 260;
 const minSectionW = 400;
@@ -142,7 +158,8 @@ export function layout(graph: GraphT, opts: Options): Layout {
   const parentJob = (id: string) => (incoming.get(id) ?? []).find((p) => byId.get(p)?.kind === "job");
   const accounts = jobAccounts(graph, index);
   const keep = opts.keep ?? (() => true);
-  const tileW = opts.compact ? 156 : 196;
+  const names = opts.names ?? ((n: GraphNode): { title: string; detail?: string } => ({ title: n.label }));
+  const tileW = opts.compact ? 156 : tileWidth;
   const tileH = opts.compact ? 34 : 66;
   const providers = graph.nodes.filter((n) => n.kind === "provider");
   const outputs = graph.nodes.filter((n) => n.kind === "output");
@@ -192,7 +209,10 @@ export function layout(graph: GraphT, opts: Options): Layout {
       nodes.push({
         id: j.id, type: "tile", parentId: gid, extent: "parent", selected: opts.selected === j.id, ariaLabel: `job ${j.label}, ${nodeWord(j)}`,
         position: { x: gap + (i % cols) * (tileW + gap), y: head + Math.floor(i / cols) * (tileH + gap) },
-        data: { node: j, selected: opts.selected === j.id, dim: opts.match ? !opts.match(j) : false, compact: opts.compact, parent: p ? byId.get(p)?.label : undefined },
+        data: {
+          node: j, selected: opts.selected === j.id, dim: opts.match ? !opts.match(j) : false, compact: opts.compact,
+          title: names(j).title, kind: names(j).detail, parent: p ? names(byId.get(p)!).title : undefined,
+        },
         style: { width: tileW },
       });
     });
@@ -238,7 +258,11 @@ export function layout(graph: GraphT, opts: Options): Layout {
       y += h + 32;
     }
   } else {
-    const col = { provider: 0, account: 240, target: 480, jobs: 720 };
+    // The column of the targets only when an account shown has some.
+    const step = tileWidth + 48;
+    const shown = providers.filter(keep).flatMap(accountsOf);
+    const targets = shown.some((a) => (outgoing.get(a.id) ?? []).some((id) => byId.get(id)?.kind === "target"));
+    const col = { provider: 0, account: step, target: 2 * step, jobs: (targets ? 3 : 2) * step };
     const centers = new Map<string, number>();
     for (const p of providers) {
       if (!keep(p)) continue;
@@ -274,12 +298,61 @@ export function layout(graph: GraphT, opts: Options): Layout {
 function tile(n: GraphNode, x: number, y: number, opts: { selected?: string | null }): TileNode {
   return {
     id: n.id, type: "tile", position: { x, y }, selected: opts.selected === n.id, ariaLabel: `${n.kind} ${n.label}, ${n.health}`, data: { node: n, selected: opts.selected === n.id, dim: false, compact: false },
-    style: { width: 196 },
+    style: { width: tileWidth },
   };
 }
 
 function edge(from: string, to: string, out = false): Edge {
   return { id: `${from}->${to}`, source: from, target: to, style: { stroke: out ? "var(--cyan-2)" : "var(--ink-2)", opacity: out ? 0.8 : 0.6 } };
+}
+
+// readableZoom is the smallest zoom the graph opens at: below it, the
+// names of the tiles are too small to read (G1 of the UX audit). A larger
+// graph opens at this zoom on its top left corner, and scrolls.
+export const readableZoom = 0.8;
+
+// initialViewport frames the content of the graph (bounds) in the pane
+// (size): the whole graph when it reads at readableZoom or more, never
+// enlarged past 1, centered on an axis where it fits and from its start
+// on an axis where it does not.
+export function initialViewport(bounds: Rect, size: { width: number; height: number }, pad = 24): Viewport {
+  const fit = Math.min((size.width - 2 * pad) / Math.max(bounds.width, 1), (size.height - 2 * pad) / Math.max(bounds.height, 1));
+  const zoom = Math.min(1, Math.max(readableZoom, fit));
+  const place = (room: number, start: number, length: number) =>
+    length * zoom <= room - 2 * pad ? (room - length * zoom) / 2 - start * zoom : pad - start * zoom;
+  return { x: place(size.width, bounds.x, bounds.width), y: place(size.height, bounds.y, bounds.height), zoom };
+}
+
+// layoutBounds is the rectangle the top-level nodes of a layout cover,
+// from their positions and sizes (a tile without a set height counts as
+// tileHeight): known before React Flow measures anything.
+export function layoutBounds(nodes: Node[], tileHeight = 66): Rect {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const n of nodes) {
+    if (n.parentId) continue;
+    const w = Number(n.style?.width ?? tileWidth);
+    const h = Number(n.style?.height ?? tileHeight);
+    x0 = Math.min(x0, n.position.x);
+    y0 = Math.min(y0, n.position.y);
+    x1 = Math.max(x1, n.position.x + w);
+    y1 = Math.max(y1, n.position.y + h);
+  }
+  return Number.isFinite(x0) ? { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } : { x: 0, y: 0, width: 1, height: 1 };
+}
+
+// InitialView sets the first viewport of the graph as soon as the
+// viewport can move; React Flow then keeps the one the person chooses.
+function InitialView({ pane, bounds }: { pane: RefObject<HTMLDivElement | null>; bounds: Rect }) {
+  const ready = useStore((s) => s.panZoom !== null);
+  const flow = useReactFlow();
+  const done = useRef(false);
+  useEffect(() => {
+    const el = pane.current;
+    if (!ready || done.current || !el) return;
+    done.current = true;
+    void flow.setViewport(initialViewport(bounds, { width: el.clientWidth, height: el.clientHeight }));
+  }, [ready, flow, pane, bounds]);
+  return null;
 }
 
 // selectionAfter is the node selected once React Flow applied changes: the
@@ -300,6 +373,8 @@ export function Graph() {
   const colorMode = useColorMode();
   const graph = useJSON<GraphT>("/graph");
   const accountList = useList<Account>("/accounts");
+  const jobList = useList<Job>("/jobs");
+  const pane = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [provider, setProvider] = useState("");
   const [account, setAccount] = useState("");
@@ -315,6 +390,13 @@ export function Graph() {
     for (const e of data.edges) if (byId.get(e.from)?.kind === "provider") providerOf.set(e.to, e.from);
     return { providerOf, accounts: jobAccounts(data) };
   }, [data]);
+  const names = useMemo(() => {
+    const jobs = new Map((jobList.data ?? []).map((j) => [j.name, j]));
+    return (n: GraphNode) => {
+      const j = n.kind === "job" ? jobs.get(n.label) : undefined;
+      return j ? jobTitle(j) : { title: n.label };
+    };
+  }, [jobList.data]);
   const { nodes, edges } = useMemo(() => {
     if (!data || !index) return { nodes: [] as Node[], edges: [] as Edge[] };
     const { providerOf, accounts } = index;
@@ -325,12 +407,14 @@ export function Graph() {
       if (n.kind === "account") return (!account || n.id === account) && (!provider || providerOf.get(n.id) === provider);
       if (n.kind === "job") {
         const a = accounts.get(n.id) ?? "";
-        return (!account || a === account) && (!provider || providerOf.get(a) === provider) && (!q || n.label.toLowerCase().includes(q));
+        return (!account || a === account) && (!provider || providerOf.get(a) === provider) && (!q || matches(n));
       }
       return true;
     };
-    return layout(data, { compact, keep: filtering ? keep : undefined, match: q ? (n) => n.label.toLowerCase().includes(q) : undefined, selected });
-  }, [data, index, selected, provider, account, query, compact]);
+    // A job matches by its name or its title ("networks").
+    const matches = (n: GraphNode) => n.label.toLowerCase().includes(q) || names(n).title.toLowerCase().includes(q);
+    return layout(data, { compact, names, keep: filtering ? keep : undefined, match: q ? matches : undefined, selected });
+  }, [data, index, selected, provider, account, query, compact, names]);
   if (graph.error && !data) return <Failure error={graph.error} />;
   if (!data) return <Loading />;
   const sel = data.nodes.find((n) => n.id === selected);
@@ -340,7 +424,7 @@ export function Graph() {
   const reasons = sel?.kind === "account" ? accountList.data?.find((a) => a.name === sel.label)?.health_reasons ?? [] : [];
   return (
     <>
-      <PageHead title="Graph" sub="Providers, accounts and targets, the jobs of each account, and the outputs. Select a node (click it, or Tab to it and press Enter) for its details; Escape closes them.">
+      <PageHead title="Graph" sub="Providers, accounts and targets, the jobs of each account, and the outputs. Scroll to move around, Ctrl or ⌘ and scroll (or pinch) to zoom. Select a node (click it, or Tab to it and press Enter) for its details; Escape closes them.">
         <Select label="Provider" value={provider} onChange={(v) => { setProvider(v); setAccount(""); }}>
           <option value="">All providers</option>
           {providers.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
@@ -352,14 +436,15 @@ export function Graph() {
         <input className="search" type="search" placeholder="Search jobs" aria-label="Search jobs" value={query} onChange={(e) => setQuery(e.target.value)} />
         <button type="button" className="btn" aria-pressed={compact} onClick={() => setCompact(!compact)}>{compact ? "Detailed tiles" : "Compact tiles"}</button>
       </PageHead>
-      <div className="graph" style={{ position: "relative" }}>
+      <div className="graph" style={{ position: "relative" }} ref={pane}>
         <ReactFlow
           key={`${provider}|${account}|${compact}`}
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
-          fitView
           minZoom={0.1}
+          panOnScroll
+          zoomOnScroll={false}
           nodesDraggable={false}
           nodesConnectable={false}
           edgesFocusable={false}
@@ -370,16 +455,18 @@ export function Graph() {
           colorMode={colorMode}
         >
           <Background color="var(--line)" gap={24} />
-          <Controls showInteractive={false} />
+          <Controls showInteractive={false} position="bottom-right" />
+          <InitialView pane={pane} bounds={layoutBounds(nodes)} />
         </ReactFlow>
         {(sel || selGroup) && (
           <div className="card panel" role="dialog" aria-label={sel ? `${sel.kind} ${sel.label}` : selected?.startsWith("section:") ? `provider section ${selGroup!.label}` : `jobs of ${selGroup!.label}`}>
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <h3 style={{ margin: 0 }}>{(sel ?? selGroup)!.label}</h3>
+              <h3 style={{ margin: 0, overflowWrap: "anywhere" }}>{sel ? names(sel).title : selGroup!.label}</h3>
               <button className="btn" onClick={() => setSelected(null)} aria-label="Close">Close</button>
             </div>
             <dl className="kv small" style={{ marginTop: 10 }}>
               <dt>Kind</dt><dd>{sel ? sel.kind : selected?.startsWith("section:") ? "provider section" : "jobs of the account"}</dd>
+              {sel && names(sel).title !== sel.label && (<><dt>Name</dt><dd className="mono" style={{ overflowWrap: "anywhere" }}>{sel.label}</dd><dt>Lists</dt><dd>{names(sel).detail}</dd></>)}
               <dt>Health</dt><dd>{sel?.kind === "job" && sel.waiting ? <Badge state="unknown">{waitingWord(sel.waiting)}</Badge> : <Badge state={(sel ?? selGroup)!.health} />}</dd>
               {sel?.instances ? (<><dt>Instances</dt><dd>{sel.instances}</dd></>) : null}
             </dl>
