@@ -1,0 +1,14 @@
+# The documents after a document commented out are loaded, and their
+# errors are reported at their line.
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: prometheus }
+spec: { type: prometheus }
+---
+# apiVersion: tapyr/v1alpha1
+# kind: Output
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: otlp }
+spec: { type: otlp }

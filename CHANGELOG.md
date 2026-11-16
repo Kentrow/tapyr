@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The documents of a configuration file that follow an empty one (a document commented out, or two `---` in a row) were ignored without a word; they are loaded.
+
 ## [0.5.0] - 2026-11-16
 
 ### Added

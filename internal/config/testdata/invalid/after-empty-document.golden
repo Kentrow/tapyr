@@ -1,0 +1,1 @@
+testdata/invalid/after-empty-document.yaml:14:1: spec: missing required field "otlp"
