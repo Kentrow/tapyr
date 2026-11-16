@@ -155,9 +155,27 @@ func (f *Fake) Next() (time.Time, bool) {
 // lets a test wait for goroutines to reach Sleep or a timer before calling
 // Advance.
 func (f *Fake) BlockUntil(ctx context.Context, n int) error {
+	return f.blockUntil(ctx, n, func(*fakeWaiter) bool { return true })
+}
+
+// BlockUntilTimers is BlockUntil counting the timers, tickers and sleepers
+// only: AfterFunc callbacks are left out. It lets a test wait for loops to
+// arm their timers while work in flight holds AfterFunc deadlines, which
+// BlockUntil would count in their place.
+func (f *Fake) BlockUntilTimers(ctx context.Context, n int) error {
+	return f.blockUntil(ctx, n, func(w *fakeWaiter) bool { return w.fn == nil })
+}
+
+func (f *Fake) blockUntil(ctx context.Context, n int, counted func(*fakeWaiter) bool) error {
 	for {
 		f.mu.Lock()
-		if len(f.waiters) >= n {
+		count := 0
+		for _, w := range f.waiters {
+			if counted(w) {
+				count++
+			}
+		}
+		if count >= n {
 			f.mu.Unlock()
 			return nil
 		}

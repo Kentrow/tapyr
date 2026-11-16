@@ -377,6 +377,27 @@ func TestFakeBlockUntilHonorsContext(t *testing.T) {
 	}
 }
 
+func TestFakeBlockUntilTimers(t *testing.T) {
+	f := NewFake(epoch)
+	f.AfterFunc(time.Minute, func() {})
+	// The callback is a waiter, not a timer.
+	if err := f.BlockUntil(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	if err := f.BlockUntilTimers(ctx, 1); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("BlockUntilTimers() with an AfterFunc only = %v, want context.DeadlineExceeded", err)
+	}
+	errc := make(chan error, 1)
+	go func() { errc <- f.BlockUntilTimers(context.Background(), 2) }()
+	f.NewTimer(time.Minute)
+	f.NewTicker(time.Minute)
+	if err := waitErr(t, errc); err != nil {
+		t.Fatalf("BlockUntilTimers() = %v", err)
+	}
+}
+
 func TestFakeConcurrentUse(t *testing.T) {
 	f := NewFake(epoch)
 	const sleepers = 50
