@@ -64,7 +64,7 @@ export function Overview() {
   const unfit = s.plan_feasible ? [] : (plan.data?.scopes ?? []).filter((sc) => !sc.feasible && sc.problem);
   return (
     <>
-      <PageHead title="Overview" sub={`Tapyr ${s.version}, up ${duration(s.uptime_seconds)}, configuration ${s.config_hash.slice(0, 8)} loaded ${since(s.last_reload.at)}.`} />
+      <PageHead title="Overview" sub={<>Tapyr {s.version}, up {duration(s.uptime_seconds)}, <span title={`Configuration ${s.config_hash.slice(0, 12)} (SHA-256 of the configuration files)`}>configuration loaded {since(s.last_reload.at)}</span>.</>} />
       <div className="kpis">
         <Kpi icon="graph" label="Providers healthy" value={`${okProviders}/${providers.data.length}`} ok={okProviders === providers.data.length}
           hint={plural(accounts.data.length, "account")} href={href(["graph"])} />

@@ -53,7 +53,8 @@ export function Outputs() {
               <div className="series-block">
                 <div className="label">Series</div>
                 {o.max_series ? (
-                  <Meter total={o.max_series} label={`${o.series} of ${o.max_series} series`} parts={[{
+                  // The status below says "777 of 1,000 series": no legend.
+                  <Meter legend={false} total={o.max_series} label={`${o.series} of ${o.max_series} series`} parts={[{
                     value: Math.min(o.series, o.max_series),
                     color: series.state === "ok" ? "var(--cyan-2)" : "var(--sun)",
                     label: `${count(o.series)} of ${count(o.max_series)} series`,
@@ -83,8 +84,15 @@ export function Outputs() {
                 <dt>Dropped</dt><dd className="num">{count(o.dropped)}</dd>
                 <dt>Send rate</dt>
                 <dd className="row" style={{ gap: 8 }}>
-                  <Sparkline values={values} label={`send rate of ${o.name}`} />
-                  <span className="num">{values.length ? `${values[values.length - 1]!.toFixed(1)}/s` : "-"}</span>
+                  {values.length < 2 ? (
+                    // A rate needs two refreshes: say so rather than "- -".
+                    <span className="muted" title="The rate is measured between two refreshes of the page">measuring...</span>
+                  ) : (
+                    <>
+                      <Sparkline values={values} label={`send rate of ${o.name}`} />
+                      <span className="num">{`${values[values.length - 1]!.toFixed(1)}/s`}</span>
+                    </>
+                  )}
                 </dd>
                 <dt>Last success</dt><dd title={absolute(o.last_success)}>{since(o.last_success)}</dd>
                 {o.last_error && (<><dt>Last error</dt><dd className="mono small" title={absolute(o.last_error_at)}>{o.last_error} ({since(o.last_error_at)})</dd></>)}

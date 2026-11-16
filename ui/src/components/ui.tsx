@@ -50,8 +50,9 @@ export function PageHead({ title, sub, children }: { title: string; sub?: ReactN
   );
 }
 
-// Meter shows parts of a whole, each with a color and a legend entry.
-export function Meter({ parts, total, label }: { parts: { value: number; color: string; label: string }[]; total: number; label: string }) {
+// Meter shows parts of a whole, each with a color and a legend entry; legend
+// false leaves the legend out when the figures are written next to it.
+export function Meter({ parts, total, label, legend = true }: { parts: { value: number; color: string; label: string }[]; total: number; label: string; legend?: boolean }) {
   const safe = total > 0 ? total : 1;
   return (
     <div>
@@ -60,14 +61,14 @@ export function Meter({ parts, total, label }: { parts: { value: number; color: 
           <span key={p.label} style={{ width: `${Math.min(100, (100 * Math.max(0, p.value)) / safe)}%`, background: p.color }} />
         ))}
       </div>
-      <div className="legend">
+      {legend && <div className="legend">
         {parts.map((p) => (
           <span key={p.label}>
             <i style={{ background: p.color }} />
             {p.label}
           </span>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }

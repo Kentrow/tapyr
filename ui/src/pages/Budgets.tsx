@@ -124,12 +124,6 @@ function QuotaBody({ budget: b }: { budget: Budget }) {
       ) : (
         <Loading />
       )}
-      <div className="legend">
-        <span><i style={{ background: "var(--cyan-2)" }} />consumed</span>
-        <span><i style={{ background: "var(--cyan-2)", opacity: 0.5 }} />projection at the current pace (dashed)</span>
-        <span><i style={{ background: "var(--red)" }} />limit</span>
-        <span><i style={{ background: "var(--sun-soft)" }} />retry reserve</span>
-      </div>
     </div>
   );
 }
