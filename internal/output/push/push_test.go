@@ -158,6 +158,33 @@ func (h *harness) waitIdle() {
 	}
 }
 
+// waitObserved waits until the observer has counted every point the state
+// counts as sent or dropped. The queue updates its state under its lock and
+// tells the observer of a delivery (and of samples rejected or pushed out)
+// after releasing it: waitIdle can return a moment before.
+func (h *harness) waitObserved() {
+	h.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		st := h.q.State()
+		h.obs.mu.Lock()
+		dropped := 0
+		for _, n := range h.obs.dropped {
+			dropped += n
+		}
+		sent := h.obs.sent
+		h.obs.mu.Unlock()
+		done := int64(sent) == st.Sent && int64(dropped) == st.Dropped
+		if done {
+			return
+		}
+		if time.Now().After(deadline) {
+			h.t.Fatalf("the observer counts %d sent and %d dropped, the state %+v", sent, dropped, st)
+		}
+		time.Sleep(100 * time.Microsecond)
+	}
+}
+
 func TestBatching(t *testing.T) {
 	h := newHarness(t, 100, 3)
 	// A full batch leaves at once; the rest waits for the flush interval.
@@ -177,6 +204,7 @@ func TestBatching(t *testing.T) {
 	if st.Queue != 0 || st.Sent != 4 || st.Capacity != 100 || !st.LastSuccess.Equal(start.Add(5*time.Second)) {
 		t.Errorf("state = %+v", st)
 	}
+	h.waitObserved()
 	h.obs.mu.Lock()
 	defer h.obs.mu.Unlock()
 	if h.obs.sent != 4 || h.obs.sends != 2 {
@@ -291,6 +319,7 @@ func TestRejections(t *testing.T) {
 	if st := h.q.State(); st.Sent != 0 || st.Dropped != 3 {
 		t.Errorf("state = %+v", st)
 	}
+	h.waitObserved()
 	h.obs.mu.Lock()
 	defer h.obs.mu.Unlock()
 	if !cmp.Equal(h.obs.dropped, map[string]int{ClassRejected: 3}) {
@@ -364,6 +393,7 @@ func TestOutOfOrderSplit(t *testing.T) {
 			if st := h.q.State(); st.Sent != int64(tt.wantSent) || st.Dropped != int64(dropped) || st.Queue != 0 {
 				t.Errorf("state = %+v", st)
 			}
+			h.waitObserved()
 			h.obs.mu.Lock()
 			defer h.obs.mu.Unlock()
 			wantDropped := map[string]int{ClassOutOfOrder: dropped}
@@ -453,6 +483,7 @@ func TestOutOfOrderSplitPushedOut(t *testing.T) {
 	if got := h.sender.got(); !cmp.Equal(got, [][]float64{{1, 2, 3, 4}, {1, 2}, {5, 6, 7, 8}}) {
 		t.Errorf("batches = %v", got)
 	}
+	h.waitObserved()
 	h.obs.mu.Lock()
 	defer h.obs.mu.Unlock()
 	if h.obs.sent != 4 || h.obs.dropped["queue_full"] != 4 {
