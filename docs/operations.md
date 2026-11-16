@@ -63,7 +63,7 @@ scrape_configs:
 
 Where nothing scrapes Tapyr, `settings.selfMetrics.outputs` pushes them through an output instead, every 30 seconds.
 
-- **Dashboard.** `dashboards/tapyr-overview.json` (Grafana): health, quotas left and projected, job freshness and intervals, provider calls, outputs. Every provider package ships a dashboard of the data it collects as well.
+- **Dashboard.** `dashboards/tapyr-overview.json` (Grafana): health, quotas left and projected, job freshness and intervals, provider calls, outputs. Quotas are named by the accounts that share them (`tapyr_budget_scope_info`), so a dashboard of this version needs a Tapyr of the same version or later. Every provider package ships a dashboard of the data it collects as well.
 - **Alerts.** [`examples/alerts/tapyr-alerts.yaml`](../examples/alerts/tapyr-alerts.yaml) has 14 rules for Prometheus or vmalert, explained in [Alerts](alerts.md): process down, stale jobs, open circuits, re-authentication required, quotas about to run out, unexpected 429s, outputs dropping samples, rejected reloads, state store failures.
 - **Probes.** `/healthz` answers 503 when the internal loops are stuck (liveness); `/readyz` answers 503 until the configuration is loaded, the state store answers and every output has started (readiness). Neither is ever protected by basic auth.
 - **Logs.** JSON on stderr by default, with `component`, `provider`, `account`, `job` and `run_id` fields; `--log-format text` (or `TAPYR_LOG_FORMAT`, or `settings.log.format`) for plain lines. Requests are logged at `debug` level only; repetitive warnings are logged at most once per minute.

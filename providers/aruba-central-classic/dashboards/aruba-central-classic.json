@@ -370,7 +370,7 @@
     {
       "id": 7,
       "type": "stat",
-      "title": "Re-bootstrap required",
+      "title": "Re-auth needed",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -438,7 +438,7 @@
         "colorMode": "value",
         "graphMode": "area"
       },
-      "description": "The refresh token was rejected: generate a new token pair in the API Gateway (Tapyr self-metrics)."
+      "description": "The refresh token was rejected and Tapyr can no longer renew it: generate a new token pair in the API Gateway and reload (Tapyr self-metrics)."
     },
     {
       "id": 8,

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The `Tapyr / Overview` dashboard names quotas by their accounts instead of their scope key, keeps its stat titles short with the details in their descriptions, shows full legends, and says "no response" and "penalty or priority" instead of "none".
 - The Graph opens readable: framed on its content between 80% and 100% zoom instead of fitted to the window, on its top left corner when it is larger, with the wheel to scroll and wider tiles; implicit jobs carry their readable name there too.
 - The web UI names implicit jobs by what they list and for whom ("Networks, listed for network-devices"), as do `tapyr plan` and the status API (`items`, `discovery_for`), and explains the columns of the Plan and Jobs pages in tooltips. A scope of the whole process reads "the whole Tapyr process" instead of "each instance".
 
