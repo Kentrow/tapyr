@@ -173,6 +173,7 @@ The documentation is published on [docs.tapyr.eu](https://docs.tapyr.eu): the de
 | [Getting started](docs/getting-started.md) | A first configuration against a simulator, its plan, its run, a shrinking quota |
 | [Configure your accounts](docs/configure-accounts.md) | From the simulator to your own account: credentials, account, jobs, output, checks |
 | [Concepts](docs/concepts.md) | Providers, accounts, jobs, discovery, the budget engine and the planner |
+| [Glossary](docs/glossary.md) | The words of the configuration, the CLI, the web UI and the metrics, defined in one place |
 | [Install](docs/install.md) | Binaries, image, systemd, Kubernetes, signature verification, build from source |
 | [Outputs](docs/outputs.md) | Prometheus exposition, remote write, OTLP |
 | [Operations](docs/operations.md) | State store, reloads, secrets, monitoring Tapyr, exposing the server, upgrades |

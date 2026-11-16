@@ -1,6 +1,6 @@
 # Concepts
 
-Tapyr polls the APIs of vendor platforms and turns their answers into metrics. What makes it different from a script with a loop is that it treats the API quota as a budget: the limits of every API are declared once, every request is accounted against them, and the polling slows down on purpose before a quota runs out. This page explains the pieces and how they fit; the [specification](spec/01-vision-and-scope.md) has the full detail.
+Tapyr polls the APIs of vendor platforms and turns their answers into metrics. What makes it different from a script with a loop is that it treats the API quota as a budget: the limits of every API are declared once, every request is accounted against them, and the polling slows down on purpose before a quota runs out. This page explains the pieces and how they fit; the [specification](spec/01-vision-and-scope.md) has the full detail, and the [glossary](glossary.md) defines every term in a few lines.
 
 ## Configuration documents
 
