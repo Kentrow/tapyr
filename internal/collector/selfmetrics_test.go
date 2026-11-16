@@ -19,6 +19,7 @@ import (
 	"github.com/kentrow/tapyr/internal/budget"
 	"github.com/kentrow/tapyr/internal/budget/planner"
 	"github.com/kentrow/tapyr/internal/clock"
+	"github.com/kentrow/tapyr/internal/runtime"
 	"github.com/kentrow/tapyr/internal/selfobs"
 	"github.com/kentrow/tapyr/internal/state"
 )
@@ -71,14 +72,20 @@ func TestQuotaGauges(t *testing.T) {
 	want := []selfobs.QuotaGauge{
 		{
 			Provider: "p", Limit: "daily", Scope: "account=acme", Max: 1000, Used: 250, Remaining: 750, ObservedRemaining: -1,
-			ReserveRemaining: 100, WindowEnd: end,
+			ReserveRemaining: 100, WindowEnd: end, Accounts: []string{"acme"},
 		},
 		{
 			Provider: "p", Limit: "org", Scope: "var:organizationId", Max: 100, Used: 95, Remaining: 5, ObservedRemaining: 4,
 			ReserveRemaining: 5, WindowEnd: end, ExhaustionETA: 6 * time.Hour * 5 / 95, Mismatch: true,
+			// A scope keyed by a variable narrows no account: every account
+			// of the provider with a job.
+			Accounts: []string{"acme", "beta"},
 		},
 	}
-	if diff := cmp.Diff(want, quotaGauges(quotas, now)); diff != "" {
+	jobs := []*runtime.Job{
+		{Name: "a", Provider: "p", Account: "acme"}, {Name: "b", Provider: "p", Account: "beta"}, {Name: "c", Provider: "q", Account: "other"},
+	}
+	if diff := cmp.Diff(want, quotaGauges(quotas, now, jobs)); diff != "" {
 		t.Errorf("gauges (-want +got):\n%s", diff)
 	}
 }
