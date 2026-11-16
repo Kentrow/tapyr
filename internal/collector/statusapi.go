@@ -269,7 +269,7 @@ func (s statusSource) Jobs(ctx context.Context) []api.Job {
 func (s statusSource) job(ctx context.Context, snap *snapshot, j *runtime.Job) api.Job {
 	aj := api.Job{
 		Name: j.Name, Provider: j.Provider, Account: j.Account, Role: string(j.Role), Priority: string(j.Priority),
-		Implicit: j.Implicit, DesiredIntervalSeconds: j.Interval.Seconds(), Outputs: slices.Clone(j.Outputs),
+		Implicit: j.Implicit, Items: j.Items, DiscoveryFor: slices.Clone(j.DiscoveryFor), DesiredIntervalSeconds: j.Interval.Seconds(), Outputs: slices.Clone(j.Outputs),
 		Labels: map[string]string{}, Collected: j.NotCollected == "", NotCollectedReason: j.NotCollected,
 	}
 	if aj.Outputs == nil {

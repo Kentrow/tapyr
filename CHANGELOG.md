@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tapyr provider show <name>` describes a provider package: its secrets and params, its templates with their interval and metrics, its limits with their sources; `--example` prints its example configuration, ready to copy. `tapyr provider list --output json` gains the params, secrets, roles and parents of the templates.
 - Documentation: a [glossary](docs/glossary.md) of the terms of the configuration, the CLI, the web UI and the metrics (scope, stretch, retry reserve, fan-out, implicit job, instance...), with the labels the web UI shows them under.
 
+### Changed
+
+- The web UI names implicit jobs by what they list and for whom ("Networks, listed for network-devices"), as do `tapyr plan` and the status API (`items`, `discovery_for`), and explains the columns of the Plan and Jobs pages in tooltips. A scope of the whole process reads "the whole Tapyr process" instead of "each instance".
+
 ### Fixed
 
 - The documents of a configuration file that follow an empty one (a document commented out, or two `---` in a row) were ignored without a word; they are loaded.

@@ -88,6 +88,10 @@ export interface Job {
   role: string;
   priority: string;
   implicit: boolean;
+  // What an implicit job lists ("networks") and the configured jobs it
+  // lists them for.
+  items?: string;
+  discovery_for?: string[];
   parent?: string;
   desired_interval_seconds: number;
   effective_interval_seconds: number;

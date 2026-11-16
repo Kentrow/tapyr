@@ -92,6 +92,10 @@ example-sim/daily                24h          4500           4679               
   job demo.example-sim-networks  desired 30m  effective 6h   4 runs x 3 x 1 page = 13    (slowed down x12, priority low, to fit the daily quota of account demo)
   job demo.example-sim-sites     desired 1h   effective 12h  2 runs x 2 pages = 4        (slowed down x12, priority low, to fit the daily quota of account demo)
 
+Implicit jobs, run at priority low to list the items of a fan-out that no job declares:
+  demo.example-sim-networks  lists the networks for network-devices
+  demo.example-sim-sites     lists the sites for network-devices
+
 OUTPUT      SERIES   SAMPLES/MIN  LIMIT
 prometheus  unknown  -            -      until its jobs have run once
 
@@ -107,7 +111,7 @@ The plan does not fit:
   How to fix: https://docs.tapyr.eu/0.5/troubleshooting/#quota-problems
 ```
 
-Read it from the top. The daily quota is 5000 calls; 500 are kept for retries, which leaves 4500 available. Listing 5 devices takes 3 pages, so polling them every minute costs 4320 calls a day, 4536 with the 5% the planner adds for retries: more than what is available on its own. The planner slowed every other job down 12 times, the most it allows, and it is still not enough. A critical job is never slowed down, so the plan does not fit, and `tapyr plan` exits with code 3: a CI would have caught it before deployment. The conclusion says what to change. The series of the output are unknown until the jobs have run once.
+Read it from the top. The daily quota is 5000 calls; 500 are kept for retries, which leaves 4500 available. Listing 5 devices takes 3 pages, so polling them every minute costs 4320 calls a day, 4536 with the 5% the planner adds for retries: more than what is available on its own. The planner slowed every other job down 12 times, the most it allows, and it is still not enough. A critical job is never slowed down, so the plan does not fit, and `tapyr plan` exits with code 3: a CI would have caught it before deployment. The conclusion says what to change. You declared two jobs, and `network-devices` runs once per network of every site: Tapyr adds the two jobs that list the sites and the networks, at priority `low`. The series of the output are unknown until the jobs have run once.
 
 Poll the devices every 2 minutes instead (`interval: 2m` in `config.yaml`) and plan again:
 

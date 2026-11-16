@@ -1,7 +1,7 @@
 // Formatting helpers. Durations and counts use compact units; times are
 // shown relative to now, with the absolute time in a title.
 
-import type { Budget, Health, Output, Waiting, WaitingReason } from "./types";
+import type { Budget, Health, Job, Output, Waiting, WaitingReason } from "./types";
 
 export function duration(seconds: number | undefined): string {
   if (seconds === undefined || !Number.isFinite(seconds)) return "-";
@@ -138,7 +138,7 @@ export function waitingWord(reason: WaitingReason | undefined): string {
 // the tables and the squares, long for the job page. Waiting is not
 // failing: the words say what the job waits for and until when, and name
 // the job that fails when one does.
-export function waitingText(w: Waiting, now = Date.now()): { short: string; long: string } {
+export function waitingText(w: Waiting, now = Date.now(), words: (job: string) => string = (job) => job): { short: string; long: string } {
   const when = (iso: string | undefined) => (iso ? since(iso, now) : "");
   switch (w.reason) {
     case "first_run":
@@ -146,15 +146,19 @@ export function waitingText(w: Waiting, now = Date.now()): { short: string; long
         short: w.until ? `first run ${when(w.until)}` : "first run soon",
         long: w.until ? `Waiting for its first run, due ${when(w.until)}.` : "Waiting for its first run.",
       };
-    case "parent":
+    case "parent": {
+      const parent = words(w.parent ?? "");
       return {
-        short: `waiting for ${w.parent}`,
-        long: `Waiting for ${w.parent} to list its items: one instance per item.${w.until ? ` The discovery moves on ${when(w.until)}.` : ""}`,
+        short: `waiting for ${parent}`,
+        long: `Waiting for ${parent === w.parent ? `${parent} to list its items` : parent}: one instance per item.${w.until ? ` The discovery moves on ${when(w.until)}.` : ""}`,
       };
+    }
     case "parent_failing": {
-      const who = w.failing_job === w.parent ? `${w.parent}, which fails` : `${w.parent}, whose parent ${w.failing_job} fails`;
+      const parent = words(w.parent ?? "");
+      const failing = words(w.failing_job ?? "");
+      const who = w.failing_job === w.parent ? `${parent}, which fails` : `${parent}, whose parent ${failing} fails`;
       return {
-        short: `waiting: ${w.failing_job} fails`,
+        short: `waiting: ${failing} fails`,
         // The problem, when there is one, says the error in words below.
         long: `Waiting for ${who}${w.error && !w.problem ? `: ${w.error}` : ""}${w.failed_at ? ` (${when(w.failed_at)})` : ""}.${w.until ? ` Next try ${when(w.until)}.` : ""}`,
       };
@@ -231,11 +235,49 @@ export function seriesStatus(o: Pick<Output, "series" | "max_series" | "series_r
 }
 
 // scopeWords names a scope key in words: "account demo", "account lab
-// and target eu", "each instance", "all accounts" for a provider-wide one.
+// and target eu", "the whole Tapyr process" for the instance dimension
+// (all the accounts of this Tapyr), "all accounts" for a provider-wide one.
 export function scopeWords(key: string): string {
   if (!key) return "all accounts";
-  return key.split(",").map((part) => (part === "instance" ? "each instance" : part.replace("=", " "))).join(" and ");
+  if (key === "instance") return "the whole Tapyr process";
+  return key.split(",").map((part) => (part === "instance" ? "the Tapyr process" : part.replace("=", " "))).join(" and ");
 }
+
+// jobTitle names a job for people. An implicit job, which Tapyr adds to
+// list the items of a fan-out that no job declares, is named by what it
+// lists and for whom: "Networks", "listed for network-devices". The
+// others keep their name.
+export function jobTitle(j: Pick<Job, "name" | "implicit" | "items" | "discovery_for">): { title: string; detail?: string } {
+  if (!j.implicit || !j.items) return { title: j.name };
+  const forWhom = j.discovery_for?.length ? `listed for ${j.discovery_for.join(", ")}` : "listed for a fan-out";
+  return { title: j.items.charAt(0).toUpperCase() + j.items.slice(1), detail: forWhom };
+}
+
+// jobLabels returns how a title names a job: "Networks, listed for
+// network-devices" for an implicit job, the name of the others and of
+// anything that is not a job.
+export function jobLabels(jobs: Job[] | undefined): (name: string) => string {
+  const byName = new Map((jobs ?? []).map((j) => [j.name, j]));
+  return (name) => {
+    const j = byName.get(name);
+    if (!j) return name;
+    const t = jobTitle(j);
+    return t.detail ? `${t.title}, ${t.detail}` : t.title;
+  };
+}
+
+// jobWords returns how a sentence names a job: "the job listing the
+// networks" for an implicit job, the name of the others.
+export function jobWords(jobs: Job[] | undefined): (name: string) => string {
+  const byName = new Map((jobs ?? []).map((j) => [j.name, j]));
+  return (name) => {
+    const j = byName.get(name);
+    return j?.implicit && j.items ? `the job listing the ${j.items}` : name;
+  };
+}
+
+// implicitHelp explains an implicit job, next to its name.
+export const implicitHelp = "An implicit job: Tapyr adds it, at priority low, to list the items a fan-out runs on when no job of the configuration lists them.";
 
 // limitTitle names a limit for people: its name as the provider declares
 // it, with spaces and a capital ("account-rate" is "Account rate").

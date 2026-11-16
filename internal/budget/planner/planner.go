@@ -475,7 +475,8 @@ func ScopeWords(key string) string {
 		dim, value, ok := strings.Cut(part, "=")
 		if !ok {
 			if part == "instance" {
-				part = "each instance"
+				// The whole process: every account of this Tapyr.
+				part = "the Tapyr process"
 			}
 			parts = append(parts, part)
 			continue

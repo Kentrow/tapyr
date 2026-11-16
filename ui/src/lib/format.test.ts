@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { count, duration, healthClass, limitSummary, limitTitle, outputHealth, plural, scopeAccounts, seriesStatus, since, sourceWords, toYAML, versionLabel, waitingText, waitingWord } from "./format";
-import type { Budget, Output } from "./types";
+import { count, duration, healthClass, jobLabels, jobTitle, jobWords, limitSummary, limitTitle, outputHealth, plural, scopeAccounts, seriesStatus, since, sourceWords, toYAML, versionLabel, waitingText, waitingWord } from "./format";
+import type { Budget, Job, Output } from "./types";
 
 describe("format", () => {
   it("names a limit and says what it allows", () => {
@@ -36,8 +36,35 @@ describe("format", () => {
     expect(waitingText({ ...failing, parent: "networks" }, now).long).toBe("Waiting for networks, whose parent sites fails: HTTP 401 (2m ago). Next try in 1h.");
     const problem = { class: "auth", title: "The provider rejected the credentials of lab.", action: "Check it.", docs_url: "u" };
     expect(waitingText({ ...failing, problem }, now).long).toBe("Waiting for sites, which fails (2m ago). Next try in 1h.");
+    // Implicit jobs are named by what they list.
+    const words = (job: string) => (job === "demo.example-sim-sites" ? "the job listing the sites" : job);
+    expect(waitingText({ reason: "parent", parent: "demo.example-sim-sites" }, now, words)).toEqual({
+      short: "waiting for the job listing the sites",
+      long: "Waiting for the job listing the sites: one instance per item.",
+    });
+    expect(waitingText({ ...failing, parent: "networks", failing_job: "demo.example-sim-sites" }, now, words)).toMatchObject({
+      short: "waiting: the job listing the sites fails",
+      long: "Waiting for networks, whose parent the job listing the sites fails: HTTP 401 (2m ago). Next try in 1h.",
+    });
     expect(waitingWord("parent_failing")).toBe("waiting, parent failing");
     expect(waitingWord(undefined)).toBe("no run yet");
+  });
+  it("names implicit jobs by what they list and for whom", () => {
+    const base = { provider: "example-sim", account: "demo", role: "both", priority: "low", desired_interval_seconds: 60, effective_interval_seconds: 60, instances: 1, collected: true, outputs: [], labels: {} };
+    const nets: Job = { ...base, name: "demo.example-sim-networks", implicit: true, items: "networks", discovery_for: ["network-devices", "routers"] };
+    const own: Job = { ...base, name: "demo-sites", implicit: false };
+    expect(jobTitle(nets)).toEqual({ title: "Networks", detail: "listed for network-devices, routers" });
+    expect(jobTitle({ ...nets, discovery_for: undefined })).toEqual({ title: "Networks", detail: "listed for a fan-out" });
+    // A Tapyr without the items (an older server) shows the name.
+    expect(jobTitle({ ...nets, items: undefined })).toEqual({ title: "demo.example-sim-networks" });
+    expect(jobTitle(own)).toEqual({ title: "demo-sites" });
+    const label = jobLabels([nets, own]);
+    expect(label("demo.example-sim-networks")).toBe("Networks, listed for network-devices, routers");
+    expect(label("demo-sites")).toBe("demo-sites");
+    expect(label("Configuration reloaded")).toBe("Configuration reloaded");
+    const words = jobWords([nets, own]);
+    expect(words("demo.example-sim-networks")).toBe("the job listing the networks");
+    expect(words("demo-sites")).toBe("demo-sites");
   });
   it("says how an output stands against its series limit", () => {
     const o = { series: 950, series_refused: 0, samples_refused: 0 };

@@ -381,7 +381,7 @@ func TestDescribe(t *testing.T) {
 	}{
 		{JobPlan{Desired: time.Minute, Effective: time.Minute}, ""},
 		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitQuota, Limit: "p/daily", Key: "account=lab"}}, "to fit the daily quota of account lab"},
-		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitQuota, Limit: "p/hourly", Key: "instance"}}, "to fit the hourly quota of each instance"},
+		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitQuota, Limit: "p/hourly", Key: "instance"}}, "to fit the hourly quota of the Tapyr process"},
 		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitRate, Limit: "p/rate", Key: "account=lab,target=eu"}}, "for a run to fit the rate rate limit of account lab and target eu"},
 		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Constraint: Constraint{Kind: config.LimitQuota, Limit: "global"}}, "to fit the global quota"},
 		{JobPlan{Desired: time.Minute, Effective: 2 * time.Minute, Reason: " legacy "}, "legacy"},

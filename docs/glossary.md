@@ -56,7 +56,7 @@ A job whose template has `forEach`: it runs once per item listed by its parent, 
 
 ## Implicit job
 
-The parent of a fan-out that no job of the account declares: Tapyr runs it for you, named `<account>.<template>` (`campus.meraki-organizations`), at priority `low`. You only declare the jobs whose metrics you want. The Jobs page marks it "(implicit)".
+The parent of a fan-out that no job of the account declares: Tapyr runs it for you, named `<account>.<template>` (`campus.meraki-organizations`), at priority `low`. You only declare the jobs whose metrics you want. The web UI names it by what it lists and for whom ("Networks, listed for network-devices"), with its technical name below, and `tapyr plan` lists the implicit jobs after the quotas.
 
 ## Infeasible plan
 
@@ -67,7 +67,7 @@ A plan in which the `critical` jobs alone spend more than a quota allows: they a
 Two meanings, told apart by their context:
 
 - **A job instance** is one copy of a [fan-out](#fan-out) job, for one item of its parent: the devices job of one network. The Instances column of the Jobs and Plan pages counts them, and the page of a job lists them.
-- **A Tapyr instance** is one running Tapyr process. A limit scoped by `instance` is shared by every account of the process: it stands for the limits a provider counts per source IP.
+- **A Tapyr instance** is one running Tapyr process. A limit scoped by `instance` is shared by every account of the process: it stands for the limits a provider counts per source IP. The web UI and `tapyr plan` call this scope "the whole Tapyr process".
 
 ## Inventory
 

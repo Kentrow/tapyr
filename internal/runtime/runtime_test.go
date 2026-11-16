@@ -96,8 +96,12 @@ func TestCompileExamples(t *testing.T) {
 		nd.Pagination.Type != config.PaginationCursor {
 		t.Errorf("network devices = %+v", nd)
 	}
-	if nets := byName["demo.example-sim-networks"]; !nets.Implicit || nets.ForEach.ParentJob != "demo-sites" {
+	if nets := byName["demo.example-sim-networks"]; !nets.Implicit || nets.ForEach.ParentJob != "demo-sites" ||
+		nets.Items != "networks" || !slices.Equal(nets.DiscoveryFor, []string{"demo-network-devices"}) {
 		t.Errorf("implicit networks = %+v", nets)
+	}
+	if sites := byName["demo-sites"]; sites.Items != "" || sites.DiscoveryFor != nil {
+		t.Errorf("a declared job has no discovery description: %q %v", sites.Items, sites.DiscoveryFor)
 	}
 	if devices.Auth != nil {
 		t.Error("auth must not be built without secrets")
@@ -264,6 +268,14 @@ spec:
 	}
 	if networks.ForEach.ParentJob != "fleet.orgs" || north.ForEach.ParentJob != "fleet.networks" || networks.Role != config.RoleBoth {
 		t.Errorf("parents: %q %q", networks.ForEach.ParentJob, north.ForEach.ParentJob)
+	}
+	// Two implicit levels above devices, described alike on every target.
+	for _, inst := range []string{"fleet.orgs[target=north]", "fleet.orgs[target=south]", "fleet.networks[target=south]"} {
+		j := byInstance[inst]
+		if want := strings.TrimSuffix(strings.TrimPrefix(inst, "fleet."), "[target=north]"); j.Items != strings.TrimSuffix(want, "[target=south]") ||
+			!slices.Equal(j.DiscoveryFor, []string{"devices"}) {
+			t.Errorf("%s: items %q, for %v", inst, j.Items, j.DiscoveryFor)
+		}
 	}
 
 	// Children inherit the discovery variables of their parent instance.

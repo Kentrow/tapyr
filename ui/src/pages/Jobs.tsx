@@ -1,8 +1,10 @@
-import { Badge, Failure, Loading, PageHead, Table } from "../components/ui";
+import { Badge, Failure, Help, Loading, PageHead, Table } from "../components/ui";
 import { CodeBlock } from "../components/Code";
 import { ProblemNote } from "../components/Problem";
 import { NotFound } from "./NotFound";
-import { absolute, count, duration, since, toYAML, waitingText } from "../lib/format";
+import { JobName } from "../components/JobName";
+import { absolute, count, duration, implicitHelp, jobTitle, jobWords, since, toYAML, waitingText } from "../lib/format";
+import { terms } from "../lib/terms";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
 import { href } from "../lib/router";
@@ -12,9 +14,10 @@ export function Jobs() {
   const jobs = useList<Job>("/jobs");
   if (jobs.error && !jobs.data) return <Failure error={jobs.error} />;
   if (!jobs.data) return <Loading />;
+  const words = jobWords(jobs.data);
   return (
     <>
-      <PageHead title="Jobs" sub="Every job with its desired and effective interval; implicit jobs are the parents of fan-outs that no job configures, and jobs not collected make no API call (no output keeps their metrics)." />
+      <PageHead title="Jobs" sub="Every job with its desired and effective interval. Tapyr adds the jobs that list the items of a fan-out when no job of the configuration lists them; jobs not collected make no API call (no output keeps their metrics)." />
       <Table<Job>
         rows={jobs.data}
         rowKey={(j) => j.name}
@@ -25,17 +28,16 @@ export function Jobs() {
             key: "name", label: "Job", sort: (j) => j.name,
             render: (j) => (
               <span>
-                <a href={href(["jobs", j.name])}>{j.name}</a>
-                {j.implicit && <span className="muted small"> (implicit)</span>}
+                <JobName name={j.name} job={j} />
                 {!j.collected && <span title={j.not_collected_reason}> <Badge state="unknown">not collected</Badge></span>}
               </span>
             ),
           },
           { key: "account", label: "Account", sort: (j) => j.account, render: (j) => j.account },
-          { key: "role", label: "Role", sort: (j) => j.role, render: (j) => j.role },
-          { key: "instances", label: "Instances", num: true, sort: (j) => j.instances, render: (j) => count(j.instances) },
+          { key: "role", label: "Role", help: terms.role, sort: (j) => j.role, render: (j) => j.role },
+          { key: "instances", label: "Instances", help: terms.instances, num: true, sort: (j) => j.instances, render: (j) => count(j.instances) },
           {
-            key: "interval", label: "Interval", num: true, sort: (j) => j.effective_interval_seconds,
+            key: "interval", label: "Interval", help: terms.effective, num: true, sort: (j) => j.effective_interval_seconds,
             render: (j) =>
               !j.collected ? (
                 <span className="muted" title={j.not_collected_reason}>-</span>
@@ -53,7 +55,7 @@ export function Jobs() {
               j.last_run ? (
                 <span title={absolute(j.last_run.ended_at)}><Badge state={j.last_run.result} /> {since(j.last_run.ended_at)}</span>
               ) : j.waiting ? (
-                <span className="muted" title={waitingText(j.waiting).long}>{waitingText(j.waiting).short}</span>
+                <span className="muted" title={waitingText(j.waiting, undefined, words).long}>{waitingText(j.waiting, undefined, words).short}</span>
               ) : (
                 <span className="muted">{j.collected ? "no run yet" : "-"}</span>
               ),
@@ -78,12 +80,15 @@ export function Jobs() {
 // instancesEmpty says why a job has no instance: not collected, or a
 // fan-out whose parent has not listed its items yet, fails, or listed
 // none.
-export function instancesEmpty(j: Job): string {
+export function instancesEmpty(j: Job, words: (job: string) => string = (job) => job): string {
   if (!j.collected) return "No instance: the job is not collected.";
   const w = j.waiting;
-  if (w?.reason === "parent") return `No instance yet: ${w.parent} has not listed its items.`;
-  if (w?.reason === "parent_failing") return `No instance yet: ${w.failing_job === w.parent ? w.parent : `${w.parent} waits for ${w.failing_job}, which`} fails.`;
-  if (j.parent) return `No instance: ${j.parent} listed no item in its last run.`;
+  if (w?.reason === "parent") return `No instance yet: ${words(w.parent ?? "")} has not listed its items.`;
+  if (w?.reason === "parent_failing") {
+    const parent = words(w.parent ?? "");
+    return `No instance yet: ${w.failing_job === w.parent ? parent : `${parent} waits for ${words(w.failing_job ?? "")}, which`} fails.`;
+  }
+  if (j.parent) return `No instance: ${words(j.parent)} listed no item in its last run.`;
   return "No instance.";
 }
 
@@ -91,14 +96,19 @@ export function JobDetail({ name }: { name: string }) {
   const job = useJSON<Job>(`/jobs/${encodeURIComponent(name)}`);
   const instances = useList<Instance>(`/jobs/${encodeURIComponent(name)}/instances`);
   const runs = useJSON<List<Run>>(`/jobs/${encodeURIComponent(name)}/runs?limit=25`);
+  const jobs = useList<Job>("/jobs");
   if (job.error instanceof HttpError && job.error.status === 404) return <NotFound what={`No job ${name} in the running configuration.`} />;
   if (job.error && !job.data) return <Failure error={job.error} />;
   if (!job.data) return <Loading />;
   const j = job.data;
   const stretched = j.collected && j.effective_interval_seconds > j.desired_interval_seconds;
+  const words = jobWords(jobs.data);
+  const byName = (n: string) => jobs.data?.find((o) => o.name === n);
+  const t = jobTitle(j);
+  const where = `${j.provider} / ${j.account}${j.template ? `, template ${j.template}` : ""}`;
   return (
     <>
-      <PageHead title={j.name} sub={`${j.provider} / ${j.account}${j.template ? `, template ${j.template}` : ""}`}>
+      <PageHead title={t.title} sub={t.detail ? <><abbr className="help" title={implicitHelp}>{t.detail}</abbr>: job <span className="mono">{j.name}</span>, {where}</> : where}>
         <a className="btn" href={href(["debug"], { job: j.name })}>Live debug</a>
       </PageHead>
       <div className="grid">
@@ -135,8 +145,8 @@ export function JobDetail({ name }: { name: string }) {
             <>
               <div className="row"><Badge state={j.waiting.reason === "parent_failing" ? "degraded" : "unknown"}>waiting</Badge></div>
               <p className="small" style={{ overflowWrap: "anywhere", marginBottom: 0 }}>
-                {waitingText(j.waiting).long}
-                {j.waiting.failing_job && <> <a href={href(["jobs", j.waiting.failing_job])}>See {j.waiting.failing_job}</a>.</>}
+                {waitingText(j.waiting, undefined, words).long}
+                {j.waiting.failing_job && <> See <JobName compact name={j.waiting.failing_job} job={byName(j.waiting.failing_job)} />.</>}
               </p>
               {j.waiting.problem && <div className="small" style={{ marginTop: 8 }}><ProblemNote problem={j.waiting.problem} compact /></div>}
             </>
@@ -148,10 +158,10 @@ export function JobDetail({ name }: { name: string }) {
         <div className="card">
           <h3>Job</h3>
           <dl className="kv small">
-            <dt>Role</dt><dd>{j.role}</dd>
-            <dt>Priority</dt><dd>{j.priority}</dd>
-            {j.parent && (<><dt>Parent</dt><dd><a href={href(["jobs", j.parent])}>{j.parent}</a></dd></>)}
-            <dt>Instances</dt><dd>{count(j.instances)}</dd>
+            <dt><Help text={terms.role}>Role</Help></dt><dd>{j.role}</dd>
+            <dt><Help text={terms.priority}>Priority</Help></dt><dd>{j.priority}</dd>
+            {j.parent && (<><dt>Parent</dt><dd><JobName compact name={j.parent} job={byName(j.parent)} /></dd></>)}
+            <dt><Help text={terms.instances}>Instances</Help></dt><dd>{count(j.instances)}</dd>
             <dt>Outputs</dt><dd>{j.outputs.length ? j.outputs.join(", ") : "all"}</dd>
           </dl>
         </div>
@@ -183,7 +193,7 @@ export function JobDetail({ name }: { name: string }) {
           rows={instances.data ?? []}
           rowKey={(i) => i.key}
           initialSort={{ key: "key" }}
-          empty={instancesEmpty(j)}
+          empty={instancesEmpty(j, words)}
           columns={[
             { key: "key", label: "Instance", sort: (i) => i.key, render: (i) => <span className="mono small">{i.key}</span> },
             { key: "vars", label: "Variables", render: (i) => <span className="mono small">{Object.entries(i.vars).map(([k, v]) => `${k}=${v}`).join(" ")}</span> },

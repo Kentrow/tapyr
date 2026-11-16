@@ -190,6 +190,17 @@ spec:
 	names := map[string]bool{}
 	for _, j := range jobs.Items {
 		names[j.Name] = true
+		// An implicit job says what it lists and for whom.
+		switch j.Name {
+		case "fleet.example-sim-sites", "fleet.example-sim-networks":
+			if want := strings.TrimPrefix(j.Name, "fleet.example-sim-"); j.Items != want || !slices.Equal(j.DiscoveryFor, []string{"network-devices"}) {
+				t.Errorf("job %s: items %q, discovery for %v, want %q for network-devices", j.Name, j.Items, j.DiscoveryFor, want)
+			}
+		case "devices", "network-devices":
+			if j.Items != "" || j.DiscoveryFor != nil {
+				t.Errorf("job %s: items %q, discovery for %v, want none", j.Name, j.Items, j.DiscoveryFor)
+			}
+		}
 		if j.EffectiveIntervalSeconds <= 0 {
 			t.Errorf("job %s: effective interval %v", j.Name, j.EffectiveIntervalSeconds)
 		}

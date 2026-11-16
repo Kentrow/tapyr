@@ -1,9 +1,10 @@
 import { useEffect, useRef } from "react";
-import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
+import { Badge, Failure, Help, Loading, Meter, PageHead } from "../components/ui";
 import { QuotaTimeline } from "../components/QuotaTimeline";
 import { absolute, count, duration, limitSummary, limitTitle, plural, scopeAccounts, scopeWords, since, sourceWords } from "../lib/format";
 import { useJSON, useList, useNow } from "../lib/live";
 import { useRoute } from "../lib/router";
+import { terms } from "../lib/terms";
 import type { Budget, Timeline } from "../lib/types";
 
 export function Budgets() {
@@ -80,14 +81,8 @@ export const help = {
   others: "The calls of other clients of the same quota (the vendor UI, scripts, other integrations): what the provider counts, minus what Tapyr made. Known only when the API sends quota headers.",
   remaining: "What is left in this window, as Tapyr counts it.",
   observed: "What is left as the API reports it in its quota headers. Tapyr spends no more than the lower of both.",
-  reserve: "Calls kept for retries and critical jobs: the planner leaves them out, so that a retry never finds the quota empty.",
+  reserve: terms.reserve,
 };
-
-// Help marks a term that has an explanation: dotted underline, the text as
-// a tooltip and for screen readers.
-function Help({ text, children }: { text: string; children: React.ReactNode }) {
-  return <abbr className="help" title={text}>{children}</abbr>;
-}
 
 function QuotaBody({ budget: b }: { budget: Budget }) {
   const now = useNow();
