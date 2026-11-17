@@ -15,12 +15,13 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
 - **Labels**: `scripts/sync-labels.sh` creates the labels of [`.github/labels.yml`](../.github/labels.yml).
 - **OpenSSF**: the Scorecard workflow publishes its results once the repository is public (badge in the README). The project is registered on [bestpractices.dev](https://www.bestpractices.dev/projects/16342) (passing level, badge in the README): keep its answers true when the project changes (security policy, tests, CI, release signing).
 - **Canary instance**: a Tapyr of a maintainer that polls real platforms continuously and is upgraded automatically to every release and release candidate, from the chart or the packages, as a user would. It catches what the simulators cannot: quota windows rolling over, token and session renewals, the growth of the state store, upgrades from one version to the next, API changes. Its configuration, credentials and data stay off the repository.
+- **Public demo**: [demo.tapyr.eu](https://demo.tapyr.eu) runs the latest release only, never a candidate: it is what visitors see, and it is upgraded by hand. A candidate is checked on the canary instance, and against the simulators of every provider locally (step 2).
 - **Image visibility**: after the first release, the package `ghcr.io/kentrow/tapyr` is private by default: Packages > tapyr > Package settings > Change visibility to public, and link it to the repository. The same for `ghcr.io/kentrow/charts/tapyr`, after the first release with the chart.
 
 ## A release
 
 1. Check `main`: CI green, including the release snapshot job (every platform, both images). Check the [versions updated by hand](#versions-updated-by-hand) too; a bump goes through its own pull request before the release.
-2. Release a candidate first when the release itself changed: `release.yml`, `.goreleaser.yaml` or the `Dockerfile` changed since the last tag (`git diff --stat vPREVIOUS -- .github/workflows/release.yml .goreleaser.yaml Dockerfile`), or the version is a minor one that changes the behavior or the configuration. Tag `vX.Y.Z-rc.N` on `main` before the release commit, as in steps 4 to 6: its release notes are the `[Unreleased]` section, the GitHub release is a prerelease and the image gets the tag `X.Y.Z-rc.N` only (not `X.Y` nor `latest`). Go on once it is checked, and once it has run for a few days on the [canary instance](#once-per-repository) as an upgrade from the previous version, with no new failed run, problem or unexpected 429 in its status API and its self-metrics. Otherwise, tag the version directly: a candidate would only repeat a release that already worked, and the CI checks the code of every pull request, release snapshot included.
+2. Release a candidate first when the release itself changed: `release.yml`, `.goreleaser.yaml` or the `Dockerfile` changed since the last tag (`git diff --stat vPREVIOUS -- .github/workflows/release.yml .goreleaser.yaml Dockerfile`), or the version is a minor one that changes the behavior or the configuration. Tag `vX.Y.Z-rc.N` on `main` before the release commit, as in steps 4 to 6: its release notes are the `[Unreleased]` section, the GitHub release is a prerelease and the image gets the tag `X.Y.Z-rc.N` only (not `X.Y` nor `latest`). Check it against the simulators of every provider with its image: `TAPYR_IMAGE=ghcr.io/kentrow/tapyr:X.Y.Z-rc.N docker compose up -d` in [`examples/compose`](../examples/compose/README.md), then the main journeys (the getting started guide with the binary of the candidate, the web UI, the `Tapyr / Overview` dashboard, a refused key and a failing provider). Go on once it is checked, and once it has run for a few days on the [canary instance](#once-per-repository) as an upgrade from the previous version, with no new failed run, problem or unexpected 429 in its status API and its self-metrics. Otherwise, tag the version directly: a candidate would only repeat a release that already worked, and the CI checks the code of every pull request, release snapshot included.
 3. In `CHANGELOG.md`, rename `## [Unreleased]` to `## [X.Y.Z] - YYYY-MM-DD`, add an empty `## [Unreleased]` above it, and update the links at the bottom:
 
    ```
@@ -29,15 +30,17 @@ How a maintainer publishes a version. The release workflow ([`.github/workflows/
    ```
 
    (for the first release: `[0.1.0]: https://github.com/kentrow/tapyr/releases/tag/v0.1.0`). In the same commit, update the version the docs and examples pin (`git grep -n "tapyr:PREVIOUS\|VERSION=PREVIOUS\|download/vPREVIOUS\|tapyr_PREVIOUS\|newTag"`: the README and its install table, `docs/install.md`, `docs/operations.md`, the demo compose and the Kustomize example), and `version` and `appVersion` in `charts/tapyr/Chart.yaml`. Commit it as `chore(release): vX.Y.Z` through a pull request.
-4. Tag the merge commit on `main` and push the tag:
+4. Tag the merge commit on `main` and push the tag. Name the commit: a tag without one takes the commit checked out, which may be a branch left behind (v0.5.0-rc.1 and v0.6.0-rc.1 were tagged on a commit before their merge):
 
    ```sh
-   git tag -s vX.Y.Z -m "vX.Y.Z"
+   git fetch origin
+   git tag -s vX.Y.Z -m "vX.Y.Z" origin/main
    git push origin vX.Y.Z
    ```
 
 5. The workflow checks that the commit is on `main`, runs the tests, builds the UI without permissions, then waits for the approval of the `release` environment. Approve it.
 6. Check the release: the archives, the deb and rpm packages, the cask written to `Kentrow/homebrew-tap` (a release candidate does not write it: its workflow keeps the file as the artifact `homebrew-cask`), the Helm chart, `checksums.txt` and its `.sigstore.json` bundle, `tapyr_X.Y.Z_provenance.intoto.jsonl`, the image tags, the signatures and the provenance with the commands of [`docs/install.md`](install.md#verify-the-signatures) and [the next section](install.md#verify-the-provenance). The certificate identity holds the repository name as GitHub spells it (`Kentrow/tapyr`): if the repository moves or is renamed, update those commands.
+7. Upgrade the [public demo](#once-per-repository) to the release, with what the release changes in its configuration or dashboards.
 
 If the release job fails on an incident of GitHub (an upload answered 500 or 422, a timeout), rerun the failed job from the run page, and approve the `release` environment again: GoReleaser reuses the draft release the failed run left, replaces the assets it already uploaded, and the provenance asset is replaced as well. The tag stays as it is.
 
