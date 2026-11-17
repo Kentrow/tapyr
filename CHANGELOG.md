@@ -9,16 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- The self-metric `tapyr_budget_scope_info{provider,limit,scope,accounts}` names the accounts of every quota scope, so that a scope keyed by a credential hash reads `fleet-north, fleet-south` in Grafana.
-- `tapyr provider show <name>` describes a provider package: its secrets and params, its templates with their interval and metrics, its limits with their sources; `--example` prints its example configuration, ready to copy. `tapyr provider list --output json` gains the params, secrets, roles and parents of the templates.
+- `tapyr provider show <name>` describes a provider package: its secrets and params, its templates with their interval and metrics, its limits with their sources; `--example` prints its example configuration, ready to copy. `tapyr provider list` takes `--provider-path`, and its `--output json` gains the params, secrets, roles and parents of the templates.
 - Documentation: a [glossary](docs/glossary.md) of the terms of the configuration, the CLI, the web UI and the metrics (scope, stretch, retry reserve, fan-out, implicit job, instance...), with the labels the web UI shows them under.
+- The self-metric `tapyr_budget_scope_info{provider,limit,scope,accounts}` names the accounts of every quota scope, so that a scope keyed by a credential hash reads `fleet-north, fleet-south` in Grafana.
 
 ### Changed
 
-- Web UI polish: the Budgets chart scales to the consumption with the limit marked when it is far above, and keeps its axis labels whole; the Overview says when the configuration was loaded, its hash in a tooltip; the Live debug says it is disabled as the page opens (`debug_enabled` in `GET /api/v1/status`); the Outputs page writes the series count once and says "measuring" before a send rate is known.
-- The `Tapyr / Overview` dashboard names quotas by their accounts instead of their scope key, keeps its stat titles short with the details in their descriptions, shows full legends, and says "no response" and "penalty or priority" instead of "none".
-- The Graph opens readable: framed on its content between 80% and 100% zoom instead of fitted to the window, on its top left corner when it is larger, with the wheel to scroll and wider tiles; implicit jobs carry their readable name there too.
 - The web UI names implicit jobs by what they list and for whom ("Networks, listed for network-devices"), as do `tapyr plan` and the status API (`items`, `discovery_for`), and explains the columns of the Plan and Jobs pages in tooltips. A scope of the whole process reads "the whole Tapyr process" instead of "each instance".
+- The Graph opens readable: framed on its content between 80% and 100% zoom instead of fitted to the window, on its top left corner when it is larger, with the wheel to scroll and wider tiles; implicit jobs carry their readable name there too.
+- The `Tapyr / Overview` dashboard names quotas by their accounts instead of their scope key, keeps its stat titles short with the details in their descriptions, shows full legends, and says "no response" and "penalty or priority" instead of "none". It needs Tapyr 0.6 or later: with an older one, its quota panels stay empty.
+- Web UI polish: the Budgets chart scales to the consumption with the limit marked when it is far above, and keeps its axis labels whole; the Overview says when the configuration was loaded, its hash in a tooltip; the Live debug says it is disabled as the page opens (`debug_enabled` in `GET /api/v1/status`); the Outputs page writes the series count once and says "measuring" before a send rate is known.
 
 ### Fixed
 
