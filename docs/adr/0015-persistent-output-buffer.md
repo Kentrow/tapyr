@@ -1,6 +1,6 @@
 # ADR 0015 - A persistent buffer for the push outputs
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-18
 
 ## Context
@@ -9,7 +9,7 @@ The push outputs (`remote_write`, `otlp`) keep their samples in a bounded queue 
 
 For a usual collector this is a gap of a few minutes. For Tapyr it is worse: every sample cost API quota, sometimes scarce (a daily or monthly quota, a credit spent per request), and the budget engine exists to spend that quota deliberately. Losing the samples on a backend outage or a restart wastes exactly what Tapyr promises to save, and the quota spent is not given back. An external review of the project (2026-11-17) ranked this first among the missing features.
 
-[`01-vision-and-scope.md`](../spec/01-vision-and-scope.md) lists "persistent output buffering (WAL)" as out of scope, with the rule that the design must not prevent it. This ADR proposes to take it in, for v0.7.
+[`01-vision-and-scope.md`](../spec/01-vision-and-scope.md) lists "persistent output buffering (WAL)" as out of scope, with the rule that the design must not prevent it. This ADR takes it in, for v0.7.
 
 What exists to build on: one push engine shared by both outputs (`internal/output/push`), one request in flight per output so samples leave in order, a sequence number per queued entry, the out-of-order split of refused batches, and a state store with a known path on persistent storage (ADR 0005).
 
@@ -65,7 +65,7 @@ What exists to build on: one push engine shared by both outputs (`internal/outpu
 ## Consequences
 
 - An outage of the backend, or a restart of Tapyr, no longer loses the samples already paid for in quota, within `maxSize` and `maxAge`.
-- `01-vision-and-scope.md` moves "persistent output buffering" out of the out-of-scope list once this ADR is accepted; Prometheus remote write 2.0 stays out.
+- `01-vision-and-scope.md` no longer lists persistent output buffering as out of scope; Prometheus remote write 2.0 stays out.
 - A deployment with the buffer needs a writable volume for it (the state volume already is one); the Helm chart and the systemd unit document it.
 - After a long outage, the replay sends a burst to the backend: one request in flight per output, at the size of `maxBatch`, so the burst is paced by the backend's answers, not by Tapyr.
 - The push engine gains a second storage layer to test: crashes between append and acknowledge, corrupt records, a full disk, a replay racing new runs, a reload removing an output, all on the fake clock and a temporary directory.
