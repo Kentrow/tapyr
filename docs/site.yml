@@ -77,6 +77,7 @@ nav:
           - docs/adr/0012-output-processing.md
           - docs/adr/0013-unconsumed-jobs.md
           - docs/adr/0014-output-series.md
+          - docs/adr/0015-persistent-output-buffer.md
 
 # Pages for contributors and maintainers, read on GitHub.
 unpublished:

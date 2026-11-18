@@ -73,7 +73,7 @@ Delivery:
 ## Out of scope (keep in mind, do not build)
 
 - Distributed architecture (workers, sharding, leader election, HA).
-- Shared state backends (Redis) and persistent output buffering (WAL).
+- Shared state backends (Redis). Persistent output buffering is taken in by [ADR 0015](../adr/0015-persistent-output-buffer.md), for v0.7.
 - Editable UI, budget impact simulation in the UI, mapping authoring assistant.
 - Push-based sources: webhooks (Meraki), streaming APIs (Aruba Central websocket/protobuf).
 - Logs and events as outputs (metrics only).
