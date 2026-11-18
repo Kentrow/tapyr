@@ -46,7 +46,7 @@ services:
     restart: unless-stopped
 
   victoriametrics:
-    image: victoriametrics/victoria-metrics:v1.155.0
+    image: victoriametrics/victoria-metrics:v1.156.0
     command:
       - -retentionPeriod=7d
       - -promscrape.config=/etc/victoriametrics/scrape.yml
