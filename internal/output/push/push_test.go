@@ -260,6 +260,50 @@ func TestBatchInFlightIsNotDropped(t *testing.T) {
 	}
 }
 
+// lateClock is a fake clock that moves past every timer's deadline just
+// before arming it, as a test advancing the clock between the queue
+// computing its flush time and arming its timer does.
+type lateClock struct{ *clock.Fake }
+
+func (c lateClock) NewTimer(d time.Duration) clock.Timer {
+	c.Advance(d)
+	return c.Fake.NewTimer(d)
+}
+
+// TestFlushTimeReachedBeforeTheTimer checks that a flush is not delayed
+// when the clock reaches the flush time before the timer is armed: the
+// timer then counts from the later time, and the queue must not wait for it
+// (it made TestRejections flaky under load).
+func TestFlushTimeReachedBeforeTheTimer(t *testing.T) {
+	sender := newSender()
+	clk := lateClock{clock.NewFake(start)}
+	q := New(Options{
+		Name: "out", Capacity: 100, MaxBatch: 10, FlushInterval: 5 * time.Second,
+		Sender: sender, Clock: clk, Observer: &counts{dropped: map[string]int{}, failures: map[string]int{}}, Rand: rand.New(rand.NewPCG(1, 2)),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		_ = q.Run(ctx)
+	}()
+	defer func() { cancel(); <-done }()
+	// Let the loop wait for points, so that the Add below wakes it (an Add
+	// before would leave a wake signal that hides the bug). If it is not
+	// waiting yet, the test passes without checking anything; it never
+	// fails because of it.
+	time.Sleep(20 * time.Millisecond)
+	q.Add(points(1)) // under maxBatch: waits for the flush interval
+	select {
+	case <-sender.sent:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the flush waited for a timer armed after its time")
+	}
+	if got := sender.got(); !cmp.Equal(got, [][]float64{{1}}) {
+		t.Errorf("batches = %v", got)
+	}
+}
+
 func TestRetries(t *testing.T) {
 	h := newHarness(t, 100, 10)
 	h.sender.results = []error{

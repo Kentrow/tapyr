@@ -274,12 +274,19 @@ func (q *Queue) State() output.State {
 // Run sends batches until ctx is done.
 func (q *Queue) Run(ctx context.Context) error {
 	for {
-		batch, wait := q.next()
+		batch, due := q.next()
 		if batch == nil {
 			var timerC <-chan time.Time
 			var timer clock.Timer
-			if wait > 0 {
-				timer = q.opts.Clock.NewTimer(wait)
+			if !due.IsZero() {
+				timer = q.opts.Clock.NewTimer(q.opts.Clock.Until(due))
+				// The clock may have passed the flush time between next
+				// and the timer: the timer then waits from the later time,
+				// so look again instead of waiting for it.
+				if !q.opts.Clock.Now().Before(due) {
+					timer.Stop()
+					continue
+				}
 				timerC = timer.C()
 			}
 			select {
@@ -304,26 +311,26 @@ func (q *Queue) Run(ctx context.Context) error {
 	}
 }
 
-// next returns the batch to send now, or how long to wait for one (0: until
-// points are added).
-func (q *Queue) next() ([]entry, time.Duration) {
+// next returns the batch to send now, or when to look again (the zero time:
+// when points are added).
+func (q *Queue) next() ([]entry, time.Time) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if len(q.points) == 0 {
-		return nil, 0
+		return nil, time.Time{}
 	}
 	if batch := q.nextSpan(); batch != nil {
-		return batch, 0
+		return batch, time.Time{}
 	}
 	now := q.opts.Clock.Now()
 	due := q.points[0].at.Add(q.opts.FlushInterval)
 	if len(q.points) < q.opts.MaxBatch && q.flushes == 0 && now.Before(due) {
-		return nil, due.Sub(now)
+		return nil, due
 	}
 	batch := make([]entry, min(len(q.points), q.opts.MaxBatch))
 	copy(batch, q.points)
 	q.sending = batch[len(batch)-1].seq
-	return batch, 0
+	return batch, time.Time{}
 }
 
 // nextSpan returns the points of the next span of the batch being split,
