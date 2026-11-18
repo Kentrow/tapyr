@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-18
+
 ### Added
 
 - `tapyr provider show <name>` describes a provider package: its secrets and params, its templates with their interval and metrics, its limits with their sources; `--example` prints its example configuration, ready to copy. `tapyr provider list` takes `--provider-path`, and its `--output json` gains the params, secrets, roles and parents of the templates.
@@ -167,7 +169,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/kentrow/tapyr/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kentrow/tapyr/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kentrow/tapyr/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/kentrow/tapyr/compare/v0.2.1...v0.3.0
