@@ -448,6 +448,27 @@
       },
       "type": "object"
     },
+    "DiskBuffer": {
+      "additionalProperties": false,
+      "description": "DiskBuffer is the persistent buffer of a push output (ADR 0015): the samples are written to disk before they are queued, and leave it once the backend accepted them.",
+      "properties": {
+        "maxAge": {
+          "$ref": "#/$defs/Duration",
+          "default": "2h",
+          "description": "MaxAge of a buffered sample: an older one is dropped and counted\n(reason too_old) instead of being sent, since most backends refuse\nold samples (Prometheus about 1 to 2 hours, unless it has an\nout-of-order window). Raise it for VictoriaMetrics or Mimir. At least\n1m."
+        },
+        "maxSize": {
+          "$ref": "#/$defs/Size",
+          "default": "512MiB",
+          "description": "MaxSize of the buffer on disk: beyond it, the oldest samples are\ndropped and counted (reason buffer_full). At least 8MiB."
+        },
+        "path": {
+          "description": "Path of the directory of the buffer, relative to the declaring file.\nDefault: buffer/<output name> next to the state store\n(settings.state.path). Two outputs never share a directory.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
     "DocumentAccount": {
       "additionalProperties": false,
       "description": "An instance of a provider with credentials, params, targets and labels.",
@@ -2044,6 +2065,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "disk": {
+          "$ref": "#/$defs/DiskBuffer",
+          "description": "Disk keeps the queue on disk as well (ADR 0015): the samples survive\na backend outage longer than the memory queue and a restart of Tapyr.\nOff when absent."
+        },
         "flushInterval": {
           "$ref": "#/$defs/Duration",
           "default": "5s",
@@ -2903,6 +2928,14 @@
         "routes"
       ],
       "type": "object"
+    },
+    "Size": {
+      "examples": [
+        "512MiB",
+        "2GiB"
+      ],
+      "pattern": "^[0-9]+(B|KiB|MiB|GiB|TiB)$",
+      "type": "string"
     },
     "StateSettings": {
       "additionalProperties": false,

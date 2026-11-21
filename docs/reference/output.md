@@ -90,6 +90,7 @@ Queue is the bounded in-memory queue of a push output.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `capacity` | integer |  | Capacity in samples; the oldest samples are dropped (with accounting) when full. Default `50000`. Minimum 1. |
+| `disk` | [DiskBuffer](#diskbuffer) |  | Disk keeps the queue on disk as well (ADR 0015): the samples survive a backend outage longer than the memory queue and a restart of Tapyr. Off when absent. |
 | `flushInterval` | [Duration](#duration) |  | `flushInterval` sends a partial batch after this delay. Default `5s`. |
 | `maxBatch` | integer |  | `maxBatch` is the maximum number of samples per request. Default `5000`. Minimum 1. |
 
@@ -121,6 +122,16 @@ Either a string, or an object:
 
 Type: string. Pattern <code>^(&#91;0-9&#93;+(&#92;.&#91;0-9&#93;+)?(ns&#124;us&#124;µs&#124;ms&#124;s&#124;m&#124;h))+$</code>. Examples `30s`, `5m`, `1h30m`.
 
+## DiskBuffer
+
+DiskBuffer is the persistent buffer of a push output (ADR 0015): the samples are written to disk before they are queued, and leave it once the backend accepted them.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `maxAge` | [Duration](#duration) |  | `maxAge` of a buffered sample: an older one is dropped and counted (reason too\_old) instead of being sent, since most backends refuse old samples (Prometheus about 1 to 2 hours, unless it has an out-of-order window). Raise it for VictoriaMetrics or Mimir. At least 1m. Default `2h`. |
+| `maxSize` | [Size](#size) |  | `maxSize` of the buffer on disk: beyond it, the oldest samples are dropped and counted (reason buffer\_full). At least 8MiB. Default `512MiB`. |
+| `path` | string |  | Path of the directory of the buffer, relative to the declaring file. Default: buffer/&lt;output name&gt; next to the state store (settings.state.path). Two outputs never share a directory. |
+
 ## BasicAuthSecrets
 
 BasicAuthSecrets are HTTP basic credentials read from secrets.
@@ -129,6 +140,10 @@ BasicAuthSecrets are HTTP basic credentials read from secrets.
 |---|---|---|---|
 | `password` | [SecretRef](#secretref) | yes | Password secret. |
 | `username` | [SecretRef](#secretref) | yes | Username secret. |
+
+## Size
+
+Type: string. Pattern <code>^&#91;0-9&#93;+(B&#124;KiB&#124;MiB&#124;GiB&#124;TiB)$</code>. Examples `512MiB`, `2GiB`.
 
 ## SecretRef
 
