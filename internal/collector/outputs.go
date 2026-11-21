@@ -2,10 +2,12 @@ package collector
 
 import (
 	"context"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/config"
@@ -25,6 +27,8 @@ type runningOutput struct {
 	out   output.Output
 	spec  config.OutputSpec
 	creds *runtime.OutputCredentials
+	// bufferDir is the directory of its disk buffer, empty without one.
+	bufferDir string
 	// dedup tells whether the output deduplicates samples by source
 	// timestamp (push outputs).
 	dedup bool
@@ -88,13 +92,26 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 			next[name] = prev
 		}
 	}
-	for name := range c.outputs {
+	var staleBuffers []string
+	for name, ro := range c.outputs {
 		if _, kept := next[name]; !kept {
 			stale = append(stale, name)
+			if ro.bufferDir != "" {
+				staleBuffers = append(staleBuffers, ro.bufferDir)
+			}
 		}
 	}
 	c.omu.RUnlock()
-	c.stopOutputs(ctx, stale)
+	// A backend that does not answer must not hold the reload: the flush
+	// is bounded as at shutdown; what it could not send stays in the disk
+	// buffer, or is lost with a memory queue.
+	flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), outputFlushTimeout)
+	c.stopOutputs(flushCtx, stale)
+	cancel()
+	// The buffers that no output of the graph uses any more (an output
+	// removed, its disk block removed, its path changed) are deleted once
+	// the outputs started: a restarted output reopens its own.
+	defer func() { c.removeBuffers(staleBuffers) }()
 
 	c.omu.Lock()
 	defer c.omu.Unlock()
@@ -117,6 +134,9 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 			ro = &runningOutput{
 				out: out, spec: o.Spec, creds: graph.OutputCredentials[name], dedup: o.Spec.Type != config.OutputPrometheus,
 				proc: proc, cancel: cancel, done: make(chan struct{}),
+			}
+			if q := o.Spec.Queue; q != nil && q.Disk != nil && o.Spec.Type != config.OutputPrometheus {
+				ro.bufferDir = o.BufferDir(graph.Settings.State.Path)
 			}
 			if o.Spec.Limits != nil {
 				ro.maxSeries = o.Spec.Limits.MaxSeries
@@ -182,6 +202,38 @@ func (c *Collector) openBuffer(o *config.Output, stateFile string) push.Options 
 	return push.Options{Buffer: b, MaxAge: q.Disk.MaxAge.Std()}
 }
 
+// removeBuffers deletes the disk buffers of dirs that no running output
+// uses, saying in the log what was dropped with them. c.omu must not be
+// held.
+func (c *Collector) removeBuffers(dirs []string) {
+	if len(dirs) == 0 {
+		return
+	}
+	c.omu.RLock()
+	inUse := map[string]bool{}
+	for _, ro := range c.outputs {
+		if ro.bufferDir != "" {
+			inUse[filepath.Clean(ro.bufferDir)] = true
+		}
+	}
+	c.omu.RUnlock()
+	for _, dir := range dirs {
+		if inUse[filepath.Clean(dir)] {
+			continue
+		}
+		points, err := buffer.Remove(dir)
+		switch {
+		case err != nil:
+			c.logger.Warn("disk buffer of a removed output not deleted", "component", "output", "dir", dir, "error", err)
+		case points > 0:
+			c.logger.Warn("disk buffer of a removed output deleted with samples never delivered", "component", "output",
+				"dir", dir, "dropped", points)
+		default:
+			c.logger.Info("disk buffer of a removed output deleted", "component", "output", "dir", dir)
+		}
+	}
+}
+
 // userAgent is the User-Agent of the requests of the push outputs.
 func userAgent() string { return "tapyr/" + buildinfo.Get().Version }
 
@@ -201,6 +253,9 @@ func sameCredentials(a, b *runtime.OutputCredentials) bool {
 	}
 	return true
 }
+
+// outputFlushTimeout bounds the flush of the outputs a reload stops.
+const outputFlushTimeout = 10 * time.Second
 
 // stopOutputs flushes and stops outputs that are no longer in use.
 func (c *Collector) stopOutputs(ctx context.Context, names []string) {

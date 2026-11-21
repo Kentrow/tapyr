@@ -569,3 +569,42 @@ func syncDir(dir string) {
 	_ = d.Sync()
 	_ = d.Close()
 }
+
+// Remove deletes the buffer of a directory that no output uses any more:
+// its segments, checkpoint and lock, then the directory when nothing else
+// is left in it (a path chosen by the user may hold other files, which are
+// never touched). It returns the points dropped, not acknowledged by a
+// backend. A directory without a buffer is left alone.
+func Remove(dir string) (int, error) {
+	if _, err := os.Stat(filepath.Join(dir, lockName)); errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	b, err := Open(Options{Dir: dir})
+	if err != nil {
+		return 0, err
+	}
+	points := b.Stats().Points
+	var errs []error
+	b.mu.Lock()
+	for _, seg := range b.segments {
+		errs = append(errs, removeFile(seg.path))
+	}
+	b.segments, b.records = nil, nil
+	b.mu.Unlock()
+	errs = append(errs, b.Close())
+	for _, name := range []string{checkpointName, checkpointName + ".tmp", lockName} {
+		errs = append(errs, removeFile(filepath.Join(dir, name)))
+	}
+	if err := errors.Join(errs...); err != nil {
+		return points, fmt.Errorf("removing the buffer %s: %w", dir, err)
+	}
+	_ = os.Remove(dir) // only when empty
+	return points, nil
+}
+
+func removeFile(path string) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	return nil
+}

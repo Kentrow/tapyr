@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -339,5 +340,51 @@ func TestSegmentSizeFitsMaxSize(t *testing.T) {
 	b = open(t, Options{Dir: t.TempDir(), MaxSize: 1000})
 	if b.opts.SegmentSize != 500 {
 		t.Errorf("segment size = %d, want half of MaxSize", b.opts.SegmentSize)
+	}
+}
+
+func TestRemove(t *testing.T) {
+	dir := t.TempDir()
+	buf := filepath.Join(dir, "buffer", "vm")
+	b := open(t, Options{Dir: buf, SegmentSize: 300})
+	appendN(t, b, 1, 6, t0)
+	b.Ack(2)
+	if err := b.Close(); err != nil {
+		t.Fatal(err)
+	}
+	points, err := Remove(buf)
+	if err != nil || points != 8 {
+		t.Fatalf("Remove = %d, %v; want the 8 points of records 3 to 6", points, err)
+	}
+	if _, err := os.Stat(buf); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("the directory is still there: %v", err)
+	}
+
+	// A path chosen by the user keeps its other files.
+	shared := filepath.Join(dir, "shared")
+	b = open(t, Options{Dir: shared})
+	appendN(t, b, 1, 1, t0)
+	if err := b.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(shared, "notes.txt"), []byte("mine"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Remove(shared); err != nil {
+		t.Fatal(err)
+	}
+	left, _ := os.ReadDir(shared)
+	if len(left) != 1 || left[0].Name() != "notes.txt" {
+		t.Errorf("left = %v, want only notes.txt", left)
+	}
+
+	// A directory without a buffer, or that does not exist, is left alone.
+	if n, err := Remove(filepath.Join(dir, "none")); n != 0 || err != nil {
+		t.Errorf("Remove(none) = %d, %v", n, err)
+	}
+	// A buffer in use is not removed.
+	open(t, Options{Dir: buf})
+	if _, err := Remove(buf); err == nil {
+		t.Error("removed a buffer in use")
 	}
 }
