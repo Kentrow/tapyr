@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bufferStatus, bytes, count, duration, healthClass, jobLabels, jobTitle, jobWords, limitSummary, limitTitle, outputHealth, plural, scopeAccounts, seriesStatus, since, sourceWords, toYAML, versionLabel, waitingText, waitingWord } from "./format";
+import { bufferStatus, bytes, count, duration, healthClass, jobLabels, jobTitle, jobWords, limitSummary, limitTitle, outputHealth, nextRun, plural, scopeAccounts, seriesStatus, since, sourceWords, toYAML, versionLabel, waitingText, waitingWord } from "./format";
 import type { Budget, Job, Output } from "./types";
 
 describe("format", () => {
@@ -147,6 +147,15 @@ describe("format", () => {
     expect(since("2026-11-03T11:55:00Z", now)).toBe("5m ago");
     expect(since("2026-11-03T12:01:00Z", now)).toBe("in 1m");
     expect(since(undefined, now)).toBe("never");
+  });
+  it("says when a run is due, and that it is once its time has passed", () => {
+    const now = Date.parse("2026-11-03T12:00:00Z");
+    expect(nextRun("2026-11-03T12:00:45Z", now)).toBe("in 45s");
+    expect(nextRun("2026-11-03T12:00:01Z", now)).toBe("now");
+    expect(nextRun("2026-11-03T11:59:59Z", now)).toBe("now");
+    // A run whose time has passed waits for its turn: never "3s ago".
+    expect(nextRun("2026-11-03T11:59:57Z", now)).toBe("due");
+    expect(nextRun(undefined, now)).toBe("-");
   });
   it("renders YAML", () => {
     expect(toYAML({ job: { interval: "5m0s", path: "/a/{b}", outputs: [], n: 3, list: ["x", { k: true }] } }).trimStart()).toBe(

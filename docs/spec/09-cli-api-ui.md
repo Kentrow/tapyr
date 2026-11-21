@@ -217,7 +217,7 @@ Every page shows, at the foot of the navigation, the version of the running Tapy
 
 - Responsive down to tablet width; usable on a phone for the overview.
 - Light and dark themes (follows the system preference).
-- Live updates via SSE, with polling fallback.
+- Live updates via SSE, with polling fallback. Relative times ("2m ago", "in 45s", "resets in 2h") move every second between two updates, and a next run whose time has passed reads "due".
 - No external network calls (fonts and assets bundled).
 - Accessible: keyboard navigation, sufficient contrast, no information conveyed by color alone.
 

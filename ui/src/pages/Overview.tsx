@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Badge, Failure, Loading, Meter, PageHead } from "../components/ui";
+import { Badge, Failure, Loading, Meter, PageHead, Since } from "../components/ui";
 import { Icon } from "../components/Icon";
 import { ProblemNote } from "../components/Problem";
 import { JobName } from "../components/JobName";
 import { count, duration, jobLabels, jobWords, outputHealth, percent, plural, scopeAccounts, seriesStatus, since, waitingText } from "../lib/format";
-import { useJSON, useList, useLive, type LiveEvent } from "../lib/live";
+import { useJSON, useList, useLive, useNow, type LiveEvent } from "../lib/live";
 import { href } from "../lib/router";
 import type { Account, Budget, Job, Output, Plan, Problem, Provider, Status } from "../lib/types";
 
@@ -46,6 +46,8 @@ export function Overview() {
   // The plan exists after the first planning; the Overview does without.
   const plan = useJSON<Plan>("/plan");
   const activity = useActivity(jobs.data);
+  // The times of the page ("resets in 2h", "up 3h") move with the clock.
+  const now = useNow();
   const label = jobLabels(jobs.data);
   if (status.error && !status.data) return <Failure error={status.error} />;
   if (!status.data || !providers.data || !accounts.data || !budgets.data || !jobs.data || !outputs.data) return <Loading />;
@@ -64,7 +66,7 @@ export function Overview() {
   const unfit = s.plan_feasible ? [] : (plan.data?.scopes ?? []).filter((sc) => !sc.feasible && sc.problem);
   return (
     <>
-      <PageHead title="Overview" sub={<>Tapyr {s.version}, up {duration(s.uptime_seconds)}, <span title={`Configuration ${s.config_hash.slice(0, 12)} (SHA-256 of the configuration files)`}>configuration loaded {since(s.last_reload.at)}</span>.</>} />
+      <PageHead title="Overview" sub={<>Tapyr {s.version}, up {duration(uptime(s, now))}, <span title={`Configuration ${s.config_hash.slice(0, 12)} (SHA-256 of the configuration files)`}>configuration loaded {since(s.last_reload.at, now)}</span>.</>} />
       <div className="kpis">
         <Kpi icon="graph" label="Providers healthy" value={`${okProviders}/${providers.data.length}`} ok={okProviders === providers.data.length}
           hint={plural(accounts.data.length, "account")} href={href(["graph"])} />
@@ -72,9 +74,9 @@ export function Overview() {
           hint={(waiting ? `${waiting} waiting to run, ` : "") + plural(s.instances, "instance") + (notCollected ? `, ${notCollected} not collected` : "")} href={href(["jobs"])} />
         <Kpi icon="budgets" label="Tightest quota" value={tightest ? percent(leftOf(tightest), tightest.max ?? 0) + " left" : "No quota"}
           ok={!tightest || tightest.exhaustion_eta_seconds === undefined}
-          hint={tightest ? quotaHint(tightest) : "rate and concurrency limits only"} href={href(["budgets"])} />
+          hint={tightest ? quotaHint(tightest, now) : "rate and concurrency limits only"} href={href(["budgets"])} />
         <Kpi icon="plan" label="Plan" value={s.plan_feasible ? "Fits" : "Does not fit"} ok={s.plan_feasible}
-          hint={planHint(plan.data, s.plan_feasible)} href={href(["plan"])} />
+          hint={planHint(plan.data, s.plan_feasible, now)} href={href(["plan"])} />
       </div>
 
       {(!s.ready || !s.last_reload.success || reauth.length > 0 || unhealthy.length > 0 || limited.length > 0 || unfit.length > 0) && (
@@ -90,7 +92,7 @@ export function Overview() {
             <div className="cell bad">
               <span className="label">Configuration</span>
               <span className="value"><Icon name="alert" />Reload rejected</span>
-              <span className="hint">{since(s.last_reload.at)}: {s.last_reload.error}. The previous configuration keeps running.</span>
+              <span className="hint">{since(s.last_reload.at, now)}: {s.last_reload.error}. The previous configuration keeps running.</span>
             </div>
           )}
           {reauth.map((a) => (
@@ -145,7 +147,7 @@ export function Overview() {
                   <span className="dot" aria-hidden="true" />
                   <div>
                     <strong>{label(a.title)}</strong>
-                    <span className="muted small"> {since(a.at)}</span>
+                    <span className="muted small"> {since(a.at, now)}</span>
                     <div className="small muted">{a.detail}</div>
                   </div>
                 </li>
@@ -160,7 +162,7 @@ export function Overview() {
                 {failing.map((j) => (
                   <li key={j.name}>
                     <JobName strong compact name={j.name} job={j} />
-                    <span className="muted small"> {since(j.last_run?.ended_at)}</span>
+                    <span className="muted small"> {since(j.last_run?.ended_at, now)}</span>
                     <div className="small"><ProblemNote problem={j.last_run?.problem} detail={j.last_run?.error} /></div>
                   </li>
                 ))}
@@ -210,6 +212,13 @@ export function unhealthyAccounts(accounts: Account[]): { name: string; provider
     }))
     .filter((a) => a.reasons.length > 0)
     .sort((a, b) => rank(a.health) - rank(b.health) || a.name.localeCompare(b.name));
+}
+
+// uptime is how long Tapyr has run, from its start time, so that it moves
+// with the clock between two loads of the status.
+export function uptime(s: Pick<Status, "started_at" | "uptime_seconds">, now = Date.now()): number {
+  const started = Date.parse(s.started_at);
+  return Number.isNaN(started) ? s.uptime_seconds : Math.max(s.uptime_seconds, (now - started) / 1000);
 }
 
 // quotaHint names a quota and when it resets, and, when it would run out
@@ -276,7 +285,7 @@ function ProviderCard({ provider: p, accounts, jobs, quotas }: { provider: Provi
                 { value: q.used ?? 0, color: "var(--cyan-2)", label: `Tapyr ${count(q.used)}` },
                 { value: q.external_usage ?? 0, color: "var(--sun)", label: `others ${count(q.external_usage)}` },
               ]} />
-              <div className="small muted">{count(leftOf(q))} left of {count(q.max)}, resets {since(q.window_end)}</div>
+              <div className="small muted">{count(leftOf(q))} left of {count(q.max)}, resets <Since at={q.window_end} /></div>
             </a>
           ))}
         </div>

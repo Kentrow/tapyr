@@ -52,6 +52,18 @@ export function since(iso: string | undefined, now = Date.now()): string {
   return d > 0 ? `${duration(d)} ago` : `in ${duration(-d)}`;
 }
 
+// nextRun says when a run is due: "in 45s", "now", then "due" once its
+// time has passed (the run waits for its turn: a budget, a slot, the
+// scheduler), never "3s ago".
+export function nextRun(iso: string | undefined, now = Date.now()): string {
+  if (!iso) return "-";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "-";
+  const d = (t - now) / 1000;
+  if (d >= 2) return `in ${duration(d)}`;
+  return d > -2 ? "now" : "due";
+}
+
 export function absolute(iso: string | undefined): string {
   if (!iso) return "";
   return new Date(iso).toLocaleString("en-GB", { hour12: false });
