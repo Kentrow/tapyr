@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A reload that removed or changed a push output whose backend did not answer waited for it forever; the flush of the outputs a reload stops is bounded to 10 seconds, as at shutdown.
 - `tapyr plan`, the plan problems and the logs named a quota scope keyed by a credential by its hash ("credential 34829e408ebd22e8"); they name it by the accounts that share the credential, as the Budgets page does.
+- `tapyr validate` answered `interval: 5` with a hint to quote the value, which led to the next error; a duration, size, rate or percentage written as a bare number now says what the value looks like (`30s`, `5m` or `1h30m`).
 
 ## [0.6.0] - 2026-11-18
 

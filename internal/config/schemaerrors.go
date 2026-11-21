@@ -27,9 +27,10 @@ var exactlyOneOf = map[string]string{
 
 // schemaDiagnostics flattens a validation error tree into one diagnostic
 // per failing leaf, with positions and human-readable messages.
-// properties names the fields an object schema allows, for the "did you
-// mean" of unknown fields; it may be nil.
-func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex, properties func(schemaURL string) []string) Diagnostics {
+// schemaAt returns the schema at a schema URL, for the fields an object
+// allows (the "did you mean" of unknown fields) and the pattern a string
+// must match (the hint of a value of the wrong type); it may be nil.
+func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex, schemaAt func(schemaURL string) map[string]any) Diagnostics {
 	var out Diagnostics
 	var walk func(e *jsonschema.ValidationError)
 	walk = func(e *jsonschema.ValidationError) {
@@ -42,7 +43,7 @@ func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex, prope
 			return
 		}
 		if len(e.Causes) == 0 {
-			out = append(out, leafDiagnostics(e, idx, properties)...)
+			out = append(out, leafDiagnostics(e, idx, schemaAt)...)
 			return
 		}
 		for _, c := range e.Causes {
@@ -53,18 +54,24 @@ func schemaDiagnostics(ve *jsonschema.ValidationError, idx *positionIndex, prope
 	return out
 }
 
-func leafDiagnostics(e *jsonschema.ValidationError, idx *positionIndex, properties func(string) []string) Diagnostics {
+func leafDiagnostics(e *jsonschema.ValidationError, idx *positionIndex, schemaAt func(string) map[string]any) Diagnostics {
 	loc := e.InstanceLocation
+	var schema map[string]any
+	if schemaAt != nil {
+		schema = schemaAt(e.SchemaURL)
+	}
 	diag := func(tokens []string, preferKey bool, msg string) Diagnostic {
 		return Diagnostic{Pos: idx.position(tokens, preferKey), Path: idx.path(tokens), Message: msg}
 	}
 	switch k := e.ErrorKind.(type) {
 	case *kind.AdditionalProperties:
 		out := make(Diagnostics, 0, len(k.Properties))
-		var allowed []string
-		if properties != nil {
-			allowed = properties(e.SchemaURL)
+		props, _ := schema["properties"].(map[string]any)
+		allowed := make([]string, 0, len(props))
+		for name := range props {
+			allowed = append(allowed, name)
 		}
+		slices.Sort(allowed)
 		for _, p := range k.Properties {
 			out = append(out, diag(child(loc, p), true, fmt.Sprintf("unknown field %q%s", p, didYouMean(p, allowed))))
 		}
@@ -86,6 +93,14 @@ func leafDiagnostics(e *jsonschema.ValidationError, idx *positionIndex, properti
 		}
 		msg := fmt.Sprintf("invalid type: got %s, want %s", k.Got, strings.Join(k.Want, " or "))
 		if slices.Contains(k.Want, "string") && (k.Got == "number" || k.Got == "integer" || k.Got == "boolean") {
+			// A duration, a size or a rate written as a bare number
+			// ("interval: 5"): quoting it would only lead to the next
+			// error, since it lacks a unit. Say what the value looks like.
+			if pattern, _ := schema["pattern"].(string); patternHints[pattern] != "" {
+				if raw, ok := idx.raw(loc); ok {
+					return Diagnostics{diag(loc, false, fmt.Sprintf("%s %s", raw, patternHints[pattern]))}
+				}
+			}
 			if raw, ok := idx.raw(loc); ok {
 				msg += fmt.Sprintf(" (quote the value: %q)", raw)
 			}
