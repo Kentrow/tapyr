@@ -270,6 +270,9 @@ func TestEnforceMaxSize(t *testing.T) {
 	if d.Full == 0 || d.TooOld != 0 {
 		t.Errorf("dropped = %+v", d)
 	}
+	if first, _ := b.Read(0, 1); len(first) != 1 || first[0].Seq != d.Through+1 {
+		t.Errorf("through %d, first record left %v", d.Through, seqs(first))
+	}
 	s := b.Stats()
 	if s.Bytes > 1200 {
 		t.Errorf("bytes = %d over the maximum", s.Bytes)
@@ -301,7 +304,7 @@ func TestEnforceMaxAge(t *testing.T) {
 		t.Errorf("nothing is older than 2h yet: %+v", d)
 	}
 	d := b.Enforce(t0.Add(3*time.Hour + time.Minute))
-	if d.TooOld != 8 || d.Full != 0 {
+	if d.TooOld != 8 || d.Full != 0 || d.Through != 4 {
 		t.Errorf("dropped = %+v, want the 8 points of records 1 to 4", d)
 	}
 	if got, _ := b.Read(0, 10); fmt.Sprint(seqs(got)) != "[5]" {

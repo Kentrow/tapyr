@@ -668,9 +668,6 @@ func (c *checker) checkDiskBuffer(o *Output, buffers map[string]*Output) {
 		return
 	}
 	at := loc(o.Source, "spec", "queue", "disk")
-	// The buffer is built in steps (ADR 0015): until the queue uses it,
-	// say so rather than let a user believe the samples are kept.
-	c.warnf(at, "the disk buffer is not active yet in this version of Tapyr (ADR 0015): the queue of %q stays in memory", o.Metadata.Name)
 	if d := q.Disk; d.MaxSize != 0 && d.MaxSize < minBufferSize {
 		c.errorf(at.child("maxSize"), "maxSize %s is too small: at least %s, so that the buffer holds a few segments", d.MaxSize, minBufferSize)
 	}

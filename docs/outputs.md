@@ -169,6 +169,28 @@ spec:
 
 The queue holds `capacity` samples per output. While a backend is down, the batch at the head of the queue is retried and new samples queue behind it; once full, the oldest samples are dropped and counted. Size `capacity` for the outage you want to ride out: samples per minute across your jobs, times the minutes. The batch being sent is never dropped while its request is in flight.
 
+## Keeping the queue on disk
+
+Every sample in a queue cost API quota, and the memory queue loses it when the backend is down longer than the queue lasts, or when Tapyr restarts. `queue.disk` keeps the queue of a push output on disk as well ([ADR 0015](adr/0015-persistent-output-buffer.md)):
+
+```yaml
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: hosted }
+spec:
+  type: remote_write
+  remoteWrite: { url: https://metrics.example.com/api/v1/write }
+  queue:
+    disk:
+      maxSize: 512MiB   # the default
+      maxAge: 2h        # the default
+```
+
+- The samples are written to disk before they are queued, and leave it once the backend accepted them. When the memory queue is full, the samples wait on disk instead of being dropped, and are sent in order when the backend answers again.
+- After a restart, the samples left on disk are sent first. A crash loses at most the last second of samples.
+- `maxSize` bounds the files (sizes take a binary unit: `512MiB`, `2GiB`): beyond it, the oldest samples are dropped, counted as `buffer_full`. `maxAge` drops the samples that waited longer, counted as `too_old`, rather than send them to be refused: Prometheus refuses samples older than about 1 to 2 hours unless it has an out-of-order window. Raise `maxAge` for VictoriaMetrics or Mimir, which accept older samples.
+- The buffer lives in `buffer/<output name>` next to the state store, or in `disk.path`: keep it on persistent storage, like the state ([Operations](operations.md#state-store)). If it cannot be opened or written (a full disk, a directory held by another Tapyr), the output keeps its queue in memory and the log says so; the collection goes on.
+
 ## Self-metrics to watch
 
 | Metric | Meaning |

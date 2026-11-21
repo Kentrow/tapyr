@@ -20,6 +20,7 @@ import (
 	"github.com/kentrow/tapyr/internal/clock"
 	"github.com/kentrow/tapyr/internal/model"
 	"github.com/kentrow/tapyr/internal/output"
+	"github.com/kentrow/tapyr/internal/output/buffer"
 )
 
 // Point is one queued data point: a sample, or the staleness marker of a
@@ -172,6 +173,13 @@ type Options struct {
 	Observer      Observer
 	// Rand draws the backoff jitter; inject a seeded source in tests.
 	Rand *rand.Rand
+	// Buffer keeps the queue on disk as well (ADR 0015), nil for a queue in
+	// memory only. The queue syncs it, applies its bounds and closes it
+	// when Run returns.
+	Buffer *buffer.Buffer
+	// MaxAge drops the buffered points older than this instead of sending
+	// them (0: no limit).
+	MaxAge time.Duration
 }
 
 // Queue queues points and sends them in batches. One send is in flight at
@@ -195,6 +203,16 @@ type Queue struct {
 	spans      []span
 	splitLast  uint64
 	splitSends int
+
+	// The disk buffer (disk.go): the records loaded in memory and not
+	// acknowledged, whether records wait on disk only, the last record
+	// loaded, whether the last write failed, and the points dropped for
+	// their age not reported yet.
+	records       []diskRecord
+	backlog       bool
+	loadedThrough uint64
+	diskFailing   bool
+	pendingTooOld int
 }
 
 type entry struct {
@@ -218,10 +236,20 @@ func New(opts Options) *Queue {
 		opts.Rand = rand.New(rand.NewPCG(rand.Uint64(), rand.Uint64())) //nolint:gosec // G404: backoff jitter needs no cryptographic randomness.
 	}
 	opts.Capacity, opts.MaxBatch = max(1, opts.Capacity), max(1, opts.MaxBatch)
-	return &Queue{
+	q := &Queue{
 		opts: opts, drained: make(chan struct{}), wake: make(chan struct{}, 1),
 		state: output.State{Capacity: opts.Capacity},
 	}
+	if opts.Buffer != nil {
+		// What a previous run left on disk is sent first.
+		q.backlog = true
+		q.pendingTooOld = q.fill(opts.Clock.Now())
+		if s := opts.Buffer.Stats(); s.Records > 0 {
+			opts.Logger.Info("output disk buffer: sending the samples left by the previous run", "component", "output",
+				"output", opts.Name, "samples", s.Points, "oldest", s.Oldest)
+		}
+	}
+	return q
 }
 
 // Add queues points without blocking. When the queue is full, the oldest
@@ -232,6 +260,15 @@ func (q *Queue) Add(points []Point) {
 	}
 	q.mu.Lock()
 	now := q.opts.Clock.Now()
+	if q.opts.Buffer != nil {
+		if ok, full := q.addToDisk(points, now); ok {
+			q.state.Dropped += int64(full)
+			q.mu.Unlock()
+			q.reportDrops(full, 0)
+			q.signal()
+			return
+		}
+	}
 	for _, p := range points {
 		q.seq++
 		q.points = append(q.points, entry{Point: p, seq: q.seq, at: now})
@@ -273,6 +310,16 @@ func (q *Queue) State() output.State {
 
 // Run sends batches until ctx is done.
 func (q *Queue) Run(ctx context.Context) error {
+	if q.opts.Buffer != nil {
+		maintained := make(chan struct{})
+		go func() {
+			defer close(maintained)
+			q.maintain(ctx)
+		}()
+		// The buffer is closed before Run returns: a queue started next on
+		// the same directory finds it free.
+		defer func() { <-maintained }()
+	}
 	for {
 		batch, due := q.next()
 		if batch == nil {
@@ -472,8 +519,12 @@ func (q *Queue) remove(seq uint64) {
 	}
 	q.points = append(q.points[:0], q.points[n:]...)
 	q.sending = 0
+	if q.opts.Buffer != nil {
+		q.acknowledge(seq)
+		q.pendingTooOld += q.fill(q.opts.Clock.Now())
+	}
 	q.state.Queue = len(q.points)
-	if len(q.points) == 0 {
+	if len(q.points) == 0 && !q.backlog {
 		close(q.drained)
 		q.drained = make(chan struct{})
 	}
@@ -483,7 +534,10 @@ func (q *Queue) remove(seq uint64) {
 // returns when the queue is empty, or with an error when ctx ends first.
 func (q *Queue) Flush(ctx context.Context) error {
 	q.mu.Lock()
-	if len(q.points) == 0 {
+	if q.opts.Buffer != nil {
+		q.pendingTooOld += q.fill(q.opts.Clock.Now())
+	}
+	if len(q.points) == 0 && !q.backlog {
 		q.mu.Unlock()
 		return nil
 	}
