@@ -27,6 +27,9 @@ func resolvePaths(cfg *Config) {
 		if otlp := o.Spec.OTLP; otlp != nil {
 			resolveHeaderSecrets(dir, otlp.Headers)
 		}
+		if q := o.Spec.Queue; q != nil && q.Disk != nil {
+			q.Disk.Path = resolvePath(dir, q.Disk.Path)
+		}
 	}
 	if s := cfg.Settings; s != nil {
 		dir := filepath.Dir(s.Source.File)

@@ -20,6 +20,7 @@ const (
 	durationPattern   = `^([0-9]+(\.[0-9]+)?(ns|us|µs|ms|s|m|h))+$`
 	ratePattern       = `^[0-9]+(\.[0-9]+)?/(s|m|h)$`
 	percentPattern    = `^[0-9]+(\.[0-9]+)?%$`
+	sizePattern       = `^[0-9]+(B|KiB|MiB|GiB|TiB)$`
 	namePattern       = `^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$`
 	identifierPattern = `^[A-Za-z_][A-Za-z0-9_]*$`
 	labelNamePattern  = `^[a-zA-Z_][a-zA-Z0-9_]*$`
@@ -36,6 +37,7 @@ var patternHints = map[string]string{
 	durationPattern:   "must be a duration such as 30s, 5m or 1h30m",
 	ratePattern:       "must be a rate such as 10/s, 600/m or 100/h",
 	percentPattern:    `must be a percentage such as "10%"`,
+	sizePattern:       "must be a size such as 512MiB or 2GiB (B, KiB, MiB, GiB or TiB)",
 	namePattern:       "must be a DNS label: lowercase letters, digits and hyphens, starting and ending with a letter or digit, at most 63 characters",
 	identifierPattern: "must be an identifier: letters, digits and underscores, not starting with a digit",
 	labelNamePattern:  "must be a valid label name: letters, digits and underscores, not starting with a digit",
@@ -183,6 +185,70 @@ func parsePercent(s string) (Percent, error) {
 // JSONSchema implements the schema reflector hook.
 func (Percent) JSONSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{Type: "string", Pattern: percentPattern, Examples: []any{"10%"}}
+}
+
+// Size is a number of bytes written with a binary unit: "512MiB", "2GiB",
+// "4096B". Only the units of powers of 1024 are accepted, so that a size
+// never means two things (MB is 1000 or 1024 depending on the tool).
+type Size int64
+
+// Bytes returns the size in bytes.
+func (s Size) Bytes() int64 { return int64(s) }
+
+// sizeUnits are the units of Size, largest first.
+var sizeUnits = []struct {
+	name  string
+	bytes int64
+}{{"TiB", 1 << 40}, {"GiB", 1 << 30}, {"MiB", 1 << 20}, {"KiB", 1 << 10}, {"B", 1}}
+
+// String writes the size with the largest unit that divides it.
+func (s Size) String() string {
+	for _, u := range sizeUnits {
+		if s != 0 && int64(s)%u.bytes == 0 {
+			return strconv.FormatInt(int64(s)/u.bytes, 10) + u.name
+		}
+	}
+	return strconv.FormatInt(int64(s), 10) + "B"
+}
+
+// MarshalJSON implements json.Marshaler.
+func (s Size) MarshalJSON() ([]byte, error) { return json.Marshal(s.String()) }
+
+// UnmarshalJSON implements json.Unmarshaler.
+func (s *Size) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err != nil {
+		return errors.New(`size must be a string such as "512MiB"`)
+	}
+	v, err := parseSize(str)
+	if err != nil {
+		return err
+	}
+	*s = v
+	return nil
+}
+
+var sizeRe = regexp.MustCompile(sizePattern)
+
+func parseSize(s string) (Size, error) {
+	if !sizeRe.MatchString(s) {
+		return 0, fmt.Errorf("invalid size %q (want a size such as 512MiB or 2GiB)", s)
+	}
+	for _, u := range sizeUnits {
+		if n, ok := strings.CutSuffix(s, u.name); ok {
+			v, err := strconv.ParseInt(n, 10, 64)
+			if err != nil || v > (1<<62)/u.bytes {
+				return 0, fmt.Errorf("invalid size %q: too large", s)
+			}
+			return Size(v * u.bytes), nil
+		}
+	}
+	return 0, fmt.Errorf("invalid size %q", s)
+}
+
+// JSONSchema implements the schema reflector hook.
+func (Size) JSONSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "string", Pattern: sizePattern, Examples: []any{"512MiB", "2GiB"}}
 }
 
 // IntOrAuto is a positive integer, or "auto" when the value is learned at

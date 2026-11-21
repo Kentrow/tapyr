@@ -18,3 +18,28 @@ spec:
   type: otlp
   otlp: { endpoint: "http://collector:4318" }
   remoteWrite: { url: "http://vm:8428/api/v1/write" }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: tiny-buffer }
+spec:
+  type: remote_write
+  remoteWrite: { url: "http://vm:8428/api/v1/write" }
+  queue:
+    disk: { maxSize: 1MiB, maxAge: 30s }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: buffer-a }
+spec:
+  type: otlp
+  otlp: { endpoint: "http://collector:4318" }
+  queue: { disk: { path: ./shared-buffer } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Output
+metadata: { name: buffer-b }
+spec:
+  type: remote_write
+  remoteWrite: { url: "http://vm:8428/api/v1/write" }
+  queue: { disk: { path: shared-buffer/ } }

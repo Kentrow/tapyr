@@ -103,6 +103,42 @@ func TestPercent(t *testing.T) {
 	}
 }
 
+func TestSize(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    int64
+		text    string
+		wantErr bool
+	}{
+		{in: `"512MiB"`, want: 512 << 20, text: "512MiB"},
+		{in: `"2GiB"`, want: 2 << 30, text: "2GiB"},
+		{in: `"1TiB"`, want: 1 << 40, text: "1TiB"},
+		{in: `"4096B"`, want: 4096, text: "4KiB"}, // written with the largest exact unit
+		{in: `"1536KiB"`, want: 1536 << 10, text: "1536KiB"},
+		{in: `"0B"`, want: 0, text: "0B"},
+		{in: `"512MB"`, wantErr: true}, // decimal units are ambiguous: refused
+		{in: `"1.5GiB"`, wantErr: true},
+		{in: `"512"`, wantErr: true},
+		{in: `"99999999999TiB"`, wantErr: true},
+		{in: `512`, wantErr: true},
+	}
+	for _, tt := range tests {
+		var s Size
+		err := json.Unmarshal([]byte(tt.in), &s)
+		if (err != nil) != tt.wantErr {
+			t.Errorf("Unmarshal(%s) error = %v, wantErr %v", tt.in, err, tt.wantErr)
+			continue
+		}
+		if tt.wantErr {
+			continue
+		}
+		if s.Bytes() != tt.want || s.String() != tt.text {
+			t.Errorf("Unmarshal(%s) = %d (%s), want %d (%s)", tt.in, s.Bytes(), s, tt.want, tt.text)
+		}
+		roundTrip(t, s)
+	}
+}
+
 func TestIntOrAuto(t *testing.T) {
 	tests := []struct {
 		in       string
@@ -236,6 +272,10 @@ func TestSchemaPatternsMatchParsers(t *testing.T) {
 		{
 			percentPattern, func(s string) error { _, err := parsePercent(s); return err },
 			[]string{"10%", "2.5%", "0%", "100%"},
+		},
+		{
+			sizePattern, func(s string) error { _, err := parseSize(s); return err },
+			[]string{"512MiB", "2GiB", "1TiB", "4096B", "0B", "1KiB"},
 		},
 		{
 			datePattern, func(s string) error { _, err := ParseDate(s); return err },
