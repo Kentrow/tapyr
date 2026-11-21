@@ -252,6 +252,8 @@ pre.code .s { color: var(--code-string); } pre.code .n { color: var(--code-numbe
   font-size: 0.82rem; min-width: 150px; box-shadow: var(--shadow); color: var(--ink);
 }
 .tnode-box .kind { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); }
+/* A sentence naming a job ("↳ fan-out of meraki-organizations"): in lower case, which the name keeps whole. */
+.tnode-box .kind.fanout { text-transform: none; letter-spacing: 0; }
 .tnode-box.ok { border-left-color: var(--green); }
 .tnode-box.degraded { border-left-color: var(--sun); }
 .tnode-box.failing { border-left-color: var(--red); }

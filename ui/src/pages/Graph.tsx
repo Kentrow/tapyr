@@ -34,7 +34,9 @@ function Tile({ data }: NodeProps<TileNode>) {
       title={tileHint(data)}
     >
       <Handle type="target" position={Position.Left} />
-      {!data.compact && <div className="kind">{data.parent ? `↳ fan-out of ${data.parent}` : data.kind ?? n.kind}</div>}
+      {!data.compact && (data.parent
+        ? <div className="kind fanout">↳ fan-out of {data.parent}</div>
+        : <div className="kind">{data.kind ?? n.kind}</div>)}
       <div className="tlabel">
         {data.compact && <StateMark state={n.health} />}
         {data.parent && data.compact && <span className="muted">↳ </span>}
@@ -104,7 +106,7 @@ const gap = 12;
 // The width of a detailed tile: room for the longest names of the
 // built-in packages (meraki-appliance-uplink-statuses) at the zoom the
 // graph opens at.
-const tileWidth = 232;
+const tileWidth = 256;
 // Minimum widths, so that the heads keep their names next to their state.
 const minGroupW = 260;
 const minSectionW = 400;

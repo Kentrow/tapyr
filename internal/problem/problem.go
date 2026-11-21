@@ -246,7 +246,7 @@ func ForPlan(s planner.ScopePlan, version string) *api.Problem {
 	}
 	p := &api.Problem{Class: ClassPlanInfeasible, DocsURL: DocsURL(version, anchorQuota)}
 	p.Title = fmt.Sprintf("The %s quota%s is too small: its jobs need at least %s calls %s, it leaves %s.",
-		planner.LimitName(s.Limit), planner.ScopeWords(s.Key), count(sf.Needed), period(sf), count(sf.Budget))
+		planner.LimitName(s.Limit), planner.ScopeWords(s.Key, s.Accounts), count(sf.Needed), period(sf), count(sf.Budget))
 	switch {
 	case sf.FirstFactor > 0:
 		// The job with the most calls can make room on its own: the

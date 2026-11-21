@@ -89,6 +89,9 @@ type ScopePlan struct {
 	// does (infeasible plans only).
 	ExhaustionAt time.Time
 	Jobs         []string
+	// Accounts are the accounts of the jobs counted in the scope, sorted:
+	// they name a scope keyed by a credential, whose key is a hash.
+	Accounts []string
 	// Shortfall says why the scope does not fit, nil when it does.
 	Shortfall *Shortfall
 }
@@ -99,6 +102,8 @@ type Constraint struct {
 	Kind  config.LimitKind
 	Limit string
 	Key   string
+	// Accounts are the accounts counted in the scope, as in ScopePlan.
+	Accounts []string
 }
 
 // Shortfall says why a quota scope does not fit, and what would make it
@@ -168,6 +173,7 @@ func Plan(jobs []Job, opts Options) *Result {
 	}
 
 	scopes, order := quotaScopes(jobs, opts)
+	accounts := scopeAccounts(jobs)
 
 	// Stretch per scope, independently; a job keeps the largest stretch.
 	feasible := true
@@ -182,7 +188,7 @@ func Plan(jobs []Job, opts Options) *Result {
 		for i, k := range need {
 			if k > stretch[i] {
 				stretch[i], reason[i] = k, "quota "+s.plan.Limit+" "+s.plan.Key
-				constraint[i] = Constraint{Kind: config.LimitQuota, Limit: s.plan.Limit, Key: s.plan.Key}
+				constraint[i] = Constraint{Kind: config.LimitQuota, Limit: s.plan.Limit, Key: s.plan.Key, Accounts: s.plan.Accounts}
 			}
 		}
 	}
@@ -203,7 +209,7 @@ func Plan(jobs []Job, opts Options) *Result {
 			}
 			if minimum := time.Duration(math.Ceil(calls/ps.Rate)) * time.Second; minimum > eff {
 				eff, reason[i] = minimum, "rate "+ps.Limit+" "+ps.Key
-				constraint[i] = Constraint{Kind: config.LimitRate, Limit: ps.Limit, Key: ps.Key}
+				constraint[i] = Constraint{Kind: config.LimitRate, Limit: ps.Limit, Key: ps.Key, Accounts: accounts[ps.ID]}
 			}
 		}
 		res.Jobs = append(res.Jobs, JobPlan{
@@ -302,8 +308,29 @@ func quotaScopes(jobs []Job, opts Options) (map[string]*scope, []string) {
 			s.perJob[i] = calls
 		}
 	}
+	accounts := scopeAccounts(jobs)
+	for id, s := range scopes {
+		s.plan.Accounts = accounts[id]
+	}
 	slices.Sort(order)
 	return scopes, order
+}
+
+// scopeAccounts returns the accounts of the jobs counted in each scope,
+// quota or rate, by scope ID, sorted.
+func scopeAccounts(jobs []Job) map[string][]string {
+	out := map[string][]string{}
+	for i := range jobs {
+		for _, ps := range jobs[i].Scopes {
+			if a := jobs[i].Account; a != "" && !slices.Contains(out[ps.ID], a) {
+				out[ps.ID] = append(out[ps.ID], a)
+			}
+		}
+	}
+	for _, a := range out {
+		slices.Sort(a)
+	}
+	return out
 }
 
 // Evaluate projects the consumption of every quota scope over its period
@@ -447,9 +474,9 @@ func (j *JobPlan) Describe() string {
 	c := j.Constraint
 	switch c.Kind {
 	case config.LimitQuota:
-		return "to fit the " + LimitName(c.Limit) + " quota" + ScopeWords(c.Key)
+		return "to fit the " + LimitName(c.Limit) + " quota" + ScopeWords(c.Key, c.Accounts)
 	case config.LimitRate:
-		return "for a run to fit the " + LimitName(c.Limit) + " rate limit" + ScopeWords(c.Key)
+		return "for a run to fit the " + LimitName(c.Limit) + " rate limit" + ScopeWords(c.Key, c.Accounts)
 	}
 	return strings.TrimSpace(j.Reason)
 }
@@ -465,8 +492,10 @@ func LimitName(limit string) string {
 
 // ScopeWords names a scope key in words, as a complement: " of account
 // lab", " of account lab and target eu", or "" for a scope shared by every
-// account of the provider.
-func ScopeWords(key string) string {
+// account of the provider. A credential is named by the accounts that use
+// it (" of accounts north and south"), its key being a hash; by the hash
+// when no account is known.
+func ScopeWords(key string, accounts []string) string {
 	if key == "" {
 		return ""
 	}
@@ -481,7 +510,23 @@ func ScopeWords(key string) string {
 			parts = append(parts, part)
 			continue
 		}
+		if dim == "credential" && len(accounts) > 0 {
+			parts = append(parts, accountWords(accounts))
+			continue
+		}
 		parts = append(parts, dim+" "+value)
 	}
 	return " of " + strings.Join(parts, " and ")
+}
+
+// accountWords names accounts in words: "account lab", "accounts north and
+// south", "accounts a, b and c".
+func accountWords(accounts []string) string {
+	switch len(accounts) {
+	case 0:
+		return ""
+	case 1:
+		return "account " + accounts[0]
+	}
+	return "accounts " + strings.Join(accounts[:len(accounts)-1], ", ") + " and " + accounts[len(accounts)-1]
 }

@@ -1,10 +1,11 @@
 testdata/invalid/scalars.yaml:6:21: spec.collection.defaultTimeout: "1d" must be a duration such as 30s, 5m or 1h30m
-testdata/invalid/scalars.yaml:7:13: spec.collection.jitter: invalid type: got number, want string (quote the value: "0.1")
+testdata/invalid/scalars.yaml:7:13: spec.collection.jitter: 0.1 must be a percentage such as "10%"
 testdata/invalid/scalars.yaml:9:19: spec.budget.retryReserve: "ten percent" must be a percentage such as "10%"
-testdata/invalid/scalars.yaml:11:12: spec.log.level: invalid value "verbose" (want one of "debug", "info", "warn", "error")
-testdata/invalid/scalars.yaml:19:39: spec.limits[0].rate: "10/x" must be a rate such as 10/s, 600/m or 100/h
-testdata/invalid/scalars.yaml:22:12: spec.limits[1].max: "lots" must be a positive integer or "auto"
-testdata/invalid/scalars.yaml:23:39: spec.limits[1].window.resetAt: "24:00" must be a time of day in 24h HH:MM format
-testdata/invalid/scalars.yaml:23:58: spec.limits[1].window.monthDay: must be at most 31 (got 32)
-testdata/invalid/scalars.yaml:31:11: spec.params.port: invalid type: got number, want string (quote the value: "8080")
-testdata/invalid/scalars.yaml:32:14: spec.params.enabled: invalid type: got boolean, want string (quote the value: "true")
+testdata/invalid/scalars.yaml:10:21: spec.budget.replanInterval: 5 must be a duration such as 30s, 5m or 1h30m
+testdata/invalid/scalars.yaml:12:12: spec.log.level: invalid value "verbose" (want one of "debug", "info", "warn", "error")
+testdata/invalid/scalars.yaml:20:39: spec.limits[0].rate: "10/x" must be a rate such as 10/s, 600/m or 100/h
+testdata/invalid/scalars.yaml:23:12: spec.limits[1].max: "lots" must be a positive integer or "auto"
+testdata/invalid/scalars.yaml:24:39: spec.limits[1].window.resetAt: "24:00" must be a time of day in 24h HH:MM format
+testdata/invalid/scalars.yaml:24:58: spec.limits[1].window.monthDay: must be at most 31 (got 32)
+testdata/invalid/scalars.yaml:32:11: spec.params.port: invalid type: got number, want string (quote the value: "8080")
+testdata/invalid/scalars.yaml:33:14: spec.params.enabled: invalid type: got boolean, want string (quote the value: "true")

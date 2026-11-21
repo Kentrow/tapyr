@@ -68,6 +68,8 @@ storage:
 
 Without it, **one** sample out of bounds makes Prometheus refuse the whole request (`400`), over remote write and OTLP alike, and it ingests none of its samples. Tapyr then splits the batch: it sends both halves again, one after the other, and splits a refused half further, down to the samples really refused. The other samples of the batch, the fresh ones of the other jobs included, arrive, in order. A batch costs a few more requests to the backend (about two per halving, 13 halvings at most for the default `maxBatch` of 5000), never API quota. Splitting stops after 64 requests for one batch: the halves left are sent once more each, and dropped if refused.
 
+Over OTLP, Prometheus also writes a `target_info` series for each resource (each provider and account), stamped with the newest sample of the request, and refuses a whole request that would move it back in time. Jobs of one account that run at the same time stamp their samples when their pages arrive: a request whose samples are all older than the newest sample of the request before is refused, fresh samples included. For OTLP into Prometheus, enable the out-of-order window even if the APIs report no source timestamps; a few minutes is enough for this case.
+
 The samples refused are counted in `tapyr_output_samples_dropped_total{reason="out_of_order"}`, and logged as `samples dropped: the backend rejected the batch` with `class=out_of_order`; every refused request counts in `tapyr_output_send_failures_total{class="out_of_order"}`. Mimir and Thanos have settings equivalent to the out-of-order window; VictoriaMetrics accepts such samples.
 
 ## `otlp`

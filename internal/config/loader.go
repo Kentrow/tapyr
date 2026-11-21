@@ -462,7 +462,7 @@ func (l *Loader) decode(d *rawDocument) (envelope, Diagnostics) {
 	if err := l.schemas[d.kind].Validate(any(d.tree)); err != nil {
 		var ve *jsonschema.ValidationError
 		if errors.As(err, &ve) {
-			return nil, schemaDiagnostics(ve, d.index, l.propertyNames)
+			return nil, schemaDiagnostics(ve, d.index, l.schemaAt)
 		}
 		return nil, Diagnostics{{Pos: d.index.position(nil, false), Message: err.Error()}}
 	}
@@ -490,10 +490,9 @@ func quoteAny(v any) string {
 	return string(b)
 }
 
-// propertyNames returns the fields allowed by the object schema at a
-// schema URL (a document and a JSON pointer, as the validator reports
-// them), sorted, or nil when there is none.
-func (l *Loader) propertyNames(schemaURL string) []string {
+// schemaAt returns the schema at a schema URL (a document and a JSON
+// pointer, as the validator reports them), or nil when there is none.
+func (l *Loader) schemaAt(schemaURL string) map[string]any {
 	base, pointer, _ := strings.Cut(schemaURL, "#")
 	node := l.docs[base]
 	for token := range strings.SplitSeq(strings.TrimPrefix(pointer, "/"), "/") {
@@ -508,11 +507,5 @@ func (l *Loader) propertyNames(schemaURL string) []string {
 		node = m[token]
 	}
 	m, _ := node.(map[string]any)
-	props, _ := m["properties"].(map[string]any)
-	out := make([]string, 0, len(props))
-	for name := range props {
-		out = append(out, name)
-	}
-	slices.Sort(out)
-	return out
+	return m
 }

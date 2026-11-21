@@ -157,7 +157,7 @@ func printPlanTable(e *env, res *planner.Result, notCollected []*runtime.Job, ou
 			status += fmt.Sprintf(" (%.1f%%)", 100*s.Projected/s.Budget)
 		}
 		fmt.Fprintf(w, "%s\t%s\t%.0f\t%.0f\t%.0f\t%s\n", s.Limit, shortDuration(s.Period), s.Budget, s.Projected, s.Reserve, status)
-		if words := strings.TrimPrefix(planner.ScopeWords(s.Key), " of "); words != "" {
+		if words := strings.TrimPrefix(planner.ScopeWords(s.Key, s.Accounts), " of "); words != "" {
 			fmt.Fprintf(w, "  %s\t\t\t\t\t\n", words)
 		}
 		for _, j := range res.Jobs {
