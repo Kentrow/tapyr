@@ -333,9 +333,19 @@ func TestPushOutputs(t *testing.T) {
 	// The Prometheus without out-of-order window refuses the counter with
 	// the source timestamps of the fixtures, days old, and gets every
 	// sample stamped with the collection time, sent in the same batches.
+	//
+	// Over OTLP, Prometheus also writes the target_info of the resource
+	// (one per provider and account), stamped with the newest sample of
+	// each request, and refuses a whole request that would move it back.
+	// The first runs of devices and sites run at the same time, their
+	// pages stamped when received: a half of a split batch can hold fresh
+	// samples a millisecond older than the half before, and be refused
+	// (seen once in about 60 CI runs). Their next runs do not overlap
+	// (the planner slows them down to about 1m23s and 2m to fit the daily
+	// quota), so the wait covers them.
 	strictPushed := `example_%s{tapyr_run="` + runMarker + `",tapyr_protocol=""}`
 	strictOTLP := `example_%s{tapyr_run="` + runMarker + `",tapyr_protocol="strict-otlp"}`
-	eventually(t, "the devices and sites in the Prometheus without out-of-order window", 60*time.Second, func() bool {
+	eventually(t, "the devices and sites in the Prometheus without out-of-order window", 150*time.Second, func() bool {
 		for _, q := range []string{strictPushed, strictOTLP} {
 			for _, m := range []string{"device_up", "device_clients", "device_info", "devices", "site_info"} {
 				if series(t, strictURL, fmt.Sprintf(q, m)) == 0 {
