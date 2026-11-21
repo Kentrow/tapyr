@@ -202,6 +202,10 @@ func defaultOutput(spec *OutputSpec) {
 	setDefault(&spec.Queue.Capacity, 50000)
 	setDefault(&spec.Queue.MaxBatch, 5000)
 	setDefault(&spec.Queue.FlushInterval, Duration(5*time.Second))
+	if d := spec.Queue.Disk; d != nil {
+		setDefault(&d.MaxSize, Size(512<<20))
+		setDefault(&d.MaxAge, Duration(2*time.Hour))
+	}
 }
 
 func defaultSettings(s *SettingsSpec) {

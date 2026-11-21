@@ -1,3 +1,6 @@
 testdata/invalid/outputs.yaml:6:3: spec.queue: queue is not allowed for prometheus outputs (pull exposition)
 testdata/invalid/outputs.yaml:12:9: spec.type: at most one prometheus output is allowed (another one is "prom" at testdata/invalid/outputs.yaml:5:9)
 testdata/invalid/outputs.yaml:20:3: spec.remoteWrite: remoteWrite is not allowed with output type otlp
+testdata/invalid/outputs.yaml:29:22: spec.queue.disk.maxSize: maxSize 1MiB is too small: at least 8MiB, so that the buffer holds a few segments
+testdata/invalid/outputs.yaml:29:36: spec.queue.disk.maxAge: maxAge 30s is too short: at least 1m
+testdata/invalid/outputs.yaml:45:12: spec.queue.disk: the disk buffer of "buffer-b" uses the directory of the one of "buffer-a" (testdata/invalid/shared-buffer): give one of them a path of its own

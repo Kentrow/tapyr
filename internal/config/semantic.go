@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -622,6 +623,7 @@ func (c *checker) jobRole(j *Job) JobRole {
 
 func (c *checker) checkOutputs() {
 	var prometheus *Output
+	buffers := map[string]*Output{} // disk buffer directory -> output
 	for _, o := range c.cfg.Outputs {
 		base := loc(o.Source, "spec")
 		set := map[string]bool{
@@ -636,6 +638,7 @@ func (c *checker) checkOutputs() {
 		}
 		c.checkProcessing(o)
 		if o.Spec.Type != OutputPrometheus {
+			c.checkDiskBuffer(o, buffers)
 			continue
 		}
 		if o.Spec.Queue != nil {
@@ -648,6 +651,47 @@ func (c *checker) checkOutputs() {
 		}
 		prometheus = o
 	}
+}
+
+// Bounds of a disk buffer (ADR 0015): room for a few segments, and a
+// maximum age longer than a flush.
+const (
+	minBufferSize = Size(8 << 20)
+	minBufferAge  = Duration(time.Minute)
+)
+
+// checkDiskBuffer checks the disk buffer of a push output (ADR 0015): its
+// bounds, and a directory of its own.
+func (c *checker) checkDiskBuffer(o *Output, buffers map[string]*Output) {
+	q := o.Spec.Queue
+	if q == nil || q.Disk == nil {
+		return
+	}
+	at := loc(o.Source, "spec", "queue", "disk")
+	// The buffer is built in steps (ADR 0015): until the queue uses it,
+	// say so rather than let a user believe the samples are kept.
+	c.warnf(at, "the disk buffer is not active yet in this version of Tapyr (ADR 0015): the queue of %q stays in memory", o.Metadata.Name)
+	if d := q.Disk; d.MaxSize != 0 && d.MaxSize < minBufferSize {
+		c.errorf(at.child("maxSize"), "maxSize %s is too small: at least %s, so that the buffer holds a few segments", d.MaxSize, minBufferSize)
+	}
+	if d := q.Disk; d.MaxAge != 0 && d.MaxAge < minBufferAge {
+		c.errorf(at.child("maxAge"), "maxAge %s is too short: at least 1m", d.MaxAge.Std())
+	}
+	statePath := "./data/tapyr.db"
+	if s := c.cfg.Settings; s != nil && s.Spec.State.Path != "" {
+		statePath = s.Spec.State.Path
+	}
+	dir := o.BufferDir(statePath)
+	key, err := filepath.Abs(dir)
+	if err != nil {
+		key = dir
+	}
+	if other, ok := buffers[key]; ok {
+		c.errorf(at, "the disk buffer of %q uses the directory of the one of %q (%s): give one of them a path of its own",
+			o.Metadata.Name, other.Metadata.Name, dir)
+		return
+	}
+	buffers[key] = o
 }
 
 // checkProcessing checks the processing rules of an output (ADR 0012).

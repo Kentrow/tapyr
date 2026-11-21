@@ -1,6 +1,10 @@
 package config
 
-import "github.com/invopop/jsonschema"
+import (
+	"path/filepath"
+
+	"github.com/invopop/jsonschema"
+)
 
 // Output sends collected samples to a backend.
 type Output struct {
@@ -160,4 +164,36 @@ type Queue struct {
 	MaxBatch int `json:"maxBatch,omitempty" jsonschema:"minimum=1,default=5000"`
 	// FlushInterval sends a partial batch after this delay.
 	FlushInterval Duration `json:"flushInterval,omitempty" jsonschema:"default=5s"`
+	// Disk keeps the queue on disk as well (ADR 0015): the samples survive
+	// a backend outage longer than the memory queue and a restart of Tapyr.
+	// Off when absent.
+	Disk *DiskBuffer `json:"disk,omitempty"`
+}
+
+// DiskBuffer is the persistent buffer of a push output (ADR 0015): the
+// samples are written to disk before they are queued, and leave it once
+// the backend accepted them.
+type DiskBuffer struct {
+	// Path of the directory of the buffer, relative to the declaring file.
+	// Default: buffer/<output name> next to the state store
+	// (settings.state.path). Two outputs never share a directory.
+	Path string `json:"path,omitempty"`
+	// MaxSize of the buffer on disk: beyond it, the oldest samples are
+	// dropped and counted (reason buffer_full). At least 8MiB.
+	MaxSize Size `json:"maxSize,omitempty" jsonschema:"default=512MiB"`
+	// MaxAge of a buffered sample: an older one is dropped and counted
+	// (reason too_old) instead of being sent, since most backends refuse
+	// old samples (Prometheus about 1 to 2 hours, unless it has an
+	// out-of-order window). Raise it for VictoriaMetrics or Mimir. At least
+	// 1m.
+	MaxAge Duration `json:"maxAge,omitempty" jsonschema:"default=2h"`
+}
+
+// BufferDir returns the directory of the disk buffer of an output: its
+// path, or buffer/<output name> next to the state store at stateFile.
+func (o *Output) BufferDir(stateFile string) string {
+	if q := o.Spec.Queue; q != nil && q.Disk != nil && q.Disk.Path != "" {
+		return filepath.Clean(q.Disk.Path)
+	}
+	return filepath.Join(filepath.Dir(stateFile), "buffer", string(o.Metadata.Name))
 }
