@@ -1,9 +1,9 @@
-import { Badge, Failure, Help, Loading, PageHead, Table } from "../components/ui";
+import { Badge, Failure, Help, Loading, NextRun, PageHead, Since, Table } from "../components/ui";
 import { CodeBlock } from "../components/Code";
 import { ProblemNote } from "../components/Problem";
 import { NotFound } from "./NotFound";
 import { JobName } from "../components/JobName";
-import { absolute, count, duration, implicitHelp, jobTitle, jobWords, since, toYAML, waitingText } from "../lib/format";
+import { absolute, count, duration, implicitHelp, jobTitle, jobWords, toYAML, waitingText } from "../lib/format";
 import { terms } from "../lib/terms";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
@@ -53,7 +53,7 @@ export function Jobs() {
             key: "last", label: "Last run", sort: (j) => j.last_run?.ended_at ?? "",
             render: (j) =>
               j.last_run ? (
-                <span title={absolute(j.last_run.ended_at)}><Badge state={j.last_run.result} /> {since(j.last_run.ended_at)}</span>
+                <span><Badge state={j.last_run.result} /> <Since at={j.last_run.ended_at} /></span>
               ) : j.waiting ? (
                 <span className="muted" title={waitingText(j.waiting, undefined, words).long}>{waitingText(j.waiting, undefined, words).short}</span>
               ) : (
@@ -64,9 +64,9 @@ export function Jobs() {
             key: "next", label: "Next run", sort: (j) => j.next_run ?? j.waiting?.until ?? "",
             render: (j) =>
               j.next_run ? (
-                <span title={absolute(j.next_run)}>{since(j.next_run)}</span>
+                <NextRun at={j.next_run} />
               ) : j.waiting?.until ? (
-                <span className="muted" title={`${absolute(j.waiting.until)}: the next step of its discovery; the job runs after it`}>discovery {since(j.waiting.until)}</span>
+                <span className="muted" title={`${absolute(j.waiting.until)}: the next step of its discovery; the job runs after it`}>discovery <NextRun at={j.waiting.until} /></span>
               ) : (
                 "-"
               ),
@@ -136,7 +136,7 @@ export function JobDetail({ name }: { name: string }) {
           <h3>Last run</h3>
           {j.last_run ? (
             <>
-              <div className="row"><Badge state={j.last_run.result} /> <span title={absolute(j.last_run.ended_at)}>{since(j.last_run.ended_at)}</span></div>
+              <div className="row"><Badge state={j.last_run.result} /> <Since at={j.last_run.ended_at} /></div>
               {(j.last_run.problem || j.last_run.error) && (
                 <div className="small" style={{ marginTop: 8 }}><ProblemNote problem={j.last_run.problem} detail={j.last_run.error} /></div>
               )}
@@ -153,7 +153,7 @@ export function JobDetail({ name }: { name: string }) {
           ) : (
             <span className="muted">{j.collected ? "no run yet" : "none: not collected"}</span>
           )}
-          {j.collected && j.next_run && <p className="small muted" style={{ marginBottom: 0 }} title={absolute(j.next_run)}>next {since(j.next_run)}</p>}
+          {j.collected && j.next_run && <p className="small muted" style={{ marginBottom: 0 }}>next <NextRun at={j.next_run} /></p>}
         </div>
         <div className="card">
           <h3>Job</h3>
@@ -174,7 +174,7 @@ export function JobDetail({ name }: { name: string }) {
           rowKey={(r) => r.run_id + r.instance}
           empty="No run yet."
           columns={[
-            { key: "started", label: "Started", render: (r) => <span title={absolute(r.started_at)}>{since(r.started_at)}</span> },
+            { key: "started", label: "Started", render: (r) => <Since at={r.started_at} /> },
             { key: "instance", label: "Instance", render: (r) => <span className="mono small">{r.instance}</span> },
             { key: "result", label: "Result", render: (r) => <Badge state={r.result} /> },
             { key: "duration", label: "Duration", num: true, render: (r) => `${r.duration_seconds < 1 ? Math.round(r.duration_seconds * 1000) + "ms" : duration(r.duration_seconds)}` },
@@ -198,9 +198,9 @@ export function JobDetail({ name }: { name: string }) {
             { key: "key", label: "Instance", sort: (i) => i.key, render: (i) => <span className="mono small">{i.key}</span> },
             { key: "vars", label: "Variables", render: (i) => <span className="mono small">{Object.entries(i.vars).map(([k, v]) => `${k}=${v}`).join(" ")}</span> },
             { key: "series", label: "Series", num: true, sort: (i) => i.series, render: (i) => count(i.series) },
-            { key: "last", label: "Last run", sort: (i) => i.last_run?.ended_at ?? "", render: (i) => (i.last_run ? <><Badge state={i.last_run.result} /> {since(i.last_run.ended_at)}</> : <span className="muted">{i.next_run ? `first run ${since(i.next_run)}` : "no run yet"}</span>) },
-            { key: "success", label: "Last success", sort: (i) => i.last_success ?? "", render: (i) => <span title={absolute(i.last_success)}>{since(i.last_success)}</span> },
-            { key: "next", label: "Next run", sort: (i) => i.next_run ?? "", render: (i) => since(i.next_run) },
+            { key: "last", label: "Last run", sort: (i) => i.last_run?.ended_at ?? "", render: (i) => (i.last_run ? <><Badge state={i.last_run.result} /> <Since at={i.last_run.ended_at} /></> : <span className="muted">{i.next_run ? <>first run <NextRun at={i.next_run} /></> : "no run yet"}</span>) },
+            { key: "success", label: "Last success", sort: (i) => i.last_success ?? "", render: (i) => <Since at={i.last_success} /> },
+            { key: "next", label: "Next run", sort: (i) => i.next_run ?? "", render: (i) => <NextRun at={i.next_run} /> },
           ]}
         />
       </section>

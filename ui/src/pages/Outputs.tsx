@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Badge, Failure, Loading, Meter, PageHead, Sparkline } from "../components/ui";
+import { Badge, Failure, Loading, Meter, PageHead, Since, Sparkline } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { absolute, bufferStatus, bytes, count, outputHealth, seriesStatus, since } from "../lib/format";
+import { bufferStatus, bytes, count, outputHealth, seriesStatus } from "../lib/format";
 import { useList } from "../lib/live";
 import type { Output } from "../lib/types";
 
@@ -97,8 +97,8 @@ export function Outputs() {
                     </>
                   )}
                 </dd>
-                <dt>Last success</dt><dd title={absolute(o.last_success)}>{since(o.last_success)}</dd>
-                {o.last_error && (<><dt>Last error</dt><dd className="mono small" title={absolute(o.last_error_at)}>{o.last_error} ({since(o.last_error_at)})</dd></>)}
+                <dt>Last success</dt><dd><Since at={o.last_success} /></dd>
+                {o.last_error && (<><dt>Last error</dt><dd className="mono small" >{o.last_error} (<Since at={o.last_error_at} />)</dd></>)}
               </dl>}
             </div>
           );

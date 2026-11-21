@@ -1,4 +1,4 @@
-import { since } from "../lib/format";
+import { Since } from "./ui";
 import type { Problem } from "../lib/types";
 
 // ProblemNote says what went wrong the way spec 09 asks ("Messages"): the
@@ -9,7 +9,7 @@ export function ProblemNote({ problem, detail, compact = false }: { problem?: Pr
   return (
     <div className={`problem${compact ? " compact" : ""}`}>
       <strong className="problem-title">{problem.title}</strong>
-      {problem.until && <span className="muted"> Ends {since(problem.until)}.</span>}
+      {problem.until && <span className="muted"> Ends <Since at={problem.until} />.</span>}
       <div className="problem-action">
         {problem.action}{" "}
         <a href={problem.docs_url} target="_blank" rel="noreferrer">How to fix</a>

@@ -67,7 +67,7 @@ function BudgetCard({ budget: b, focused }: { budget: Budget; focused: boolean }
 function BudgetState({ budget: b }: { budget: Budget }) {
   const now = useNow();
   const penalty = b.penalty_until && Date.parse(b.penalty_until) > now;
-  if (penalty) return <Badge state="failing">rate limited until {since(b.penalty_until)}</Badge>;
+  if (penalty) return <Badge state="failing">rate limited until {since(b.penalty_until, now)}</Badge>;
   if (b.kind === "quota" && b.exhaustion_eta_seconds !== undefined) return <span title="At the pace of the consumption so far, others included"><Badge state="failing">runs out in {duration(b.exhaustion_eta_seconds)}</Badge></span>;
   if (b.limit_mismatch) return <span title="The quota headers announce another maximum than the provider definition: Tapyr follows the headers."><Badge state="degraded">the API reports another maximum</Badge></span>;
   return <Badge state="ok">ok</Badge>;
@@ -96,7 +96,7 @@ function QuotaBody({ budget: b }: { budget: Budget }) {
         <dt>Window</dt>
         <dd>
           {b.rolling ? "rolling, " : ""}
-          <span title={absolute(b.window_start)}>from {since(b.window_start)}</span>, <span title={absolute(b.window_end)}>resets {since(b.window_end)}</span>
+          <span title={absolute(b.window_start)}>from {since(b.window_start, now)}</span>, <span title={absolute(b.window_end)}>resets {since(b.window_end, now)}</span>
         </dd>
         <dt><Help text={help.limit}>Limit</Help></dt>
         <dd className="num">

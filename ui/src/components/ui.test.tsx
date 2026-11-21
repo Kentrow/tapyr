@@ -1,6 +1,6 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
-import { Table, type Column } from "./ui";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { NextRun, Since, Table, type Column } from "./ui";
 
 interface Row {
   name: string;
@@ -58,5 +58,30 @@ describe("Table", () => {
   it("says when there is nothing to show", () => {
     render(<Table rows={[]} columns={columns} rowKey={(r) => r.name} empty="No job." />);
     expect(screen.getByText("No job.")).toBeTruthy();
+  });
+});
+
+// The relative times tick on their own: between two runs nothing else
+// renders the page again, and "in 45s" stayed frozen until the next run.
+describe("relative times", () => {
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  it("move with the clock, without a new render of the page", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.parse("2026-11-03T12:00:00Z"));
+    render(<p><Since at="2026-11-03T11:59:50Z" />, <NextRun at="2026-11-03T12:00:05Z" /></p>);
+    expect(screen.getByRole("paragraph").textContent).toBe("10s ago, in 5s");
+    act(() => vi.advanceTimersByTime(4000));
+    expect(screen.getByRole("paragraph").textContent).toBe("14s ago, now");
+    act(() => vi.advanceTimersByTime(5000));
+    expect(screen.getByRole("paragraph").textContent).toBe("19s ago, due");
+  });
+
+  it("show the absolute time in their title", () => {
+    render(<Since at="2026-11-03T11:59:50Z" />);
+    expect(screen.getByText(/ago/).getAttribute("title")).toMatch(/2026/);
   });
 });

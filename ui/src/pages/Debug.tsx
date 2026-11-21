@@ -1,9 +1,8 @@
 import { Fragment, useMemo } from "react";
-import { Badge, Failure, Loading, PageHead, Select, Table } from "../components/ui";
+import { Badge, Failure, Loading, PageHead, Select, Since, Table } from "../components/ui";
 import { JsonTree } from "../components/JsonTree";
 import { CodeBlock, CopyButton } from "../components/Code";
 import { ProblemNote } from "../components/Problem";
-import { absolute, since } from "../lib/format";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
 import { href, useRoute } from "../lib/router";
@@ -70,7 +69,7 @@ function Capture({ capture: c }: { capture: DebugT }) {
       <div className="row small">
         <Badge state={c.result} />
         <span className="mono">{c.instance}</span>
-        <span className="muted" title={absolute(c.time)}>run {c.run_id}, {since(c.time)}</span>
+        <span className="muted">run {c.run_id}, <Since at={c.time} /></span>
       </div>
       {(c.problem || c.error) && (
         <div className={`banner ${c.result === "failed" ? "bad" : "warn"} small`}>

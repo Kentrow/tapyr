@@ -1,10 +1,25 @@
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Icon } from "./Icon";
-import { healthClass } from "../lib/format";
+import { absolute, healthClass, nextRun, since } from "../lib/format";
+import { useNow } from "../lib/live";
 
 // stateWord is the word of a state. The health "unknown" means that no run
 // has happened yet: the word says so, since nothing is wrong.
 const stateWord = (state: string | undefined) => (!state || state === "unknown" ? "no run yet" : state.replace(/_/g, " "));
+
+// Since shows a time relative to now ("2m ago", "in 45s") that moves with
+// the clock, with the absolute time in its title.
+export function Since({ at }: { at: string | undefined }) {
+  const now = useNow();
+  return <span title={absolute(at)}>{since(at, now)}</span>;
+}
+
+// NextRun shows when a run is due ("in 45s", "now", "due"), moving with
+// the clock.
+export function NextRun({ at }: { at: string | undefined }) {
+  const now = useNow();
+  return <span title={absolute(at)}>{nextRun(at, now)}</span>;
+}
 
 export function Badge({ state, children }: { state: string | undefined; children?: ReactNode }) {
   return <span className={`badge ${healthClass(state)}`}>{children ?? stateWord(state)}</span>;

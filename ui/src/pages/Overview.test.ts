@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { jobCounts, planHint, quotaHint, squareWord, unhealthyAccounts } from "./Overview";
+import { jobCounts, planHint, quotaHint, squareWord, unhealthyAccounts, uptime } from "./Overview";
 import type { Account, Budget, Job } from "../lib/types";
 
 const now = Date.parse("2026-11-03T12:00:00Z");
@@ -76,5 +76,13 @@ describe("jobs of a provider", () => {
     expect(squareWord(first, now)).toBe("first run in 30s");
     expect(squareWord(child, now)).toBe("waiting: sites fails");
     expect(squareWord(job("sites", { last_run: run("failed") }), now)).toBe("failed");
+  });
+});
+
+describe("uptime", () => {
+  it("moves with the clock between two loads of the status", () => {
+    const s = { started_at: "2026-11-03T12:00:00Z", uptime_seconds: 60 };
+    expect(uptime(s, Date.parse("2026-11-03T12:05:00Z"))).toBe(300);
+    expect(uptime({ ...s, started_at: "" }, Date.parse("2026-11-03T12:05:00Z"))).toBe(60);
   });
 });

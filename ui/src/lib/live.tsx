@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useEffectEvent, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { apiBase, fetchAll, fetchJSON } from "./api";
 
 // Live updates: every event of the stream bumps a version that the data
@@ -120,13 +120,42 @@ export function useList<T>(path: string | null): Remote<T[]> {
   return useRemote<T[]>(path ? (signal) => fetchAll<T>(path, signal) : null, "list:" + (path ?? ""));
 }
 
-// useNow returns the current time, refreshed every interval, for the views
+// The clock of the relative times ("2m ago", "in 45s"): one timer for the
+// whole page, ticking every second while something shows a time. Between
+// two runs nothing else renders a page again: without it, "in 45s" stays
+// on screen until the next run.
+const clockListeners = new Set<() => void>();
+let clockNow = Date.now();
+let clockTimer: ReturnType<typeof setInterval> | undefined;
+
+function subscribeClock(fn: () => void): () => void {
+  clockListeners.add(fn);
+  if (clockTimer === undefined) {
+    clockNow = Date.now();
+    clockTimer = setInterval(() => {
+      clockNow = Date.now();
+      for (const l of clockListeners) l();
+    }, 1_000);
+  }
+  return () => {
+    clockListeners.delete(fn);
+    if (clockListeners.size === 0 && clockTimer !== undefined) {
+      clearInterval(clockTimer);
+      clockTimer = undefined;
+    }
+  };
+}
+
+// useNow returns the current time, refreshed every second, for the views
 // that compare times with now.
-export function useNow(interval = 5_000): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), interval);
-    return () => clearInterval(id);
-  }, [interval]);
-  return now;
+export function useNow(): number {
+  return useSyncExternalStore(subscribeClock, clockSnapshot);
+}
+
+// clockSnapshot is the time of the last tick; with no timer running (the
+// first view that shows a time), the current time, so that it never shows
+// the time the previous view stopped at.
+function clockSnapshot(): number {
+  if (clockTimer === undefined) clockNow = Math.floor(Date.now() / 1_000) * 1_000;
+  return clockNow;
 }

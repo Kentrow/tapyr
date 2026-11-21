@@ -1,7 +1,7 @@
-import { Badge, Failure, Loading, PageHead, Table } from "../components/ui";
+import { Badge, Failure, Loading, PageHead, Since, Table } from "../components/ui";
 import { ProblemNote } from "../components/Problem";
 import { JobName } from "../components/JobName";
-import { absolute, count, duration, jobWords, percent, scopeWords, since, waitingText } from "../lib/format";
+import { count, duration, jobWords, percent, scopeWords, waitingText } from "../lib/format";
 import { terms } from "../lib/terms";
 import { useJSON, useList } from "../lib/live";
 import { HttpError } from "../lib/api";
@@ -57,7 +57,7 @@ export function Plan() {
   const missing = jobs.data ? unplanned(p, jobs.data) : [];
   return (
     <>
-      <PageHead title="Plan" sub={<span title={absolute(p.at)}>Applied {since(p.at)}: what each quota will spend until its reset, and the jobs slowed down to fit. <span className="mono">tapyr plan</span> projects a full window instead.</span>}>
+      <PageHead title="Plan" sub={<span>Applied <Since at={p.at} />: what each quota will spend until its reset, and the jobs slowed down to fit. <span className="mono">tapyr plan</span> projects a full window instead.</span>}>
         <Badge state={p.feasible ? "ok" : "failing"}>{p.feasible ? "fits" : "does not fit"}</Badge>
       </PageHead>
       {unfit.length > 0 && (
@@ -92,7 +92,7 @@ export function Plan() {
             {
               key: "status", label: "Status", sort: (s) => (s.feasible ? 1 : 0),
               render: (s) => (s.feasible ? <Badge state="ok">fits</Badge> : (
-                <span title="with the planned intervals"><Badge state="failing">does not fit</Badge>{s.exhaustion_at && <span className="small muted"> runs out {since(s.exhaustion_at)}</span>}</span>
+                <span title="with the planned intervals"><Badge state="failing">does not fit</Badge>{s.exhaustion_at && <span className="small muted"> runs out <Since at={s.exhaustion_at} /></span>}</span>
               )),
             },
           ]}
