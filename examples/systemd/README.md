@@ -36,7 +36,7 @@ sudo tapyr validate --config /etc/tapyr
 ```
 
 - **Listener.** Tapyr listens on `127.0.0.1:9790` by default. For a Prometheus on another host, set `settings.server.listen` to `0.0.0.0:9790`, and protect the UI and the status API with `settings.server.basicAuth` or a firewall.
-- **State.** The state store is `/var/lib/tapyr/data/tapyr.db` (`/var/lib/private/tapyr` on disk, because of `DynamicUser`). It remembers what was already spent of the daily and monthly quotas, and the rotated tokens (every refresh of an Aruba Central token returns a new refresh token, and the previous one is no longer valid): back it up with the host, and do not delete it to "reset" Tapyr.
+- **State.** The state store is `/var/lib/tapyr/data/tapyr.db` (`/var/lib/private/tapyr` on disk, because of `DynamicUser`). It remembers what was already spent of the daily and monthly quotas, and the rotated tokens (every refresh of an Aruba Central token returns a new refresh token, and the previous one is no longer valid): back it up with the host, and do not delete it to "reset" Tapyr. The disk buffers of the outputs with `queue.disk` live next to it, in `/var/lib/tapyr/data/buffer/<output name>`.
 - **Provider packages.** User packages go in `/etc/tapyr/providers` with `providerPaths: [./providers]` in a `Settings` document (relative paths are resolved against the file that declares them).
 - **One instance per account.** Run a single Tapyr per set of accounts: two instances polling the same accounts spend the same quotas without coordinating.
 

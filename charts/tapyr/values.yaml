@@ -22,7 +22,9 @@ config: ""
 
 persistence:
   # Without it, a restart forgets what was already spent of the daily and
-  # monthly quotas, and the rotated tokens.
+  # monthly quotas, and the rotated tokens. It also holds the disk buffers
+  # of the outputs with queue.disk (up to their maxSize, 512MiB by default):
+  # size it for them.
   enabled: true
   size: 1Gi
   storageClass: ""

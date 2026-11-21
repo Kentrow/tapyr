@@ -14,10 +14,14 @@ import (
 	"github.com/kentrow/tapyr/internal/clock"
 )
 
-// TestRemovedOutputBuffer checks that the reload that removes an output
-// whose backend is down completes: its flush is bounded (it used to wait
-// for the backend forever).
+// TestRemovedOutputBuffer checks the end of a disk buffer: an output whose
+// backend is down keeps its samples on disk; once a reload removes the
+// output, its buffer is deleted and the log says how many samples were
+// never delivered. Without a buffer, the reload that removes an output
+// whose backend is down completes too: its flush is bounded (it used to
+// wait for the backend forever).
 func TestRemovedOutputBuffer(t *testing.T) {
+	t.Run("disk", func(t *testing.T) { testRemovedOutput(t, true) })
 	t.Run("memory", func(t *testing.T) { testRemovedOutput(t, false) })
 }
 

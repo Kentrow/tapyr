@@ -52,7 +52,7 @@ The chart is signed: [Install](../../docs/install.md#verify-the-signatures) show
 | `existingSecret` | empty | A Secret whose keys become environment variables. The chart never holds a secret: values end up in Git and in the Helm history |
 | `image.repository`, `.tag`, `.pullPolicy` | `ghcr.io/kentrow/tapyr`, the version of the chart, `IfNotPresent` | The image |
 | `imagePullSecrets` | `[]` | For a private registry |
-| `persistence.enabled`, `.size`, `.storageClass`, `.existingClaim` | `true`, `1Gi`, empty, empty | The volume of the state store |
+| `persistence.enabled`, `.size`, `.storageClass`, `.existingClaim` | `true`, `1Gi`, empty, empty | The volume of the state store, and of the disk buffers of the outputs with `queue.disk` (up to their `maxSize` each, 512MiB by default): size it for them |
 | `service.type`, `.port`, `.annotations` | `ClusterIP`, `9790`, `{}` | `/metrics`, `/metrics/self`, the UI and the status API |
 | `ingress.enabled`, `.className`, `.annotations`, `.host`, `.tls`, `.paths` | off, empty, `{}`, empty, `[]`, `/`, `/ui` and `/api` | See [Ingress](#ingress) |
 | `serviceMonitor.enabled`, `.labels`, `.interval` | off, `{}`, empty | A ServiceMonitor of the Prometheus Operator, for the samples and the self-metrics |
