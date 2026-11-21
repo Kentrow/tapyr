@@ -73,8 +73,7 @@ spec:
 	if outputs["memory-only"].Spec.Queue.Disk != nil {
 		t.Error("an output without disk has no disk buffer")
 	}
-	// Until the queue uses it (ADR 0015, in steps), a warning says so.
-	if n := len(cfg.Warnings); n != 2 {
-		t.Errorf("warnings = %v, want one per disk buffer", cfg.Warnings)
+	if len(cfg.Warnings) != 0 {
+		t.Errorf("warnings = %v", cfg.Warnings)
 	}
 }

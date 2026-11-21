@@ -44,7 +44,7 @@ The state store is a SQLite database, `settings.state.path` (default `./data/tap
 | Inventories and run history | Discovery restarts from the cache instead of waiting for its parents; the planner estimates from real runs |
 | Series and last timestamps sent | Stale markers and deduplication work across restarts |
 
-Keep it on persistent storage (a volume, `StateDirectory=` with systemd), and back it up with the host. Do not delete it to "reset" Tapyr. It is written every 5 seconds and on shutdown; `tapyr_state_flush_failures_total` counts failed writes (full disk, permissions).
+Keep it on persistent storage (a volume, `StateDirectory=` with systemd), and back it up with the host. The disk buffers of the outputs (`queue.disk`, [Outputs](outputs.md#keeping-the-queue-on-disk)) live next to it by default, in `buffer/<output name>`: the same volume keeps them. Do not delete it to "reset" Tapyr. It is written every 5 seconds and on shutdown; `tapyr_state_flush_failures_total` counts failed writes (full disk, permissions).
 
 Set `TAPYR_STATE_KEY` to encrypt the tokens in the store (AES-GCM, with a key derived from its value). Without it, Tapyr logs a warning once and stores them in clear. Changing the key makes the stored tokens unreadable: they are requested again, except for rotated tokens that need a new bootstrap.
 

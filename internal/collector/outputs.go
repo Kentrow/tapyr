@@ -10,8 +10,10 @@ import (
 	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/output"
+	"github.com/kentrow/tapyr/internal/output/buffer"
 	"github.com/kentrow/tapyr/internal/output/otlp"
 	"github.com/kentrow/tapyr/internal/output/prometheus"
+	"github.com/kentrow/tapyr/internal/output/push"
 	"github.com/kentrow/tapyr/internal/output/remotewrite"
 	"github.com/kentrow/tapyr/internal/processing"
 	"github.com/kentrow/tapyr/internal/runtime"
@@ -101,7 +103,7 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 		name := string(o.Metadata.Name)
 		ro, ok := next[name]
 		if !ok {
-			out, err := c.newOutput(name, o.Spec, graph.OutputCredentials[name])
+			out, err := c.newOutput(o, graph.Settings.State.Path, graph.OutputCredentials[name])
 			var proc *processing.Processor
 			if err == nil {
 				proc, err = processing.Compile(o.Spec.Processing)
@@ -134,22 +136,50 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 	c.outputs = next
 }
 
-// newOutput builds an output of the configuration.
-func (c *Collector) newOutput(name string, spec config.OutputSpec, creds *runtime.OutputCredentials) (output.Output, error) {
+// newOutput builds an output of the configuration, with its disk buffer
+// when it has one (ADR 0015); stateFile locates the default directory of
+// the buffer.
+func (c *Collector) newOutput(o *config.Output, stateFile string, creds *runtime.OutputCredentials) (output.Output, error) {
+	name, spec := string(o.Metadata.Name), o.Spec
+	if spec.Type == config.OutputPrometheus {
+		return prometheus.New(name, spec.Prometheus.ExposeTimestamps, c.logger), nil
+	}
+	queue := c.openBuffer(o, stateFile)
 	switch spec.Type {
 	case config.OutputRemoteWrite:
 		return remotewrite.New(remotewrite.Options{
 			Name: name, Spec: spec, Credentials: creds, Client: c.client, Clock: c.clock, Logger: c.logger,
-			Observer: c.metrics, UserAgent: userAgent(),
+			Observer: c.metrics, UserAgent: userAgent(), Queue: queue,
 		}), nil
-	case config.OutputOTLP:
-		return otlp.New(otlp.Options{
-			Name: name, Spec: spec, Credentials: creds, Client: c.client, Clock: c.clock, Logger: c.logger,
-			Observer: c.metrics, Version: buildinfo.Get().Version, InstanceID: c.instance,
-		})
 	default:
-		return prometheus.New(name, spec.Prometheus.ExposeTimestamps, c.logger), nil
+		out, err := otlp.New(otlp.Options{
+			Name: name, Spec: spec, Credentials: creds, Client: c.client, Clock: c.clock, Logger: c.logger,
+			Observer: c.metrics, Version: buildinfo.Get().Version, InstanceID: c.instance, Queue: queue,
+		})
+		if err != nil && queue.Buffer != nil {
+			_ = queue.Buffer.Close()
+		}
+		return out, err
 	}
+}
+
+// openBuffer opens the disk buffer of a push output, when it has one. A
+// buffer that cannot be opened (a directory not writable, locked by
+// another process) leaves the queue in memory, with an error in the log:
+// the collection goes on.
+func (c *Collector) openBuffer(o *config.Output, stateFile string) push.Options {
+	q := o.Spec.Queue
+	if q == nil || q.Disk == nil {
+		return push.Options{}
+	}
+	dir := o.BufferDir(stateFile)
+	b, err := buffer.Open(buffer.Options{Dir: dir, MaxSize: q.Disk.MaxSize.Bytes(), MaxAge: q.Disk.MaxAge.Std()})
+	if err != nil {
+		c.logger.Error("output disk buffer not opened: the queue keeps the samples in memory only", "component", "output",
+			"output", o.Metadata.Name, "dir", dir, "error", err)
+		return push.Options{}
+	}
+	return push.Options{Buffer: b, MaxAge: q.Disk.MaxAge.Std()}
 }
 
 // userAgent is the User-Agent of the requests of the push outputs.

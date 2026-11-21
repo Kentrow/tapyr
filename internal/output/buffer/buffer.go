@@ -67,6 +67,9 @@ type Dropped struct {
 	Full int
 	// TooOld counts the points of the segments dropped for MaxAge.
 	TooOld int
+	// Through is the sequence of the last record dropped that was not
+	// acknowledged (0 when none): the records up to it are gone.
+	Through uint64
 }
 
 // Stats describes the buffer.
@@ -416,6 +419,7 @@ func (b *Buffer) Enforce(now time.Time) Dropped {
 		n := 0
 		for n < len(b.records) && b.records[n].seg == seg {
 			points += b.records[n].count
+			d.Through = b.records[n].seq
 			n++
 		}
 		b.records = slices.Delete(b.records, 0, n)
