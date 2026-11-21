@@ -89,6 +89,16 @@ type OutputGauge struct {
 	// Series is the number of series the output receives, and MaxSeries
 	// its series limit, 0 without one (ADR 0014).
 	Series, MaxSeries int
+	// Buffer is its disk buffer (ADR 0015), nil without one.
+	Buffer *BufferGauge
+}
+
+// BufferGauge is the disk buffer of an output.
+type BufferGauge struct {
+	Bytes, LimitBytes int64
+	// Oldest is how long the oldest sample not acknowledged has waited.
+	Oldest, MaxAge time.Duration
+	Writable       bool
 }
 
 func desc(name, help string, labels ...string) *prometheus.Desc {
@@ -131,6 +141,14 @@ var (
 	descOutputLastSuccess = desc("tapyr_output_last_success_timestamp_seconds", "Time of the last successful send.", "output")
 	descOutputSeries      = desc("tapyr_output_series", "Series the output receives, after its processing rules and its limit.", "output")
 	descOutputSeriesLimit = desc("tapyr_output_series_limit", "Series limit of the output (maxSeries), when it has one.", "output")
+	descBufferBytes       = desc("tapyr_output_buffer_bytes", "Size of the disk buffer of the output.", "output")
+	descBufferLimit       = desc("tapyr_output_buffer_limit_bytes", "Maximum size of the disk buffer of the output (maxSize).", "output")
+	descBufferOldest      = desc("tapyr_output_buffer_oldest_seconds",
+		"How long the oldest sample of the disk buffer not acknowledged by the backend has waited, 0 when none.", "output")
+	descBufferMaxAge = desc("tapyr_output_buffer_max_age_seconds",
+		"Maximum age of the samples of the disk buffer (maxAge): older ones are dropped.", "output")
+	descBufferWritable = desc("tapyr_output_buffer_writable",
+		"0 while the disk buffer cannot be written and the queue keeps its samples in memory only.", "output")
 )
 
 // stateCollector exposes a State as gauges at scrape time.
@@ -144,6 +162,7 @@ func (c *stateCollector) Describe(ch chan<- *prometheus.Desc) {
 		descBudgetWindowEnd, descBudgetETA, descBudgetMismatch, descBudgetScope, descPlanFeasible,
 		descJobLastSuccess, descJobDesired, descJobEffective, descJobLag, descJobInstances, descJobSeries, descJobCollected,
 		descTokenExpiry, descReauth, descCircuit, descOutputQueue, descOutputLastSuccess, descOutputSeries, descOutputSeriesLimit,
+		descBufferBytes, descBufferLimit, descBufferOldest, descBufferMaxAge, descBufferWritable,
 	} {
 		ch <- d
 	}
@@ -211,6 +230,13 @@ func (c *stateCollector) Collect(ch chan<- prometheus.Metric) {
 		gauge(descOutputSeries, float64(o.Series), o.Output)
 		if o.MaxSeries > 0 {
 			gauge(descOutputSeriesLimit, float64(o.MaxSeries), o.Output)
+		}
+		if b := o.Buffer; b != nil {
+			gauge(descBufferBytes, float64(b.Bytes), o.Output)
+			gauge(descBufferLimit, float64(b.LimitBytes), o.Output)
+			gauge(descBufferOldest, b.Oldest.Seconds(), o.Output)
+			gauge(descBufferMaxAge, b.MaxAge.Seconds(), o.Output)
+			gauge(descBufferWritable, bool01(b.Writable), o.Output)
 		}
 	}
 }

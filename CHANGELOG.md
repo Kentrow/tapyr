@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `queue.disk` keeps the queue of a push output on disk ([ADR 0015](docs/adr/0015-persistent-output-buffer.md)): samples already paid for in API quota survive a backend outage longer than the memory queue and a restart of Tapyr, within `maxSize` (default `512MiB`) and `maxAge` (default `2h`).
+- `queue.disk` keeps the queue of a push output on disk ([ADR 0015](docs/adr/0015-persistent-output-buffer.md)): samples already paid for in API quota survive a backend outage longer than the memory queue and a restart of Tapyr, within `maxSize` (default `512MiB`) and `maxAge` (default `2h`). `tapyr plan` says how long an outage each buffer holds; the Outputs page, the status API, the `tapyr_output_buffer_*` self-metrics, the `Tapyr / Overview` dashboard and the `TapyrOutputBehind` and `TapyrOutputBufferNotWritable` alerts show it.
 
 ## [0.6.0] - 2026-11-18
 

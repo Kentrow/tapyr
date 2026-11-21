@@ -46,6 +46,7 @@ type Metrics struct {
 	outputFiltered *prometheus.CounterVec
 	outputFailures *prometheus.CounterVec
 	outputDuration *prometheus.HistogramVec
+	bufferErrors   *prometheus.CounterVec
 
 	reloadSuccess   prometheus.Gauge
 	reloadTimestamp prometheus.Gauge
@@ -102,6 +103,8 @@ func NewMetrics(info buildinfo.Info, state func() State) *Metrics {
 		outputFailures: f.counter("tapyr_output_send_failures_total", "Failed send requests of an output, by class.", "output", "class"),
 		outputDuration: f.histogram("tapyr_output_send_duration_seconds", "Duration of the send requests of an output.",
 			prometheus.DefBuckets, "output"),
+		bufferErrors: f.counter("tapyr_output_buffer_errors_total",
+			"Failures of the disk buffer of an output: write, sync, corrupt (records skipped).", "output", "kind"),
 
 		reloadSuccess: f.plainGauge("tapyr_config_last_reload_success",
 			"1 when the last configuration load or reload succeeded."),
@@ -276,6 +279,11 @@ func (m *Metrics) OutputSendFailed(output, class string) {
 // OutputSendDuration records the duration of a send request.
 func (m *Metrics) OutputSendDuration(output string, d time.Duration) {
 	m.outputDuration.WithLabelValues(output).Observe(d.Seconds())
+}
+
+// OutputBufferError records failures of the disk buffer of an output.
+func (m *Metrics) OutputBufferError(output, kind string, n int) {
+	m.bufferErrors.WithLabelValues(output, kind).Add(float64(n))
 }
 
 // ConfigLoaded records a configuration load or reload attempt.

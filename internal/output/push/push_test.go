@@ -85,6 +85,12 @@ func (c *counts) OutputSendFailed(_, class string) {
 
 func (c *counts) OutputSendDuration(string, time.Duration) { c.mu.Lock(); c.sends++; c.mu.Unlock() }
 
+func (c *counts) OutputBufferError(_, kind string, n int) {
+	c.mu.Lock()
+	c.failures["buffer_"+kind] += n
+	c.mu.Unlock()
+}
+
 func points(values ...float64) []Point {
 	out := make([]Point, len(values))
 	for i, v := range values {

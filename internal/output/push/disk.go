@@ -6,8 +6,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"time"
-
-	"github.com/kentrow/tapyr/internal/output/buffer"
 )
 
 // The disk buffer of a queue (ADR 0015). Every Add is written to the buffer
@@ -68,6 +66,7 @@ func (q *Queue) addToDisk(points []Point, now time.Time) (bool, int) {
 			return true, q.enforce(now)
 		}
 	}
+	q.opts.Observer.OutputBufferError(q.opts.Name, "write", 1)
 	if !q.diskFailing {
 		q.diskFailing = true
 		q.opts.Logger.Warn("output disk buffer not writable: the queue keeps the samples in memory only",
@@ -213,7 +212,14 @@ func (q *Queue) maintain(ctx context.Context) {
 		case <-ticker.C():
 		}
 		if err := q.opts.Buffer.Sync(); err != nil {
+			q.opts.Observer.OutputBufferError(q.opts.Name, "sync", 1)
 			q.opts.Logger.Warn("syncing the output disk buffer", "component", "output", "output", q.opts.Name, "error", err)
+		}
+		if corrupt := q.opts.Buffer.Stats().Corrupt; corrupt > q.corruptSeen {
+			q.opts.Observer.OutputBufferError(q.opts.Name, "corrupt", corrupt-q.corruptSeen)
+			q.opts.Logger.Warn("output disk buffer: corrupt records skipped", "component", "output", "output", q.opts.Name,
+				"records", corrupt-q.corruptSeen)
+			q.corruptSeen = corrupt
 		}
 		q.mu.Lock()
 		now := q.opts.Clock.Now()
@@ -238,13 +244,4 @@ func (q *Queue) reportDrops(full, tooOld int) {
 		q.opts.Logger.Warn("output disk buffer: samples older than the maximum age dropped", "component", "output", "output", q.opts.Name,
 			"dropped", tooOld, "max_age", q.opts.MaxAge.String())
 	}
-}
-
-// Buffered reports the state of the disk buffer: zero when the queue has
-// none.
-func (q *Queue) Buffered() buffer.Stats {
-	if q.opts.Buffer == nil {
-		return buffer.Stats{}
-	}
-	return q.opts.Buffer.Stats()
 }

@@ -270,6 +270,21 @@ export interface Output {
   samples_refused: number;
   // Jobs sent to the output without a successful run yet: not counted.
   unmeasured_jobs: string[];
+  // The disk buffer of the output (queue.disk, ADR 0015), absent without
+  // one or from a Tapyr older than 0.7.
+  buffer?: OutputBuffer;
+}
+
+export interface OutputBuffer {
+  bytes: number;
+  max_bytes: number;
+  // Samples not acknowledged by the backend yet, and when the oldest of
+  // them was queued.
+  samples: number;
+  oldest?: string;
+  max_age_seconds: number;
+  // False while writes fail and the queue keeps its samples in memory only.
+  writable: boolean;
 }
 
 export interface DebugPage {

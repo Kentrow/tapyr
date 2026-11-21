@@ -83,7 +83,7 @@ Self-metrics can also be pushed: setting `selfMetrics.outputs: [name]` in `Setti
 | Metric | Type | Labels | Notes |
 |---|---|---|---|
 | `tapyr_output_samples_sent_total` | counter | output | |
-| `tapyr_output_samples_dropped_total` | counter | output, reason | queue_full, rejected, out_of_order, duplicate (samples that processing rules made identical), series_limit (new series beyond `limits.maxSeries`, ADR 0014) |
+| `tapyr_output_samples_dropped_total` | counter | output, reason | queue_full, rejected, out_of_order, duplicate (samples that processing rules made identical), series_limit (new series beyond `limits.maxSeries`, ADR 0014), buffer_full (oldest samples beyond the `maxSize` of the disk buffer, ADR 0015), too_old (samples that waited longer than its `maxAge`) |
 | `tapyr_output_samples_filtered_total` | counter | output | removed by the keep and drop processing rules of the output (intended, not a loss) |
 | `tapyr_output_send_failures_total` | counter | output, class | |
 | `tapyr_output_queue_samples` | gauge | output | |
@@ -91,6 +91,12 @@ Self-metrics can also be pushed: setting `selfMetrics.outputs: [name]` in `Setti
 | `tapyr_output_last_success_timestamp_seconds` | gauge | output | |
 | `tapyr_output_series` | gauge | output | series the output receives: those of the last successful run of every job instance sent to it, after its processing rules and its limit ([ADR 0014](../adr/0014-output-series.md)) |
 | `tapyr_output_series_limit` | gauge | output | `limits.maxSeries` of the output, when it has one |
+| `tapyr_output_buffer_bytes` | gauge | output | size of the disk buffer of the output ([ADR 0015](../adr/0015-persistent-output-buffer.md)), when it has one |
+| `tapyr_output_buffer_limit_bytes` | gauge | output | its `maxSize` |
+| `tapyr_output_buffer_oldest_seconds` | gauge | output | how long the oldest sample of the buffer not acknowledged by the backend has waited; 0 when none |
+| `tapyr_output_buffer_max_age_seconds` | gauge | output | its `maxAge`: samples that waited longer are dropped (too_old) |
+| `tapyr_output_buffer_writable` | gauge | output | 0 while the buffer cannot be written and the queue keeps its samples in memory only |
+| `tapyr_output_buffer_errors_total` | counter | output, kind | write (a write that failed), sync, corrupt (records found corrupt and skipped) |
 
 ### Process and config
 
