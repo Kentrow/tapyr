@@ -374,6 +374,60 @@ func TestShortfall(t *testing.T) {
 	}
 }
 
+// TestCredentialScopeAccounts checks that a scope keyed by a credential
+// is named by the accounts that share it, not by its hash: on the demo,
+// "the monthly quota of credential 34829e408ebd22e8".
+func TestCredentialScopeAccounts(t *testing.T) {
+	q := daily("monthly", 100, 0)
+	q.Key = "credential=34829e408ebd22e8"
+	rate := budget.PlanScope{ID: "rate", Limit: "p/rate", Key: q.Key, Kind: config.LimitRate, Rate: 0.01}
+	north := job("north", config.PriorityCritical, time.Minute, 1, q, rate)
+	north.Account = "fleet-north"
+	south := job("south", config.PriorityLow, time.Minute, 1, q, rate)
+	south.Account = "fleet-south"
+	again := job("south-again", config.PriorityLow, time.Minute, 1, q)
+	again.Account = "fleet-south"
+	res := Plan([]Job{south, north, again}, Options{MaxStretch: 12, Now: now})
+	s := res.Scopes[0]
+	if fmt.Sprint(s.Accounts) != "[fleet-north fleet-south]" {
+		t.Fatalf("accounts = %v", s.Accounts)
+	}
+	if got, want := ScopeWords(s.Key, s.Accounts), " of accounts fleet-north and fleet-south"; got != want {
+		t.Errorf("ScopeWords() = %q, want %q", got, want)
+	}
+	for _, j := range res.Jobs {
+		if j.Name == "north" && j.Describe() != "for a run to fit the rate rate limit of accounts fleet-north and fleet-south" {
+			t.Errorf("north: %q", j.Describe())
+		}
+		if j.Name == "south-again" && j.Describe() != "to fit the monthly quota of accounts fleet-north and fleet-south" {
+			t.Errorf("south-again: %q", j.Describe())
+		}
+	}
+	if ev := Evaluate([]Job{north}, nil, Options{Now: now}); fmt.Sprint(ev[0].Accounts) != "[fleet-north]" {
+		t.Errorf("evaluate accounts = %v", ev[0].Accounts)
+	}
+}
+
+func TestScopeWords(t *testing.T) {
+	for _, tc := range []struct {
+		key      string
+		accounts []string
+		want     string
+	}{
+		{"", []string{"a"}, ""},
+		{"account=lab", []string{"lab"}, " of account lab"},
+		{"credential=34829e408ebd22e8", nil, " of credential 34829e408ebd22e8"},
+		{"credential=34829e408ebd22e8", []string{"fleet-rms"}, " of account fleet-rms"},
+		{"credential=34829e408ebd22e8", []string{"a", "b", "c"}, " of accounts a, b and c"},
+		{"credential=34829e408ebd22e8,endpoint=/devices", []string{"a"}, " of account a and endpoint /devices"},
+		{"instance", nil, " of the Tapyr process"},
+	} {
+		if got := ScopeWords(tc.key, tc.accounts); got != tc.want {
+			t.Errorf("ScopeWords(%q, %v) = %q, want %q", tc.key, tc.accounts, got, tc.want)
+		}
+	}
+}
+
 func TestDescribe(t *testing.T) {
 	for _, tc := range []struct {
 		plan JobPlan

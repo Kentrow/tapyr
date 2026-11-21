@@ -182,6 +182,13 @@ func TestForPlan(t *testing.T) {
 			}
 		})
 	}
+	credential := planner.ScopePlan{
+		Limit: "teltonika-rms/monthly", Key: "credential=34829e408ebd22e8", Accounts: []string{"fleet-rms"},
+		Shortfall: &planner.Shortfall{Needed: 900, Budget: 600, Period: 30 * time.Minute, MaxStretch: 4},
+	}
+	if p := ForPlan(credential, "0.5.0"); !strings.HasPrefix(p.Title, "The monthly quota of account fleet-rms is too small") {
+		t.Errorf("credential scope: %q", p.Title)
+	}
 	if p := ForPlan(scope, "0.5.0"); p != nil {
 		t.Errorf("a scope without shortfall: %+v", p)
 	}
