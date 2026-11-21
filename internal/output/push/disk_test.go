@@ -118,8 +118,8 @@ func TestDiskSurvivesRestart(t *testing.T) {
 	if got := again.values(); len(got) != 0 {
 		t.Errorf("sent again = %v", got)
 	}
-	if s := third.q.Buffered(); s.Records != 0 {
-		t.Errorf("buffer = %+v", s)
+	if b := third.q.State().Buffer; b == nil || b.Points != 0 || !b.Oldest.IsZero() {
+		t.Errorf("buffer = %+v", b)
 	}
 }
 
@@ -135,8 +135,8 @@ func TestDiskBacklogBeyondCapacity(t *testing.T) {
 	if st := dq.q.State(); st.Queue > 4 || st.Dropped != 0 {
 		t.Errorf("state = %+v: the memory queue holds at most its capacity and drops nothing", st)
 	}
-	if s := dq.q.Buffered(); s.Points != 10 {
-		t.Errorf("buffered = %+v", s)
+	if b := dq.q.State().Buffer; b == nil || b.Points != 10 || !b.Oldest.Equal(start) || !b.Writable || b.MaxBytes != 64<<20 || b.Bytes == 0 {
+		t.Errorf("buffer state = %+v", b)
 	}
 	backend.setDown(false)
 	advanceUntil(t, clk, time.Second, "the backlog", func() bool { return len(backend.values()) == 10 })
@@ -185,10 +185,12 @@ func TestDiskNotWritable(t *testing.T) {
 	}
 	dq.q.Add(points(1, 2))
 	advanceUntil(t, clk, time.Second, "the points kept in memory", func() bool { return len(backend.values()) == 2 })
-	dq.q.mu.Lock()
-	failing := dq.q.diskFailing
-	dq.q.mu.Unlock()
-	if !failing {
-		t.Error("the queue does not know its buffer is failing")
+	if st := dq.q.State(); st.Buffer == nil || st.Buffer.Writable {
+		t.Errorf("buffer state = %+v, want not writable", st.Buffer)
+	}
+	dq.obs.mu.Lock()
+	defer dq.obs.mu.Unlock()
+	if dq.obs.failures["buffer_write"] != 1 {
+		t.Errorf("errors = %v", dq.obs.failures)
 	}
 }

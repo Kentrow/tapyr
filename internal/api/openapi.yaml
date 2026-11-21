@@ -587,6 +587,18 @@ components:
           type: array
           description: Jobs sent to the output that have not run successfully yet, whose series are not counted
           items: { type: string }
+        buffer:
+          type: object
+          additionalProperties: false
+          description: The disk buffer of the output (queue.disk, ADR 0015), absent without one
+          required: [bytes, max_bytes, samples, max_age_seconds, writable]
+          properties:
+            bytes: { type: integer, description: Size of its files }
+            max_bytes: { type: integer, description: Its maxSize }
+            samples: { type: integer, description: Samples not acknowledged by the backend yet }
+            oldest: { $ref: "#/components/schemas/Time", description: When the oldest of them was queued }
+            max_age_seconds: { type: number, description: Its maxAge; older samples are dropped }
+            writable: { type: boolean, description: False while writes fail and the queue keeps its samples in memory only }
     Debug:
       type: object
       required: [job, instance, run_id, time, result, pages, samples, instances]

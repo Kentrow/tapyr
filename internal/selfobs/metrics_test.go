@@ -41,6 +41,8 @@ func TestMetricsEvents(t *testing.T) {
 	m.OutputFiltered("vm", 7)
 	m.OutputSendFailed("vm", "transient")
 	m.OutputSendDuration("vm", 50*time.Millisecond)
+	m.OutputBufferError("vm", "write", 1)
+	m.OutputBufferError("vm", "corrupt", 2)
 	m.ConfigLoaded(at, false)
 	m.PlanRecomputed("start")
 	m.PlanRecomputed("projection")
@@ -100,6 +102,10 @@ tapyr_output_samples_sent_total{output="vm"} 10
 # HELP tapyr_output_samples_filtered_total Samples removed by the keep and drop processing rules of an output.
 # TYPE tapyr_output_samples_filtered_total counter
 tapyr_output_samples_filtered_total{output="vm"} 7
+# HELP tapyr_output_buffer_errors_total Failures of the disk buffer of an output: write, sync, corrupt (records skipped).
+# TYPE tapyr_output_buffer_errors_total counter
+tapyr_output_buffer_errors_total{kind="corrupt",output="vm"} 2
+tapyr_output_buffer_errors_total{kind="write",output="vm"} 1
 # HELP tapyr_output_send_failures_total Failed send requests of an output, by class.
 # TYPE tapyr_output_send_failures_total counter
 tapyr_output_send_failures_total{class="transient",output="vm"} 1
@@ -120,7 +126,7 @@ tapyr_state_flush_failures_total 1
 		"tapyr_config_last_reload_timestamp_seconds", "tapyr_http_in_flight", "tapyr_http_requests_total",
 		"tapyr_http_retries_total", "tapyr_job_partial_runs_total", "tapyr_job_runs_total", "tapyr_mapping_errors_total",
 		"tapyr_output_samples_dropped_total", "tapyr_output_samples_filtered_total", "tapyr_output_samples_sent_total",
-		"tapyr_output_send_failures_total",
+		"tapyr_output_send_failures_total", "tapyr_output_buffer_errors_total",
 		"tapyr_plan_recomputations_total", "tapyr_samples_deduplicated_total", "tapyr_state_flush_failures_total",
 	}
 	if err := testutil.GatherAndCompare(m.reg, strings.NewReader(want), names...); err != nil {
@@ -196,7 +202,13 @@ func TestStateGauges(t *testing.T) {
 		},
 		Tokens:   []TokenGauge{{Provider: "aruba", Account: "lab", Expiry: at}, {Provider: "aruba", Account: "lab2", ReauthRequired: true}},
 		Circuits: []CircuitGauge{{Provider: "meraki", Account: "acme", State: 2}},
-		Outputs:  []OutputGauge{{Output: "vm", Queue: 5, LastSuccess: at, Series: 900, MaxSeries: 1000}, {Output: "prom", Series: 1200}},
+		Outputs: []OutputGauge{
+			{
+				Output: "vm", Queue: 5, LastSuccess: at, Series: 900, MaxSeries: 1000,
+				Buffer: &BufferGauge{Bytes: 4 << 20, LimitBytes: 512 << 20, Oldest: 90 * time.Second, MaxAge: 2 * time.Hour, Writable: true},
+			},
+			{Output: "prom", Series: 1200},
+		},
 
 		NotCollected: []JobRef{{Provider: "meraki", Account: "acme", Job: "uplinks"}},
 	}
@@ -255,6 +267,21 @@ tapyr_output_last_success_timestamp_seconds{output="vm"} 1.7937072e+09
 # TYPE tapyr_output_series gauge
 tapyr_output_series{output="prom"} 1200
 tapyr_output_series{output="vm"} 900
+# HELP tapyr_output_buffer_bytes Size of the disk buffer of the output.
+# TYPE tapyr_output_buffer_bytes gauge
+tapyr_output_buffer_bytes{output="vm"} 4.194304e+06
+# HELP tapyr_output_buffer_limit_bytes Maximum size of the disk buffer of the output (maxSize).
+# TYPE tapyr_output_buffer_limit_bytes gauge
+tapyr_output_buffer_limit_bytes{output="vm"} 5.36870912e+08
+# HELP tapyr_output_buffer_max_age_seconds Maximum age of the samples of the disk buffer (maxAge): older ones are dropped.
+# TYPE tapyr_output_buffer_max_age_seconds gauge
+tapyr_output_buffer_max_age_seconds{output="vm"} 7200
+# HELP tapyr_output_buffer_oldest_seconds How long the oldest sample of the disk buffer not acknowledged by the backend has waited, 0 when none.
+# TYPE tapyr_output_buffer_oldest_seconds gauge
+tapyr_output_buffer_oldest_seconds{output="vm"} 90
+# HELP tapyr_output_buffer_writable 0 while the disk buffer cannot be written and the queue keeps its samples in memory only.
+# TYPE tapyr_output_buffer_writable gauge
+tapyr_output_buffer_writable{output="vm"} 1
 # HELP tapyr_output_series_limit Series limit of the output (maxSeries), when it has one.
 # TYPE tapyr_output_series_limit gauge
 tapyr_output_series_limit{output="vm"} 1000
@@ -271,7 +298,8 @@ tapyr_plan_feasible{limit="daily",provider="meraki",scope="account=acme"} 1
 		"tapyr_budget_limit", "tapyr_budget_limit_mismatch", "tapyr_budget_remaining_observed", "tapyr_budget_scope_info", "tapyr_circuit_state",
 		"tapyr_job_collected", "tapyr_job_effective_interval_seconds", "tapyr_job_last_success_timestamp_seconds", "tapyr_job_instances",
 		"tapyr_output_last_success_timestamp_seconds", "tapyr_output_queue_samples", "tapyr_output_series",
-		"tapyr_output_series_limit", "tapyr_plan_feasible",
+		"tapyr_output_series_limit", "tapyr_plan_feasible", "tapyr_output_buffer_bytes", "tapyr_output_buffer_limit_bytes",
+		"tapyr_output_buffer_max_age_seconds", "tapyr_output_buffer_oldest_seconds", "tapyr_output_buffer_writable",
 	}
 	if err := testutil.GatherAndCompare(m.reg, strings.NewReader(want), names...); err != nil {
 		t.Error(err)

@@ -147,6 +147,9 @@ type Observer interface {
 	OutputDropped(output, reason string, n int)
 	OutputSendFailed(output, class string)
 	OutputSendDuration(output string, d time.Duration)
+	// OutputBufferError counts a failure of the disk buffer: write, sync
+	// or corrupt (records found corrupt and skipped).
+	OutputBufferError(output, kind string, n int)
 }
 
 type nopObserver struct{}
@@ -155,6 +158,7 @@ func (nopObserver) OutputSent(string, int)                   {}
 func (nopObserver) OutputDropped(string, string, int)        {}
 func (nopObserver) OutputSendFailed(string, string)          {}
 func (nopObserver) OutputSendDuration(string, time.Duration) {}
+func (nopObserver) OutputBufferError(string, string, int)    {}
 
 // Options configures a Queue.
 type Options struct {
@@ -213,6 +217,7 @@ type Queue struct {
 	loadedThrough uint64
 	diskFailing   bool
 	pendingTooOld int
+	corruptSeen   int // corrupt records already reported (maintain only)
 }
 
 type entry struct {
@@ -305,7 +310,14 @@ func (q *Queue) signal() {
 func (q *Queue) State() output.State {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	return q.state
+	st := q.state
+	if q.opts.Buffer != nil {
+		s := q.opts.Buffer.Stats()
+		st.Buffer = &output.BufferState{
+			Bytes: s.Bytes, MaxBytes: s.MaxSize, Points: s.Points, Oldest: s.Oldest, MaxAge: s.MaxAge, Writable: !q.diskFailing,
+		}
+	}
+	return st
 }
 
 // Run sends batches until ctx is done.

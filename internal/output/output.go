@@ -41,4 +41,21 @@ type State struct {
 	// LastError is the last failed send, redacted, with its time.
 	LastError   string
 	LastErrorAt time.Time
+	// Buffer is the disk buffer of the queue (ADR 0015), nil without one.
+	Buffer *BufferState
+}
+
+// BufferState describes the disk buffer of a push output.
+type BufferState struct {
+	// Bytes is the size of its files, MaxBytes its maxSize.
+	Bytes, MaxBytes int64
+	// Points have not been acknowledged by the backend yet; Oldest is the
+	// time the oldest of them was queued, zero when none.
+	Points int
+	Oldest time.Time
+	// MaxAge is its maxAge: older points are dropped.
+	MaxAge time.Duration
+	// Writable is false while writes fail and the queue keeps its points
+	// in memory only.
+	Writable bool
 }

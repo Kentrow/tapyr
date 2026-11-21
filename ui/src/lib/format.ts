@@ -1,7 +1,7 @@
 // Formatting helpers. Durations and counts use compact units; times are
 // shown relative to now, with the absolute time in a title.
 
-import type { Budget, Health, Job, Output, Waiting, WaitingReason } from "./types";
+import type { Budget, Health, Job, Output, OutputBuffer, Waiting, WaitingReason } from "./types";
 
 export function duration(seconds: number | undefined): string {
   if (seconds === undefined || !Number.isFinite(seconds)) return "-";
@@ -314,4 +314,33 @@ export function sourceWords(source: Budget["source"]): string {
       return "assumed (the vendor documents no value)";
   }
   return "no source given by the provider definition";
+}
+
+// bytes writes a size with a binary unit: "512 MiB", "3.2 GiB", "900 B".
+export function bytes(n: number): string {
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  let v = n;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${i === 0 || v >= 10 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
+export interface BufferStatus {
+  state: "ok" | "waiting" | "near" | "failing";
+  text: string;
+}
+
+// bufferStatus says what the disk buffer of an output holds, in words.
+export function bufferStatus(b: OutputBuffer, now = Date.now()): BufferStatus {
+  if (!b.writable) return { state: "failing", text: "Not writable: the queue keeps its samples in memory only, and loses them on a restart." };
+  if (b.samples === 0 || !b.oldest) return { state: "ok", text: "Empty: every sample was delivered." };
+  const waited = Math.max(0, (now - Date.parse(b.oldest)) / 1000);
+  const what = `${count(b.samples)} ${b.samples === 1 ? "sample waits" : "samples wait"} for the backend, the oldest for ${duration(waited)}`;
+  if (b.max_age_seconds > 0 && waited > 0.75 * b.max_age_seconds) {
+    return { state: "near", text: `${what}: samples are dropped after ${duration(b.max_age_seconds)}.` };
+  }
+  return { state: "waiting", text: `${what}.` };
 }

@@ -726,6 +726,14 @@ func (s statusSource) Outputs(context.Context) []api.Output {
 		if !st.LastErrorAt.IsZero() {
 			ao.LastErrorAt = ptr(st.LastErrorAt.UTC())
 		}
+		if b := st.Buffer; b != nil {
+			ao.Buffer = &api.OutputBuffer{
+				Bytes: b.Bytes, MaxBytes: b.MaxBytes, Samples: b.Points, MaxAgeSeconds: b.MaxAge.Seconds(), Writable: b.Writable,
+			}
+			if !b.Oldest.IsZero() {
+				ao.Buffer.Oldest = ptr(b.Oldest.UTC())
+			}
+		}
 		ao.MaxSeries, ao.SamplesRefused, ao.UnmeasuredJobs = ro.maxSeries, ro.refusedSamples.Load(), []string{}
 		if live {
 			routed := RoutedTo(snap.g.graph, name)

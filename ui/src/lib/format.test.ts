@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { count, duration, healthClass, jobLabels, jobTitle, jobWords, limitSummary, limitTitle, outputHealth, plural, scopeAccounts, seriesStatus, since, sourceWords, toYAML, versionLabel, waitingText, waitingWord } from "./format";
+import { bufferStatus, bytes, count, duration, healthClass, jobLabels, jobTitle, jobWords, limitSummary, limitTitle, outputHealth, plural, scopeAccounts, seriesStatus, since, sourceWords, toYAML, versionLabel, waitingText, waitingWord } from "./format";
 import type { Budget, Job, Output } from "./types";
 
 describe("format", () => {
@@ -65,6 +65,21 @@ describe("format", () => {
     const words = jobWords([nets, own]);
     expect(words("demo.example-sim-networks")).toBe("the job listing the networks");
     expect(words("demo-sites")).toBe("demo-sites");
+  });
+  it("writes sizes with binary units", () => {
+    expect([900, 1536, 512 * 1024 * 1024, 3.2 * 1024 ** 3, 20 * 1024 ** 3].map(bytes)).toEqual(["900 B", "1.5 KiB", "512 MiB", "3.2 GiB", "20 GiB"]);
+  });
+  it("says what the disk buffer of an output holds", () => {
+    const now = Date.parse("2026-11-21T12:00:00Z");
+    const b = { bytes: 4 << 20, max_bytes: 512 << 20, samples: 0, max_age_seconds: 7200, writable: true };
+    expect(bufferStatus(b, now)).toEqual({ state: "ok", text: "Empty: every sample was delivered." });
+    expect(bufferStatus({ ...b, samples: 1200, oldest: "2026-11-21T11:30:00Z" }, now)).toEqual({
+      state: "waiting", text: "1,200 samples wait for the backend, the oldest for 30m.",
+    });
+    expect(bufferStatus({ ...b, samples: 1, oldest: "2026-11-21T10:00:00Z" }, now)).toEqual({
+      state: "near", text: "1 sample waits for the backend, the oldest for 2h: samples are dropped after 2h.",
+    });
+    expect(bufferStatus({ ...b, writable: false }, now).state).toBe("failing");
   });
   it("says how an output stands against its series limit", () => {
     const o = { series: 950, series_refused: 0, samples_refused: 0 };

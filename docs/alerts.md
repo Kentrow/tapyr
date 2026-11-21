@@ -68,11 +68,19 @@ The quota headers of a provider announce a maximum different from the one declar
 
 ### TapyrOutputDropping
 
-A push output (remote write or OTLP) drops samples: `queue_full` when the backend is slower than the collection, `rejected` or `out_of_order` when it refuses them. `tapyr_output_send_failures_total` gives the class of the errors; for `out_of_order`, check that no other writer sends the same series. `duplicate` means that processing rules made two series identical. `series_limit` means that the output reached its `limits.maxSeries`: the series already sent keep flowing, new ones are not sent; the Outputs page of the web UI says how many are held back. Raise the limit, or drop metrics with processing rules ([Series and limits](outputs.md#series-and-limits)).
+A push output (remote write or OTLP) drops samples: `queue_full` when the backend is slower than the collection, `rejected` or `out_of_order` when it refuses them. `tapyr_output_send_failures_total` gives the class of the errors; for `out_of_order`, check that no other writer sends the same series. `duplicate` means that processing rules made two series identical. `series_limit` means that the output reached its `limits.maxSeries`: the series already sent keep flowing, new ones are not sent; the Outputs page of the web UI says how many are held back. Raise the limit, or drop metrics with processing rules ([Series and limits](outputs.md#series-and-limits)). With a disk buffer, `buffer_full` means that it reached its `maxSize` during a long outage, and `too_old` that samples waited longer than its `maxAge` ([Keeping the queue on disk](outputs.md#keeping-the-queue-on-disk)).
 
 ### TapyrOutputFailing
 
 A push output has not delivered anything for 10 minutes, or keeps failing without having ever delivered (a wrong URL or credentials from the start). The samples wait in the bounded queue, and the oldest are dropped when it is full. Check that the backend is up and reachable, and its authentication.
+
+### TapyrOutputBehind
+
+The oldest sample in the disk buffer of an output (`queue.disk`) has waited three quarters of its `maxAge`: the backend has not accepted samples for that long, and the buffered samples older than `maxAge` will be dropped (`too_old`). `TapyrOutputFailing` usually fires too: fix the backend first. If the backend accepts old samples (VictoriaMetrics, Mimir) and the outage is planned, raise `maxAge`; Prometheus refuses samples older than its head block unless it has an out-of-order window.
+
+### TapyrOutputBufferNotWritable
+
+The disk buffer of an output cannot be written (a full disk, permissions, a directory removed): the queue keeps its samples in memory only, as without a buffer, and loses them on a restart. `tapyr_output_buffer_errors_total{kind="write"}` counts the failures and the log says why. Free space or fix the permissions of the directory (`buffer/<output name>` next to the state store by default): the queue writes to the buffer again on its own.
 
 ### TapyrConfigReloadFailed
 

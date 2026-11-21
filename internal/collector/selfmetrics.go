@@ -88,6 +88,12 @@ func (c *Collector) selfState() selfobs.State {
 	for name, ro := range c.outputs {
 		s := ro.out.State()
 		og := selfobs.OutputGauge{Output: name, Queue: s.Queue, LastSuccess: s.LastSuccess, MaxSeries: ro.maxSeries}
+		if b := s.Buffer; b != nil {
+			og.Buffer = &selfobs.BufferGauge{Bytes: b.Bytes, LimitBytes: b.MaxBytes, MaxAge: b.MaxAge, Writable: b.Writable}
+			if !b.Oldest.IsZero() {
+				og.Buffer.Oldest = max(0, now.Sub(b.Oldest))
+			}
+		}
 		og.Series, _ = c.series.OutputSeries(ro.target(name), RoutedTo(g.graph, name))
 		st.Outputs = append(st.Outputs, og)
 	}

@@ -106,6 +106,24 @@ groups:
           summary: "Output {{ $labels.output }} has not delivered for 10 minutes"
           description: The samples wait in the queue until the backend answers; the oldest are dropped when it is full.
 
+      - alert: TapyrOutputBehind
+        # The oldest sample of the disk buffer waited three quarters of
+        # maxAge: past it, the buffered samples are dropped (too_old).
+        expr: tapyr_output_buffer_oldest_seconds / tapyr_output_buffer_max_age_seconds > 0.75
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "Output {{ $labels.output }} is about to drop buffered samples for their age"
+          description: The backend has not accepted samples for most of queue.disk.maxAge; older ones are dropped (too_old).
+
+      - alert: TapyrOutputBufferNotWritable
+        expr: tapyr_output_buffer_writable == 0
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: "The disk buffer of output {{ $labels.output }} cannot be written"
+          description: The queue keeps its samples in memory only, lost on a restart; check the disk (space, permissions).
+
       - alert: TapyrConfigReloadFailed
         expr: tapyr_config_last_reload_success == 0
         for: 5m

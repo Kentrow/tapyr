@@ -290,6 +290,7 @@ func printOutputEstimates(out io.Writer, outputs []outputEstimate) error {
 	if err := w.Flush(); err != nil {
 		return err
 	}
+	printBufferEstimates(out, outputs)
 	header := false
 	for _, o := range outputs {
 		if len(o.Unmeasured) == 0 {
@@ -302,6 +303,37 @@ func printOutputEstimates(out io.Writer, outputs []outputEstimate) error {
 		fmt.Fprint(out, wrapList("  "+o.Name+": ", o.Unmeasured, 80))
 	}
 	return nil
+}
+
+// printBufferEstimates says how long an outage of the backend the disk
+// buffer of every output holds (ADR 0015).
+func printBufferEstimates(out io.Writer, outputs []outputEstimate) {
+	header := false
+	for _, o := range outputs {
+		if o.BufferMaxBytes == 0 {
+			continue
+		}
+		if !header {
+			fmt.Fprintf(out, "\nDisk buffers (about %d bytes per sample on disk):\n", bufferBytesPerSample)
+			header = true
+		}
+		size, maxAge := config.Size(o.BufferMaxBytes).String(), shortDuration(time.Duration(o.BufferMaxAgeSeconds*float64(time.Second)))
+		holds := time.Duration(o.BufferHoldsSeconds * float64(time.Second))
+		approx := holds.Round(time.Minute)
+		if holds >= time.Hour {
+			approx = holds.Round(time.Hour)
+		}
+		switch {
+		case holds == 0:
+			fmt.Fprintf(out, "  %s: %s, kept up to %s; the outage it holds is known once its jobs have run\n", o.Name, size, maxAge)
+		case holds.Seconds() >= o.BufferMaxAgeSeconds:
+			fmt.Fprintf(out, "  %s: %s holds about %s of outage at %.0f samples/min; samples older than %s are dropped first\n",
+				o.Name, size, shortDuration(approx), o.SamplesPerMinute, maxAge)
+		default:
+			fmt.Fprintf(out, "  %s: %s holds about %s of outage at %.0f samples/min, less than its maxAge of %s: raise maxSize to keep more\n",
+				o.Name, size, shortDuration(approx), o.SamplesPerMinute, maxAge)
+		}
+	}
 }
 
 // wrapList writes items after prefix, separated by commas, wrapped at
@@ -378,8 +410,31 @@ type outputEstimate struct {
 	// Unmeasured are the jobs sent to the output without a successful run
 	// yet: Series is then a lower bound.
 	Unmeasured []string `json:"unmeasured_jobs"`
+	// The disk buffer of the output (ADR 0015): its maxSize and maxAge, and
+	// how long an outage of the backend it holds at SamplesPerMinute
+	// (0 when the rate is not known).
+	BufferMaxBytes      int64   `json:"buffer_max_bytes,omitempty"`
+	BufferMaxAgeSeconds float64 `json:"buffer_max_age_seconds,omitempty"`
+	BufferHoldsSeconds  float64 `json:"buffer_holds_seconds,omitempty"`
 	// measured counts the jobs with a successful run.
 	measured int
+}
+
+// bufferBytesPerSample is the space a sample takes in a disk buffer, as an
+// order of magnitude: about 20 bytes in large runs, 30 in runs of 50
+// samples, more in small ones (measured with gob and snappy), doubled for
+// labels less repetitive than the measurement.
+const bufferBytesPerSample = 64
+
+// bufferHolds returns how long a buffer of maxBytes holds samples arriving
+// at samplesPerMinute, before it drops the oldest; 0 when the rate is not
+// known.
+func bufferHolds(maxBytes int64, samplesPerMinute float64) time.Duration {
+	if samplesPerMinute <= 0 {
+		return 0
+	}
+	minutes := float64(maxBytes) / bufferBytesPerSample / samplesPerMinute
+	return time.Duration(minutes * float64(time.Minute))
 }
 
 // outputEstimates counts the series every output receives: those of the
@@ -435,6 +490,10 @@ func outputEstimates(ctx context.Context, graph *runtime.Graph, store state.Stor
 			}
 		}
 		slices.Sort(est.Unmeasured)
+		if q := o.Spec.Queue; q != nil && q.Disk != nil {
+			est.BufferMaxBytes, est.BufferMaxAgeSeconds = q.Disk.MaxSize.Bytes(), q.Disk.MaxAge.Std().Seconds()
+			est.BufferHoldsSeconds = bufferHolds(est.BufferMaxBytes, est.SamplesPerMinute).Seconds()
+		}
 		out = append(out, est)
 	}
 	return out, nil

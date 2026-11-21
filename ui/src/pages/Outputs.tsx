@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Badge, Failure, Loading, Meter, PageHead, Sparkline } from "../components/ui";
 import { Icon } from "../components/Icon";
-import { absolute, count, outputHealth, seriesStatus, since } from "../lib/format";
+import { absolute, bufferStatus, bytes, count, outputHealth, seriesStatus, since } from "../lib/format";
 import { useList } from "../lib/live";
 import type { Output } from "../lib/types";
 
@@ -73,12 +73,15 @@ export function Outputs() {
                   </div>
                 )}
               </div>
-              {o.capacity > 0 && <div className="label" style={{ marginTop: 14 }}>Queue</div>}
+              {o.capacity > 0 && <div className="label" style={{ marginTop: 14 }}>{o.buffer ? "Queue in memory" : "Queue"}</div>}
               {o.capacity > 0 ? (
-                <Meter total={o.capacity} label={`${o.queue} of ${o.capacity} samples queued`} parts={[{ value: o.queue, color: o.queue > o.capacity * 0.8 ? "var(--red)" : "var(--cyan-2)", label: `${count(o.queue)} of ${count(o.capacity)} samples queued` }]} />
+                // With a disk buffer, a full memory queue loses nothing: the
+                // samples wait on disk.
+                <Meter total={o.capacity} label={`${o.queue} of ${o.capacity} samples queued`} parts={[{ value: o.queue, color: o.queue > o.capacity * 0.8 && !o.buffer ? "var(--red)" : "var(--cyan-2)", label: `${count(o.queue)} of ${count(o.capacity)} samples queued` }]} />
               ) : (
                 <div className="small muted">Served on /metrics (pull): no queue.</div>
               )}
+              {o.buffer && <DiskBuffer buffer={o.buffer} />}
               {o.type !== "prometheus" && <dl className="kv small" style={{ marginTop: 12 }}>
                 <dt>Sent</dt><dd className="num">{count(o.sent)}</dd>
                 <dt>Dropped</dt><dd className="num">{count(o.dropped)}</dd>
@@ -100,6 +103,23 @@ export function Outputs() {
             </div>
           );
         })}
+      </div>
+    </>
+  );
+}
+
+// DiskBuffer shows the disk buffer of an output (ADR 0015): its size
+// against its maximum, and what waits in it, in words.
+function DiskBuffer({ buffer: b }: { buffer: NonNullable<Output["buffer"]> }) {
+  const status = bufferStatus(b);
+  const color = b.bytes > b.max_bytes * 0.8 || status.state === "failing" ? "var(--red)" : status.state === "near" ? "var(--sun)" : "var(--cyan-2)";
+  return (
+    <>
+      <div className="label" style={{ marginTop: 14 }}>Disk buffer</div>
+      <Meter total={b.max_bytes} label={`${bytes(b.bytes)} of ${bytes(b.max_bytes)} on disk`} parts={[{ value: b.bytes, color, label: `${bytes(b.bytes)} of ${bytes(b.max_bytes)} on disk` }]} />
+      <div className={`series-status ${status.state === "ok" || status.state === "waiting" ? "ok" : "full"}`}>
+        {(status.state === "near" || status.state === "failing") && <Icon name="alert" />}
+        <div className="small">{status.text}</div>
       </div>
     </>
   );

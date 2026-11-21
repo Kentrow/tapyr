@@ -114,4 +114,37 @@ tests:
             exp_annotations:
               summary: Calls to teltonika-rutos account branches are suspended
               description: "Repeated failures opened the circuit of target north-01; Tapyr probes again on its own."
-
+  - interval: 1m
+    input_series:
+      # The backend of hosted has been down for 95 minutes and counting; the
+      # buffer of local cannot be written.
+      - series: 'tapyr_output_buffer_oldest_seconds{output="hosted"}'
+        values: "5700+60x20"
+      - series: 'tapyr_output_buffer_max_age_seconds{output="hosted"}'
+        values: "7200x20"
+      - series: 'tapyr_output_buffer_writable{output="hosted"}'
+        values: "1x20"
+      - series: 'tapyr_output_buffer_oldest_seconds{output="local"}'
+        values: "0x20"
+      - series: 'tapyr_output_buffer_max_age_seconds{output="local"}'
+        values: "7200x20"
+      - series: 'tapyr_output_buffer_writable{output="local"}'
+        values: "0x20"
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: TapyrOutputBehind
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: TapyrOutputBehind
+        exp_alerts:
+          - exp_labels: { severity: warning, output: hosted }
+            exp_annotations:
+              summary: Output hosted is about to drop buffered samples for their age
+              description: The backend has not accepted samples for most of queue.disk.maxAge; older ones are dropped (too_old).
+      - eval_time: 10m
+        alertname: TapyrOutputBufferNotWritable
+        exp_alerts:
+          - exp_labels: { severity: warning, output: local }
+            exp_annotations:
+              summary: The disk buffer of output local cannot be written
+              description: The queue keeps its samples in memory only, lost on a restart; check the disk (space, permissions).

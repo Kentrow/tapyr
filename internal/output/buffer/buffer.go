@@ -83,6 +83,9 @@ type Stats struct {
 	Oldest time.Time
 	// Corrupt counts the records found corrupt since Open (skipped).
 	Corrupt int
+	// MaxSize and MaxAge are the bounds of the buffer.
+	MaxSize int64
+	MaxAge  time.Duration
 }
 
 // record is the index entry of a record not acknowledged.
@@ -472,7 +475,7 @@ func (b *Buffer) sync() error {
 func (b *Buffer) Stats() Stats {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	s := Stats{Bytes: b.bytes, Records: len(b.records), Corrupt: b.corrupt}
+	s := Stats{Bytes: b.bytes, Records: len(b.records), Corrupt: b.corrupt, MaxSize: b.opts.MaxSize, MaxAge: b.opts.MaxAge}
 	for _, r := range b.records {
 		s.Points += r.count
 	}

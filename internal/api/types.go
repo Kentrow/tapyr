@@ -372,6 +372,23 @@ type Output struct {
 	// UnmeasuredJobs are the jobs sent to the output that have not run
 	// successfully yet: their series are not counted.
 	UnmeasuredJobs []string `json:"unmeasured_jobs"`
+	// Buffer is the disk buffer of the output (ADR 0015), absent without
+	// one.
+	Buffer *OutputBuffer `json:"buffer,omitempty"`
+}
+
+// OutputBuffer is the disk buffer of a push output.
+type OutputBuffer struct {
+	Bytes    int64 `json:"bytes"`
+	MaxBytes int64 `json:"max_bytes"`
+	// Samples have not been acknowledged by the backend yet; Oldest is when
+	// the oldest of them was queued.
+	Samples       int        `json:"samples"`
+	Oldest        *time.Time `json:"oldest,omitempty"`
+	MaxAgeSeconds float64    `json:"max_age_seconds"`
+	// Writable is false while writes fail and the queue keeps its samples
+	// in memory only.
+	Writable bool `json:"writable"`
 }
 
 // List is a page of a list endpoint.
