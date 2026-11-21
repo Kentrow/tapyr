@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/kentrow/tapyr/internal/buildinfo"
 	"github.com/kentrow/tapyr/internal/config"
@@ -94,7 +95,12 @@ func (c *Collector) applyOutputs(ctx context.Context, graph *runtime.Graph) {
 		}
 	}
 	c.omu.RUnlock()
-	c.stopOutputs(ctx, stale)
+	// A backend that does not answer must not hold the reload: the flush
+	// is bounded as at shutdown; what it could not send stays in the disk
+	// buffer, or is lost with a memory queue.
+	flushCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), outputFlushTimeout)
+	c.stopOutputs(flushCtx, stale)
+	cancel()
 
 	c.omu.Lock()
 	defer c.omu.Unlock()
@@ -201,6 +207,9 @@ func sameCredentials(a, b *runtime.OutputCredentials) bool {
 	}
 	return true
 }
+
+// outputFlushTimeout bounds the flush of the outputs a reload stops.
+const outputFlushTimeout = 10 * time.Second
 
 // stopOutputs flushes and stops outputs that are no longer in use.
 func (c *Collector) stopOutputs(ctx context.Context, names []string) {
