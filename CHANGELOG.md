@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-22
+
 ### Added
 
 - `queue.disk` keeps the queue of a push output on disk ([ADR 0015](docs/adr/0015-persistent-output-buffer.md)): samples already paid for in API quota survive a backend outage longer than the memory queue and a restart of Tapyr, within `maxSize` (default `512MiB`) and `maxAge` (default `2h`). `tapyr plan` says how long an outage each buffer holds; the Outputs page, the status API, the `tapyr_output_buffer_*` self-metrics, the `Tapyr / Overview` dashboard and the `TapyrOutputBehind` and `TapyrOutputBufferNotWritable` alerts show it.
@@ -181,7 +183,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kentrow/tapyr/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kentrow/tapyr/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kentrow/tapyr/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/kentrow/tapyr/compare/v0.3.0...v0.4.0
