@@ -4,6 +4,8 @@ A provider package holds everything Tapyr knows about an API: the `Provider` (ba
 
 ## Built-in packages
 
+The [provider catalog](https://tapyr.eu/providers/) on tapyr.eu presents the same packages with their templates, limits and validation, and filters them by category, tier and validation.
+
 <!-- begin provider table: generated from the provider packages by TestProviderTables (go test ./cmd/tapyr -run TestProviderTables -update), do not edit -->
 
 | Package | API | Tier | Validation |

@@ -67,6 +67,8 @@ The planner computes an effective interval for every job so that the configurati
 
 ## Built-in providers
 
+Browse them in the [provider catalog](https://tapyr.eu/providers/), with what each one collects, its limits and how it was validated.
+
 <!-- begin provider table: generated from the provider packages by TestProviderTables (go test ./cmd/tapyr -run TestProviderTables -update), do not edit -->
 
 | Package | API | Tier | Validation |
@@ -112,9 +114,9 @@ The first samples arrive within a minute. [`examples/compose/README.md`](example
 | Platform | Install |
 |---|---|
 | macOS | `brew install kentrow/tap/tapyr` |
-| Debian, Ubuntu | `curl -LO https://github.com/kentrow/tapyr/releases/download/v0.6.0/tapyr_0.6.0_linux_amd64.deb && sudo dpkg -i tapyr_0.6.0_linux_amd64.deb` |
-| Fedora, RHEL | `sudo rpm -i https://github.com/kentrow/tapyr/releases/download/v0.6.0/tapyr_0.6.0_linux_amd64.rpm` |
-| Container | `docker run --rm ghcr.io/kentrow/tapyr:0.6.0 version` |
+| Debian, Ubuntu | `curl -LO https://github.com/kentrow/tapyr/releases/download/v0.7.0/tapyr_0.7.0_linux_amd64.deb && sudo dpkg -i tapyr_0.7.0_linux_amd64.deb` |
+| Fedora, RHEL | `sudo rpm -i https://github.com/kentrow/tapyr/releases/download/v0.7.0/tapyr_0.7.0_linux_amd64.rpm` |
+| Container | `docker run --rm ghcr.io/kentrow/tapyr:0.7.0 version` |
 | Kubernetes | `helm install tapyr oci://ghcr.io/kentrow/charts/tapyr --namespace tapyr --values my-values.yaml` |
 | Any platform | the static binaries of the [releases page](https://github.com/kentrow/tapyr/releases), Linux, macOS and Windows, amd64 and arm64 |
 
