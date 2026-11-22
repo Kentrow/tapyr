@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-11-22
+
 ### Fixed
 
 - The `quota-tight` scenario of the `teltonika-rms` simulator spent its 3000 monthly calls within six days (another client at 20 calls an hour), then answered 429 until the end of the month; the other client spends 2 calls an hour, and the quota lasts the month with Tapyr slowing its jobs down. `tapyr provider lint` reports a `quota-tight` whose other client spends a whole quota window by itself.
@@ -187,7 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deployment examples: a hardened systemd unit (`examples/systemd`) and Kustomize manifests for Kubernetes (`examples/kubernetes`).
 - Releases: static binaries for Linux, macOS and Windows (amd64, arm64) with SBOMs and checksums, and the multi-arch image `ghcr.io/kentrow/tapyr` (distroless, non-root), signed with cosign; the archives and the image carry the licenses and notices of the third-party software they include.
 
-[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/kentrow/tapyr/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/kentrow/tapyr/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/kentrow/tapyr/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/kentrow/tapyr/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/kentrow/tapyr/compare/v0.4.0...v0.5.0
