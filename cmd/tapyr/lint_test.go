@@ -68,6 +68,14 @@ func TestProviderLint(t *testing.T) {
 			want: []string{`dashboards/example-sim.json: panel "Devices online per site" has no thresholds (Grafana colors it red from 80)`},
 		},
 		{
+			name: "quota-tight spent by the other client alone",
+			change: func(t *testing.T, dir string) {
+				edit(t, filepath.Join(dir, "sim", "scenarios", "quota-tight.yaml"), `daily: { max: 600 }`, `daily: { max: 600 }
+      externalConsumption: { limit: daily, ratePerHour: 25 }`)
+			},
+			want: []string{"scenario quota-tight: step 1: the other client spends 600 of the 600 calls of the daily quota in a window by itself"},
+		},
+		{
 			name: "no datasource variable",
 			change: func(t *testing.T, dir string) {
 				edit(t, filepath.Join(dir, "dashboards", "example-sim.json"), `"type": "datasource"`, `"type": "custom"`)
