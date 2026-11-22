@@ -114,9 +114,9 @@ The first samples arrive within a minute. [`examples/compose/README.md`](example
 | Platform | Install |
 |---|---|
 | macOS | `brew install kentrow/tap/tapyr` |
-| Debian, Ubuntu | `curl -LO https://github.com/kentrow/tapyr/releases/download/v0.7.0/tapyr_0.7.0_linux_amd64.deb && sudo dpkg -i tapyr_0.7.0_linux_amd64.deb` |
-| Fedora, RHEL | `sudo rpm -i https://github.com/kentrow/tapyr/releases/download/v0.7.0/tapyr_0.7.0_linux_amd64.rpm` |
-| Container | `docker run --rm ghcr.io/kentrow/tapyr:0.7.0 version` |
+| Debian, Ubuntu | `curl -LO https://github.com/kentrow/tapyr/releases/download/v0.7.1/tapyr_0.7.1_linux_amd64.deb && sudo dpkg -i tapyr_0.7.1_linux_amd64.deb` |
+| Fedora, RHEL | `sudo rpm -i https://github.com/kentrow/tapyr/releases/download/v0.7.1/tapyr_0.7.1_linux_amd64.rpm` |
+| Container | `docker run --rm ghcr.io/kentrow/tapyr:0.7.1 version` |
 | Kubernetes | `helm install tapyr oci://ghcr.io/kentrow/charts/tapyr --namespace tapyr --values my-values.yaml` |
 | Any platform | the static binaries of the [releases page](https://github.com/kentrow/tapyr/releases), Linux, macOS and Windows, amd64 and arm64 |
 
