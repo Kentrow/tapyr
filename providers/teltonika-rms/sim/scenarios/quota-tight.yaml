@@ -4,10 +4,11 @@ metadata:
   name: quota-tight
   description: >-
     A token whose monthly quota is mostly spent by other tools: 3000 requests
-    left for the month, and another client using 20 per hour.
+    left for the month, and another client using 2 per hour (about 1500 a
+    month), so that Tapyr has to slow its jobs down to last the month.
 spec:
   steps:
     - at: 0s
       limits:
         monthly: { max: 3000 }
-      externalConsumption: { limit: monthly, ratePerHour: 20 }
+      externalConsumption: { limit: monthly, ratePerHour: 2 }

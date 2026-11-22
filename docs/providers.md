@@ -145,7 +145,7 @@ tapyr provider lint --update providers/my-api      # accept the new samples
 tapyr provider lint --catalog providers/my-api     # also require the catalog metadata
 ```
 
-The lint loads the package, compiles every template, checks the dashboards (valid JSON, a datasource variable, only metrics of the package or `tapyr_` self-metrics), the examples, the required scenarios, then runs the contract test: the jobs of `tests/contract.yaml` run once against the simulator, on a fake clock starting at `2026-01-01T00:00:00Z`, and their samples must equal `tests/expected.prom`. Every template must be exercised. With `--catalog`, the catalog metadata of the package and the `source` of every limit are required too, with existing categories and dates. `make lint` and the CI lint the built-in packages with `--catalog`.
+The lint loads the package, compiles every template, checks the dashboards (valid JSON, a datasource variable, only metrics of the package or `tapyr_` self-metrics), the examples, the required scenarios (with a `quota-tight` whose other client does not spend a whole quota window by itself), then runs the contract test: the jobs of `tests/contract.yaml` run once against the simulator, on a fake clock starting at `2026-01-01T00:00:00Z`, and their samples must equal `tests/expected.prom`. Every template must be exercised. With `--catalog`, the catalog metadata of the package and the `source` of every limit are required too, with existing categories and dates. `make lint` and the CI lint the built-in packages with `--catalog`.
 
 ## End-to-end tests
 

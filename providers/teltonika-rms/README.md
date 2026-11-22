@@ -49,7 +49,7 @@ tapyr sim --provider teltonika-rms --listen 127.0.0.1:8084
 | Scenario | Effect |
 |---|---|
 | `default` | No fault |
-| `quota-tight` | 3000 requests left in the month, another client spending 20 an hour |
+| `quota-tight` | 3000 requests left in the month, another client spending 2 an hour (about 1500 a month): Tapyr slows its jobs down to last the month |
 | `bad-day` | From 1h, slow responses (p50 800 ms, p99 6 s) for an hour; from 2h, 30% of `/devices` requests fail with 503 for 30 minutes; at 4h, a 10-minute outage |
 
 ## Dashboard

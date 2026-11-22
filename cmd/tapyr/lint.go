@@ -465,7 +465,68 @@ func lintScenarios(pkg *config.Package) []string {
 			problems = append(problems, fmt.Sprintf("scenario %s: %v", name, err))
 		}
 	}
+	if sc := pkg.Scenarios["quota-tight"]; sc != nil && pkg.Provider != nil {
+		problems = append(problems, lintTightConsumption(pkg.Provider.Spec.Limits, sc)...)
+	}
 	return problems
+}
+
+// lintTightConsumption checks that the other client of the quota-tight
+// scenario does not spend a whole quota by itself: the scenario shows a
+// quota Tapyr has to share and stretch its jobs for, and a simulator left
+// running (the public demo) must not answer 429 until the end of every
+// window.
+func lintTightConsumption(limits []config.Limit, sc *config.Scenario) []string {
+	var problems []string
+	maxes := map[string]int64{}
+	for _, l := range limits {
+		if l.Kind != config.LimitQuota || l.Max == nil {
+			continue
+		}
+		maxes[string(l.Name)] = l.Max.Value
+		if l.Max.Auto {
+			maxes[string(l.Name)] = l.InitialMax
+		}
+	}
+	for i, st := range sc.Spec.Steps {
+		for name, o := range st.Limits {
+			maxes[name] = o.Max
+		}
+		ec := st.ExternalConsumption
+		if ec == nil {
+			continue
+		}
+		window := quotaWindowBound(limits, string(ec.Limit))
+		if window == 0 {
+			continue
+		}
+		if d := st.For.Std(); d > 0 && d < window {
+			window = d
+		}
+		spent := ec.RatePerHour * window.Hours()
+		if quota := maxes[string(ec.Limit)]; quota > 0 && spent >= float64(quota) {
+			problems = append(problems, fmt.Sprintf("scenario quota-tight: step %d: the other client spends %.0f of the %d calls of the %s quota in a window by itself, which leaves Tapyr nothing; keep it below the quota", i+1, spent, quota, ec.Limit))
+		}
+	}
+	return problems
+}
+
+// quotaWindowBound returns the longest length of the window of a quota
+// limit (31 days for a month), or 0 when the limit is not a quota.
+func quotaWindowBound(limits []config.Limit, name string) time.Duration {
+	for _, l := range limits {
+		if string(l.Name) != name || l.Kind != config.LimitQuota || l.Window == nil {
+			continue
+		}
+		if l.Window.Rolling > 0 {
+			return l.Window.Rolling.Std()
+		}
+		return map[string]time.Duration{
+			"minute": time.Minute, "hour": time.Hour, "day": 24 * time.Hour,
+			"week": 7 * 24 * time.Hour, "month": 31 * 24 * time.Hour,
+		}[l.Window.Period]
+	}
+	return 0
 }
 
 // packageMetrics returns the metric names produced by the templates of a

@@ -94,7 +94,7 @@ spec:
       tokenExpiry: true                                          # invalidate tokens, force 401
 ```
 
-Built-in scenarios for every provider: `default`, `quota-tight` (undersized daily quota), `bad-day`.
+Built-in scenarios for every provider: `default`, `quota-tight` (undersized daily quota), `bad-day`. In `quota-tight`, the `externalConsumption` of another client leaves part of each quota window to Tapyr, which has to share it and stretch its jobs, rather than spending the whole quota by itself: a simulator left running, such as the public demo, would otherwise answer 429 until the end of every window. `tapyr provider lint` checks it, over the longest window of the quota (31 days for a month).
 
 A step applies from `at` until `at + for`, or until the end when `for` is omitted. `at` is measured from the simulator start, in simulated time. Step actions:
 

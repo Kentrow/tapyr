@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The `quota-tight` scenario of the `teltonika-rms` simulator spent its 3000 monthly calls within six days (another client at 20 calls an hour), then answered 429 until the end of the month; the other client spends 2 calls an hour, and the quota lasts the month with Tapyr slowing its jobs down. `tapyr provider lint` reports a `quota-tight` whose other client spends a whole quota window by itself.
+
 ## [0.7.0] - 2026-11-22
 
 ### Added
