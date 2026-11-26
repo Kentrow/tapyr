@@ -78,6 +78,7 @@ nav:
           - docs/adr/0013-unconsumed-jobs.md
           - docs/adr/0014-output-series.md
           - docs/adr/0015-persistent-output-buffer.md
+          - docs/adr/0016-oauth2-authorization-code.md
 
 # Pages for contributors and maintainers, read on GitHub.
 unpublished:
