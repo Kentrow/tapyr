@@ -1,0 +1,50 @@
+# __NAME__
+
+TODO: the API, and what the package collects from it.
+
+**Validation status**: simulator only. TODO: once the package runs against a real account, say which platform version and when, and set `metadata.validation` in `provider.yaml`.
+
+This package was written by `tapyr provider new`. Replace every TODO, in this README and in the YAML files, following [Writing a package](https://docs.tapyr.eu/latest/providers/#writing-a-package).
+
+## Coverage
+
+| Template | Endpoint | Default interval | Requests | Metrics |
+|---|---|---|---|---|
+| `__NAME__-devices` | `GET /devices` | 5m | 1 | `__PREFIX___device_up`, `__PREFIX___device_info` |
+
+## Auth setup
+
+TODO: how to get the credentials, and the permissions they need.
+
+Bearer token from the `apiKey` secret. The simulator accepts `sim-api-key`.
+
+## Limits
+
+| Limit | Value | Source |
+|---|---|---|
+| `rate` | 10 requests per second per account | TODO: assumed, replace with the documented value |
+| `daily` (quota) | 1000 requests per day per account, reset at 00:00 UTC | TODO: assumed, replace with the documented value |
+
+TODO: the quota maths with the default intervals (requests per run times runs per window).
+
+## Simulator
+
+```sh
+tapyr sim --provider-path <parent directory> --provider __NAME__ --listen 127.0.0.1:8081
+```
+
+The simulator serves `sim/fixtures/devices.json` under `/v1`: 2 devices.
+
+| Scenario | Effect |
+|---|---|
+| `default` | No fault |
+| `quota-tight` | The daily quota drops to 200 calls |
+| `bad-day` | Another client consumes 10 calls per hour; from 2h to 2h20, 30% of `/devices` requests fail with 503 |
+
+## Dashboard
+
+`dashboards/__NAME__.json` (Grafana, Prometheus data source): devices, devices offline, inventory, daily quota (limit, used by Tapyr and by others, remaining).
+
+## Known caveats
+
+TODO: what the package does not cover, and the surprises of the API.

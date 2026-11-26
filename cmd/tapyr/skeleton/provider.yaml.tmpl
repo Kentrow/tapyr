@@ -1,0 +1,65 @@
+# Provider package written by tapyr provider new. Every TODO marks a value to
+# replace with what the vendor documentation says; docs/providers.md
+# ("Writing a package") walks through each file.
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata:
+  name: __NAME__
+  version: 0.1.0
+  # TODO: one line on the API and what the package collects.
+  description: __DISPLAY__ API (skeleton written by tapyr provider new)
+  # TODO: the vendor documentation of the API.
+  docs: https://example.com/docs/api
+  displayName: __DISPLAY__
+  # The main category first, from providers/categories.yaml.
+  categories: [network]
+  # TODO: the GitHub handles of the maintainers.
+  maintainers: [TODO-your-github-handle]
+  tier: community
+  # simulator until the package runs against a real account; then
+  # real-platform with a date and the platformVersion.
+  validation:
+    status: simulator
+spec:
+  # TODO: the default base URL of the API.
+  baseURL: '{{ .params.baseURL | default "https://api.example.com/v1" | trimSuffix "/" }}'
+  params:
+    - name: baseURL
+      description: Base URL of the API, for example the address of tapyr sim
+  secrets:
+    - name: apiKey
+      required: true
+      description: API key sent as a bearer token (the simulator accepts sim-api-key)
+  # TODO: the auth of the API (docs/spec/05-collection.md, "Auth").
+  auth:
+    type: bearer
+    bearer:
+      token: { secret: apiKey }
+  defaults:
+    headers:
+      Accept: application/json
+    timeout: 10s
+  # Every limit cites its source: vendor-docs with the url, measured with the
+  # date, or assumed. Tapyr never sends more than these allow.
+  limits:
+    # TODO: the request rate of the API, and its scope.
+    - name: rate
+      description: Requests per second per account (assumed, to replace with the documented value)
+      source:
+        kind: assumed
+      kind: rate
+      rate: 10/s
+      scope: { by: [account] }
+    # TODO: the quota of the API (daily, monthly), or remove it if there is none.
+    - name: daily
+      description: Daily quota per account, reset at 00:00 UTC (assumed, to replace with the documented value)
+      source:
+        kind: assumed
+      kind: quota
+      max: 1000
+      window: { period: day, resetAt: "00:00", timezone: UTC }
+      scope: { by: [account] }
+  errors:
+    rateLimited:
+      statuses: [429]
+      retryAfterHeader: Retry-After

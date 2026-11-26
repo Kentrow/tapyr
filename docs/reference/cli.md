@@ -54,6 +54,18 @@ tapyr provider list [flags]
 | `--output string` | `table` | output format: table or json |
 | `--provider-path string` |  | directory of provider packages, repeatable, after the providerPaths of the configuration |
 
+## tapyr provider new
+
+Write a minimal provider package in &lt;dir&gt;/&lt;name&gt;: provider.yaml with a rate limit and a daily quota, one job template, a simulator with the default, quota-tight and bad-day scenarios, a contract test and its expected samples, an example, a dashboard and a README. It passes tapyr provider lint --catalog as written; the TODO comments mark what to replace with what the vendor documentation says.
+
+```text
+tapyr provider new <name> [flags]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--dir string` | `.` | parent directory of the package, created when missing |
+
 ## tapyr provider show
 
 Describe a provider package: what it is and how it was validated, the secrets and params an account gives it, its templates (interval, role, metrics) and its limits with their sources. --example prints the example configuration of the package, to copy and adapt; --output json its entry of the provider catalog (see tapyr provider list --output json).

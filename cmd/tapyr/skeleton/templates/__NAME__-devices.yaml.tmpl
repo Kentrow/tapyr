@@ -1,0 +1,33 @@
+# A job template: one endpoint, the metrics extracted from each item with
+# CEL. Metric names follow <prefix>_<object>_<measure>_<unit> in base units;
+# descriptive attributes go to _info metrics.
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: __NAME__-devices
+spec:
+  provider: __NAME__
+  defaultInterval: 5m
+  defaultPriority: high
+  request:
+    # TODO: the endpoint, relative to the base URL.
+    path: /devices
+  # Requests per run, for tapyr plan.
+  estimate:
+    pagesPerRun: 1
+  extract:
+    # TODO: where the list of items is in the response.
+    items: response.body
+    metrics:
+      - name: __PREFIX___device_up
+        help: Device status (1 online, 0 otherwise)
+        value: "item.status == 'online'"
+        labels:
+          serial: item.serial
+    info:
+      - name: __PREFIX___device_info
+        help: Descriptive attributes of a device
+        labels:
+          serial: item.serial
+          name: item.name
+          model: item.model
