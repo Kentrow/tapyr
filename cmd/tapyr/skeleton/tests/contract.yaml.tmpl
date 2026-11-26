@@ -1,0 +1,15 @@
+# Contract test of __NAME__: tapyr provider lint runs these jobs once against
+# the simulator ($SIM_URL) and compares the samples with expected.prom
+# (tapyr provider lint --update writes it). Every template needs a job here.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: contract }
+spec:
+  provider: __NAME__
+  params: { baseURL: "$SIM_URL" }
+  secrets: { apiKey: { env: __ENV___API_KEY } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: devices }
+spec: { account: contract, template: __NAME__-devices }

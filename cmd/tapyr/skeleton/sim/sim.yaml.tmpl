@@ -1,0 +1,17 @@
+# The simulator of the package: tapyr sim serves these routes with the auth
+# and the limits of provider.yaml. Fixtures are synthetic, or recorded and
+# anonymized (tapyr record).
+apiVersion: tapyr/v1alpha1
+kind: Simulation
+metadata:
+  name: __NAME__
+spec:
+  basePath: /v1
+  auth:
+    accept:
+      bearer: [sim-api-key]
+  routes:
+    # TODO: one route per endpoint of the templates.
+    - path: /devices
+      response:
+        file: fixtures/devices.json

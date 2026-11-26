@@ -136,6 +136,7 @@ func newProviderCmd(e *env, flags *globalFlags) *cobra.Command {
 		newProviderListCmd(e, flags),
 		newProviderShowCmd(e, flags),
 		newProviderLintCmd(e),
+		newProviderNewCmd(e),
 	)
 	return cmd
 }

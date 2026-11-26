@@ -8,6 +8,8 @@
 package config
 
 import (
+	"errors"
+	"regexp"
 	"slices"
 
 	"github.com/invopop/jsonschema"
@@ -58,6 +60,17 @@ type Name string
 // JSONSchema implements the schema reflector hook.
 func (Name) JSONSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{Type: "string", Pattern: namePattern}
+}
+
+var nameRe = regexp.MustCompile(namePattern)
+
+// Validate reports a name that the schema would reject, with the same hint,
+// for names given outside a document (a command argument).
+func (n Name) Validate() error {
+	if !nameRe.MatchString(string(n)) {
+		return errors.New(patternHints[namePattern])
+	}
+	return nil
 }
 
 // Identifier names a param, a secret or a variable. It is usable in CEL
