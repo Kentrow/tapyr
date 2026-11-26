@@ -75,6 +75,7 @@ SimulationCredentials are accepted credentials per auth type.
 
 | Field | Type | Required | Description |
 |---|---|---|---|
+| `authorizationCode` | list of [SimulationAuthCodeClient](#simulationauthcodeclient) |  | `authorizationCode` lists the clients of the authorize, token and device endpoints with auth type oauth2\_authorization\_code. |
 | `basic` | list of [SimulationBasicCredential](#simulationbasiccredential) |  | Basic credentials accepted with auth type basic. |
 | `bearer` | list of string |  | Bearer tokens accepted with auth type bearer. |
 | `clients` | list of [SimulationClient](#simulationclient) |  | Clients accepted by the token endpoint with auth type oauth2\_client\_credentials. |
@@ -109,6 +110,17 @@ SimulationResponse is the response of a route.
 | `template` | string |  | Template is a Go text/template fixture rendering JSON, relative to the sim/ directory (see docs/spec/08-simulator.md for its data and helpers). Exactly one of file and template is set. Minimum length 1. |
 
 - Exactly one of `file`, `template` is set.
+
+## SimulationAuthCodeClient
+
+SimulationAuthCodeClient is an OAuth 2.0 client of the authorization code flow.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `clientId` | string | yes | `clientId` accepted. |
+| `clientSecret` | string |  | `clientSecret` accepted; empty for a public client, which sends its id in the request body. |
+| `refreshTokens` | list of string |  | `refreshTokens` are bootstrap refresh tokens the token endpoint accepts for this client, for contract tests (fake values, sim-...). |
+| `rotate` | boolean |  | Rotate makes every refresh return a new refresh token and spend the one it was given, as rotating APIs do. |
 
 ## SimulationBasicCredential
 

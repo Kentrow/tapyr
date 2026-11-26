@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The simulator serves the OAuth 2.0 authorization code flow (authorize, token and device authorization endpoints, PKCE, rotating refresh tokens) for packages with the `oauth2_authorization_code` auth type.
 - The `oauth2_authorization_code` auth type renews access tokens from a refresh token, rotated or not, for APIs that use the OAuth 2.0 authorization code flow, starting from a refresh token given as an account secret ([ADR 0016](docs/adr/0016-oauth2-authorization-code.md)).
 - `tapyr provider new <name>` writes the skeleton of a provider package (one template, a simulator with its scenarios, a contract test, an example, a dashboard and a README) that passes `tapyr provider lint --catalog` as written, with `TODO` comments on what to replace.
 

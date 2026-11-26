@@ -89,6 +89,9 @@ type SimulationCredentials struct {
 	// Clients accepted by the token endpoint with auth type
 	// oauth2_client_credentials.
 	Clients []SimulationClient `json:"clients,omitempty"`
+	// AuthorizationCode lists the clients of the authorize, token and device
+	// endpoints with auth type oauth2_authorization_code.
+	AuthorizationCode []SimulationAuthCodeClient `json:"authorizationCode,omitempty"`
 	// Logins accepted by the login endpoint with auth type session_login:
 	// the login body must carry both values.
 	Logins []SimulationBasicCredential `json:"logins,omitempty"`
@@ -103,6 +106,22 @@ type SimulationClient struct {
 	ClientID string `json:"clientId" jsonschema:"required"`
 	// ClientSecret accepted.
 	ClientSecret string `json:"clientSecret" jsonschema:"required"`
+}
+
+// SimulationAuthCodeClient is an OAuth 2.0 client of the authorization code
+// flow.
+type SimulationAuthCodeClient struct {
+	// ClientID accepted.
+	ClientID string `json:"clientId" jsonschema:"required"`
+	// ClientSecret accepted; empty for a public client, which sends its id
+	// in the request body.
+	ClientSecret string `json:"clientSecret,omitempty"`
+	// RefreshTokens are bootstrap refresh tokens the token endpoint accepts
+	// for this client, for contract tests (fake values, sim-...).
+	RefreshTokens []string `json:"refreshTokens,omitempty"`
+	// Rotate makes every refresh return a new refresh token and spend the
+	// one it was given, as rotating APIs do.
+	Rotate bool `json:"rotate,omitempty"`
 }
 
 // SimulationBasicCredential is a username and password pair.

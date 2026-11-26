@@ -936,7 +936,7 @@ func acceptor(a *config.Auth, sa *config.SimulationAuth, is *issuer, plugin auth
 				return equal(user, c.Username) && equal(pass, c.Password)
 			})
 		}, nil
-	case config.AuthOAuth2ClientCredentials, config.AuthSessionLogin:
+	case config.AuthOAuth2ClientCredentials, config.AuthSessionLogin, config.AuthOAuth2AuthorizationCode:
 		return func(r *http.Request) (string, bool) { return is.valid(is.tokenOf(r)) }, nil
 	case config.AuthPlugin:
 		return plugin.Identity, nil
