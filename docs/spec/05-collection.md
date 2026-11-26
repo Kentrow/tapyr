@@ -25,7 +25,38 @@ Token requests issued by authenticators go through the budget engine with `authR
 | `bearer` | `token` (secret) | `Authorization: Bearer <token>` |
 | `basic` | `username`, `password` | |
 | `oauth2_client_credentials` | `tokenURL`, `clientId`, `clientSecret`, `scopes`, `audience`, `extraParams`, `authStyle` (header or body) | Token cached until `expires_in - skew`; persisted |
+| `oauth2_authorization_code` | see below | Refresh tokens obtained once with a consent ([ADR 0016](../adr/0016-oauth2-authorization-code.md)) |
 | `session_login` | see below | Generic login flow returning a token or cookie |
+
+### `oauth2_authorization_code`
+
+For APIs where a person consents once in a browser and the client lives on refresh tokens afterwards (the OAuth 2.0 authorization code flow, [ADR 0016](../adr/0016-oauth2-authorization-code.md)).
+
+```yaml
+auth:
+  type: oauth2_authorization_code
+  oauth2AuthorizationCode:
+    authorizeURL: https://www.example.com/oauth/authorize
+    tokenURL: https://www.example.com/oauth/token
+    clientId: { secret: clientId }
+    clientSecret: { secret: clientSecret }   # optional: a public client relies on PKCE
+    refreshToken: { secret: refreshToken }   # the bootstrap refresh token
+    scopes: [read]
+    scopeSeparator: " "                      # default; some APIs want ","
+    redirectURL: http://127.0.0.1:8085/callback
+    pkce: S256                               # or none
+    authStyle: header                        # or body
+    tokenParams: {}                          # added to every token request
+    refreshBefore: 5m
+```
+
+- The access token is sent as `Authorization: Bearer <token>`, or as `apply` says (the block of `session_login`).
+- Tapyr starts from the token pair stored for the account when the SHA-256 of the `refreshToken` secret matches the one the pair descends from, and from the secret otherwise: a new bootstrap refresh token (a reload re-reads file secrets) replaces the stored pair. The pair is stored under the provider and the account only, so that a package upgrade that changes the auth block keeps it, sealed like every token (`TAPYR_STATE_KEY`).
+- It refreshes `refreshBefore` the expiry (at most halfway through a short lifetime), one refresh at a time per account, with the `refresh_token` grant and the client authentication of `authStyle` (a client without a secret sends its id in the body). An access token without `expires_in` is used until it is rejected.
+- When a refresh answers a refresh token, the new pair is stored **before** the access token is used; when the store refuses it, the pair is kept in memory and stored before its first use. A refresh that answers no refresh token keeps the previous one: rotation is detected, not declared.
+- Only `invalid_grant` sets the re-bootstrap condition (`tapyr_auth_reauth_required`, a `/readyz` reason, the status API), stored with the pair: the runs of the account then fail without calling the token endpoint again, until the bootstrap secret changes. Other rejections (`invalid_client`, any other 400, 401 or 403) are credential errors with the rejection backoff.
+- Read-only (`tapyr record`), it never refreshes, since the refresh token may rotate: it uses the stored access token until its expiry, then fails.
+- The token belongs to the account: a target cannot override the client or refresh token secrets, and the bootstrap refresh token does not enter the `credential` scope key, so a new bootstrap does not restart the budgets scoped by credential.
 
 ### `session_login`
 

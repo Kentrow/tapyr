@@ -48,7 +48,7 @@ Functional:
 - Budget engine: rate (token bucket), concurrency, fixed-window quotas (minute, hour, day, week, month, with reset time and timezone), rolling-window quotas; scopes (instance, account, target, credential, endpoint, request variables); header sync; 429 and `Retry-After` handling; retry reserve; priority-aware planning; persistent ledger.
 - `tapyr plan`: offline estimation of call consumption per quota and effective intervals.
 - `tapyr validate`: config and provider validation, including CEL type-checking.
-- Collection: auth types `none`, `header`, `bearer`, `basic`, `oauth2_client_credentials`, `session_login` (generic login flow), plus the `aruba_central_classic` auth plugin (rotating refresh tokens).
+- Collection: auth types `none`, `header`, `bearer`, `basic`, `oauth2_client_credentials`, `oauth2_authorization_code` (refresh tokens obtained once with a consent), `session_login` (generic login flow), plus the `aruba_central_classic` auth plugin (rotating refresh tokens).
 - Pagination: `none`, `offset`, `page`, `link_header`, `cursor`, `expression`.
 - Discovery: jobs that fan out from the results of a parent job, with an inventory cache.
 - Multi-target accounts (one account, N device endpoints, e.g. Teltonika RutOS routers).
