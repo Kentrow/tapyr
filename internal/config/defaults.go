@@ -75,6 +75,16 @@ func defaultProvider(spec *ProviderSpec) {
 	if o := spec.Auth.OAuth2ClientCredentials; o != nil {
 		setDefault(&o.AuthStyle, "header")
 	}
+	if o := spec.Auth.OAuth2AuthorizationCode; o != nil {
+		setDefault(&o.ScopeSeparator, " ")
+		setDefault(&o.RedirectURL, Template("http://127.0.0.1:8085/callback"))
+		setDefault(&o.PKCE, "S256")
+		setDefault(&o.AuthStyle, "header")
+		setDefault(&o.RefreshBefore, Duration(5*time.Minute))
+		if o.Apply != nil && o.Apply.Header != "" {
+			setDefault(&o.Apply.Format, "{token}")
+		}
+	}
 	if spec.Pagination != nil {
 		defaultPagination(spec.Pagination)
 	}

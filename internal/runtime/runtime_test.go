@@ -173,6 +173,91 @@ spec:
 	}
 }
 
+// authCodeProvider is a provider with the oauth2_authorization_code auth
+// type, for the compile tests of its account rules.
+const authCodeProvider = `apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: athletes, version: 0.1.0 }
+spec:
+  baseURL: https://api.example.invalid
+  secrets: [{ name: clientId, required: true }, { name: clientSecret }, { name: refreshToken, required: true }]
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      authorizeURL: https://auth.example.invalid/authorize
+      tokenURL: https://auth.example.invalid/token
+      clientId: { secret: clientId }
+      clientSecret: { secret: clientSecret }
+      refreshToken: { secret: refreshToken }
+---
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata: { name: activities }
+spec:
+  provider: athletes
+  defaultInterval: 1h
+  request: { path: /activities }
+  extract: { metrics: [{ name: activities, value: "1.0" }] }
+`
+
+func TestCompileAuthCodeTargetSecrets(t *testing.T) {
+	// The token belongs to the account: a target cannot bring its own
+	// client or refresh token (ADR 0016).
+	path := writeConfig(t, authCodeProvider+`---
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: home }
+spec:
+  provider: athletes
+  secrets: { clientId: { env: ID }, refreshToken: { env: RT } }
+  targets:
+    - { name: alice }
+    - { name: bob, secrets: { refreshToken: { env: RT_BOB }, clientSecret: { env: SECRET_BOB } } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: activities }
+spec: { account: home, template: activities }
+`)
+	_, err := Compile(load(t, path), withAuth(t, Options{}))
+	var diags config.Diagnostics
+	if !errors.As(err, &diags) {
+		t.Fatalf("Compile() error = %v", err)
+	}
+	got := strings.ReplaceAll(diags.Error(), path, "config.yaml")
+	for _, want := range []string{
+		"spec.targets[1].secrets.clientSecret: secret clientSecret of provider athletes belongs to the account (oauth2_authorization_code): a target cannot override it; use one account per person",
+		"spec.targets[1].secrets.refreshToken: secret refreshToken of provider athletes belongs to the account (oauth2_authorization_code): a target cannot override it; use one account per person",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("diagnostics lack %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "targets[0]") {
+		t.Errorf("target without secrets reported:\n%s", got)
+	}
+}
+
+func TestCompileAuthCodeNotImplemented(t *testing.T) {
+	path := writeConfig(t, authCodeProvider+`---
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: home }
+spec:
+  provider: athletes
+  secrets: { clientId: { env: ID }, refreshToken: { env: RT } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: activities }
+spec: { account: home, template: activities }
+`)
+	_, err := Compile(load(t, path), withAuth(t, Options{Secrets: secrets(map[string]string{"ID": "id", "RT": "rt"})}))
+	if err == nil || !strings.Contains(err.Error(), "auth type not supported yet: oauth2_authorization_code") {
+		t.Fatalf("Compile() error = %v", err)
+	}
+}
+
 func TestTargetsAndDiscovery(t *testing.T) {
 	path := writeConfig(t, `apiVersion: tapyr/v1alpha1
 kind: Provider

@@ -1,0 +1,6 @@
+testdata/invalid/auth-authcode-semantic.yaml:11:17: spec.auth.oauth2AuthorizationCode.tokenURL: invalid template: template: spec.auth.oauth2AuthorizationCode.tokenURL:1: unclosed action
+testdata/invalid/auth-authcode-semantic.yaml:13:7: spec.auth.oauth2AuthorizationCode.clientSecret: auth values cannot be expressions: use a literal or a {secret: name} reference
+testdata/invalid/auth-authcode-semantic.yaml:14:7: spec.auth.oauth2AuthorizationCode.refreshToken: secret "refresh" is not declared in provider "authcode-semantic"
+testdata/invalid/auth-authcode-semantic.yaml:15:7: spec.auth.oauth2AuthorizationCode.apply: apply must set exactly one of header or cookie
+testdata/invalid/auth-authcode-semantic.yaml:16:5: spec.auth.bearer: bearer is not allowed with auth type oauth2_authorization_code
+testdata/invalid/auth-authcode-semantic.yaml:30:21: spec.auth.oauth2AuthorizationCode.refreshToken: refreshToken must be a {secret: name} reference, written by tapyr auth login

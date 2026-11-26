@@ -1,0 +1,26 @@
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: authcode-missing, version: 0.1.0 }
+spec:
+  baseURL: https://api.example.invalid
+  secrets: [{ name: clientId }]
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      clientId: { secret: clientId }
+---
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: authcode-enums, version: 0.1.0 }
+spec:
+  baseURL: https://api.example.invalid
+  secrets: [{ name: clientId }, { name: refreshToken }]
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      authorizeURL: https://auth.example.invalid/authorize
+      tokenURL: https://auth.example.invalid/token
+      clientId: { secret: clientId }
+      refreshToken: { secret: refreshToken }
+      pkce: plain
+      authStyle: query

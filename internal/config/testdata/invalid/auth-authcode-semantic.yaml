@@ -1,0 +1,30 @@
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: authcode-semantic, version: 0.1.0 }
+spec:
+  baseURL: https://api.example.invalid
+  secrets: [{ name: clientId }]
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      authorizeURL: https://auth.example.invalid/authorize
+      tokenURL: '{{ .params.tokenURL | default "https://auth.example.invalid/token" '
+      clientId: { secret: clientId }
+      clientSecret: { expr: "'x'" }
+      refreshToken: { secret: refresh }
+      apply: { header: X-Token, cookie: token }
+    bearer: { token: { secret: clientId } }
+---
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: authcode-literal, version: 0.1.0 }
+spec:
+  baseURL: https://api.example.invalid
+  secrets: [{ name: clientId }]
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      authorizeURL: https://auth.example.invalid/authorize
+      tokenURL: https://auth.example.invalid/token
+      clientId: { secret: clientId }
+      refreshToken: a-refresh-token-pasted-here

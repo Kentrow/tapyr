@@ -91,6 +91,7 @@ const (
 	AuthBearer                  AuthType = "bearer"
 	AuthBasic                   AuthType = "basic"
 	AuthOAuth2ClientCredentials AuthType = "oauth2_client_credentials"
+	AuthOAuth2AuthorizationCode AuthType = "oauth2_authorization_code"
 	AuthSessionLogin            AuthType = "session_login"
 	AuthPlugin                  AuthType = "plugin"
 )
@@ -99,7 +100,7 @@ const (
 // named after the type in camelCase.
 type Auth struct {
 	// Type of authentication.
-	Type AuthType `json:"type" jsonschema:"required,enum=none,enum=header,enum=bearer,enum=basic,enum=oauth2_client_credentials,enum=session_login,enum=plugin"`
+	Type AuthType `json:"type" jsonschema:"required,enum=none,enum=header,enum=bearer,enum=basic,enum=oauth2_client_credentials,enum=oauth2_authorization_code,enum=session_login,enum=plugin"`
 	// Header sends a static value in a header (type header).
 	Header *HeaderAuth `json:"header,omitempty"`
 	// Bearer sends Authorization: Bearer <token> (type bearer).
@@ -109,6 +110,9 @@ type Auth struct {
 	// OAuth2ClientCredentials obtains tokens with the OAuth 2.0 client
 	// credentials grant (type oauth2_client_credentials).
 	OAuth2ClientCredentials *OAuth2ClientCredentials `json:"oauth2ClientCredentials,omitempty"`
+	// OAuth2AuthorizationCode renews tokens from a refresh token obtained
+	// once with tapyr auth login (type oauth2_authorization_code).
+	OAuth2AuthorizationCode *OAuth2AuthorizationCode `json:"oauth2AuthorizationCode,omitempty"`
 	// SessionLogin posts credentials to obtain a session token (type session_login).
 	SessionLogin *SessionLogin `json:"sessionLogin,omitempty"`
 	// Plugin delegates to a Go auth plugin (type plugin).
@@ -123,6 +127,7 @@ var authBlocks = map[AuthType]string{
 	AuthBearer:                  "bearer",
 	AuthBasic:                   "basic",
 	AuthOAuth2ClientCredentials: "oauth2ClientCredentials",
+	AuthOAuth2AuthorizationCode: "oauth2AuthorizationCode",
 	AuthSessionLogin:            "sessionLogin",
 	AuthPlugin:                  "plugin",
 }
@@ -185,6 +190,53 @@ type OAuth2ClientCredentials struct {
 	// AuthStyle sends the client credentials in the Authorization header or
 	// in the request body.
 	AuthStyle string `json:"authStyle,omitempty" jsonschema:"enum=header,enum=body,default=header"`
+}
+
+// OAuth2AuthorizationCode is the OAuth 2.0 authorization code flow with
+// refresh tokens (ADR 0016): tapyr auth login runs the consent once and
+// writes the refresh token to the secret named by RefreshToken; tapyr run
+// renews access tokens from it and stores the refreshed pair.
+type OAuth2AuthorizationCode struct {
+	// AuthorizeURL is the authorization endpoint the person consents at.
+	// Template.
+	AuthorizeURL Template `json:"authorizeURL" jsonschema:"required"`
+	// TokenURL is the token endpoint. Template.
+	TokenURL Template `json:"tokenURL" jsonschema:"required"`
+	// DeviceAuthorizationURL enables tapyr auth login --device, the device
+	// authorization grant (RFC 8628), when the API offers it. Template.
+	DeviceAuthorizationURL Template `json:"deviceAuthorizationURL,omitempty"`
+	// ClientID of the application registered at the vendor, a literal or
+	// {secret: name}.
+	ClientID Value `json:"clientId" jsonschema:"required"`
+	// ClientSecret of the application, usually {secret: name}. Optional: a
+	// public client relies on PKCE alone.
+	ClientSecret *Value `json:"clientSecret,omitempty"`
+	// RefreshToken is the bootstrap refresh token, {secret: name}, written
+	// by tapyr auth login. A changed value replaces the stored token pair.
+	RefreshToken Value `json:"refreshToken" jsonschema:"required"`
+	// Scopes requested at the consent.
+	Scopes []string `json:"scopes,omitempty"`
+	// ScopeSeparator joins the scopes: a space by default (RFC 6749), or
+	// what the API wants instead (a comma for some).
+	ScopeSeparator string `json:"scopeSeparator,omitempty"`
+	// RedirectURL registered for the application; the person's browser is
+	// sent there after the consent. Template.
+	RedirectURL Template `json:"redirectURL,omitempty" jsonschema:"default=http://127.0.0.1:8085/callback"`
+	// PKCE is the code challenge method: S256, or none for an API that
+	// rejects PKCE.
+	PKCE string `json:"pkce,omitempty" jsonschema:"enum=S256,enum=none,default=S256"`
+	// AuthStyle sends the client credentials in the Authorization header or
+	// in the body of token requests.
+	AuthStyle string `json:"authStyle,omitempty" jsonschema:"enum=header,enum=body,default=header"`
+	// AuthorizeParams are added to the authorization URL.
+	AuthorizeParams map[string]string `json:"authorizeParams,omitempty"`
+	// TokenParams are added to every token request.
+	TokenParams map[string]string `json:"tokenParams,omitempty"`
+	// RefreshBefore renews the access token this long before it expires.
+	RefreshBefore Duration `json:"refreshBefore,omitempty" jsonschema:"default=5m"`
+	// Apply changes how the access token is sent; by default
+	// Authorization: Bearer <token>.
+	Apply *TokenApply `json:"apply,omitempty"`
 }
 
 // SessionLogin posts credentials to a login endpoint and applies the

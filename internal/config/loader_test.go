@@ -133,6 +133,52 @@ func TestLoadTree(t *testing.T) {
 	})
 }
 
+func TestAuthCodeDefaults(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "provider.yaml")
+	doc := `apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: authcode, version: 0.1.0 }
+spec:
+  baseURL: https://api.example.invalid
+  secrets: [{ name: clientId }, { name: refreshToken }]
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      authorizeURL: https://auth.example.invalid/authorize
+      tokenURL: https://auth.example.invalid/token
+      clientId: { secret: clientId }
+      refreshToken: { secret: refreshToken }
+      scopes: [read, activity:read_all]
+      redirectURL: http://127.0.0.1:8085/callback
+`
+	if err := os.WriteFile(path, []byte(doc), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := newTestLoader(t).Load([]string{path})
+	if err != nil {
+		t.Fatalf("Load() = %v", err)
+	}
+	o := cfg.Providers[0].Spec.Auth.OAuth2AuthorizationCode
+	if o == nil {
+		t.Fatal("no oauth2AuthorizationCode block")
+	}
+	checks := []struct {
+		name      string
+		got, want any
+	}{
+		{"scopeSeparator", o.ScopeSeparator, " "},
+		{"pkce", o.PKCE, "S256"},
+		{"authStyle", o.AuthStyle, "header"},
+		{"refreshBefore", o.RefreshBefore.Std(), 5 * time.Minute},
+		{"scopes", strings.Join(o.Scopes, ","), "read,activity:read_all"},
+	}
+	for _, c := range checks {
+		if c.got != c.want {
+			t.Errorf("%s = %v, want %v", c.name, c.got, c.want)
+		}
+	}
+}
+
 func TestDefaults(t *testing.T) {
 	cfg, err := newTestLoader(t).Load([]string{filepath.Join("testdata", "valid", "minimal.yaml")})
 	if err != nil {

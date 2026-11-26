@@ -479,6 +479,25 @@ func (c *compiler) compileDefinition(src *config.Source, d *config.JobDefinition
 	return out
 }
 
+// accountOnlySecrets returns the secrets of a provider that its targets
+// cannot override: the client and the refresh token of an
+// oauth2_authorization_code account, whose token pair is stored per account
+// (ADR 0016).
+func accountOnlySecrets(p *config.Provider) []string {
+	o := p.Spec.Auth.OAuth2AuthorizationCode
+	if p.Spec.Auth.Type != config.AuthOAuth2AuthorizationCode || o == nil {
+		return nil
+	}
+	var names []string
+	for _, v := range []*config.Value{&o.ClientID, o.ClientSecret, &o.RefreshToken} {
+		if v != nil && v.Secret != "" {
+			names = append(names, v.Secret)
+		}
+	}
+	slices.Sort(names)
+	return names
+}
+
 // compileAccount evaluates the provider template fields with the params of
 // every target (account params overridden by target params) and resolves
 // the secrets (target secrets override account secrets).
@@ -530,6 +549,14 @@ func (c *compiler) compileAccount(a *config.Account) *accountData {
 		if d := p.Spec.Defaults; d != nil {
 			for _, k := range sortedKeys(d.Headers) {
 				td.headers[k] = render("defaults.headers."+k, string(d.Headers[k]))
+			}
+		}
+		for _, k := range accountOnlySecrets(p) {
+			if _, own := t.Secrets[k]; own {
+				c.errorf(a.Source, []string{"spec", "targets", strconv.Itoa(i), "secrets", k},
+					"secret %s of provider %s belongs to the account (%s): a target cannot override it; use one account per person",
+					k, p.Metadata.Name, p.Spec.Auth.Type)
+				failed = true
 			}
 		}
 		if c.opts.Secrets != nil {

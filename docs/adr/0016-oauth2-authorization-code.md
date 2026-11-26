@@ -1,6 +1,6 @@
 # ADR 0016 - OAuth 2.0 authorization code, bootstrapped by tapyr auth login
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-26
 
 ## Context

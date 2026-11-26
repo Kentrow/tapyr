@@ -69,14 +69,16 @@ Auth configures authentication.
 | `basic` | [BasicAuth](#basicauth) |  | Basic sends HTTP basic credentials (type basic). |
 | `bearer` | [BearerAuth](#bearerauth) |  | Bearer sends Authorization: Bearer &lt;token&gt; (type bearer). |
 | `header` | [HeaderAuth](#headerauth) |  | Header sends a static value in a header (type header). |
+| `oauth2AuthorizationCode` | [OAuth2AuthorizationCode](#oauth2authorizationcode) |  | `oauth2AuthorizationCode` renews tokens from a refresh token obtained once with tapyr auth login (type oauth2\_authorization\_code). |
 | `oauth2ClientCredentials` | [OAuth2ClientCredentials](#oauth2clientcredentials) |  | `oauth2ClientCredentials` obtains tokens with the OAuth 2.0 client credentials grant (type oauth2\_client\_credentials). |
 | `plugin` | [PluginAuth](#pluginauth) |  | Plugin delegates to a Go auth plugin (type plugin). |
 | `sessionLogin` | [SessionLogin](#sessionlogin) |  | `sessionLogin` posts credentials to obtain a session token (type session\_login). |
-| `type` | string | yes | Type of authentication. One of `none`, `header`, `bearer`, `basic`, `oauth2_client_credentials`, `session_login`, `plugin`. |
+| `type` | string | yes | Type of authentication. One of `none`, `header`, `bearer`, `basic`, `oauth2_client_credentials`, `oauth2_authorization_code`, `session_login`, `plugin`. |
 
 - When `type` is `basic`: `basic` is required.
 - When `type` is `bearer`: `bearer` is required.
 - When `type` is `header`: `header` is required.
+- When `type` is `oauth2_authorization_code`: `oauth2AuthorizationCode` is required.
 - When `type` is `oauth2_client_credentials`: `oauth2ClientCredentials` is required.
 - When `type` is `plugin`: `plugin` is required.
 - When `type` is `session_login`: `sessionLogin` is required.
@@ -192,6 +194,28 @@ HeaderAuth sends a static credential in a request header.
 | `format` | string |  | Format of the header value; {value} is replaced by the value, for example "Token {value}". Default `{value}`. |
 | `name` | string | yes | Name of the header, for example X-API-Key. Minimum length 1. |
 | `value` | [Value](#value) | yes | Value of the header, usually {secret: name}. |
+
+## OAuth2AuthorizationCode
+
+OAuth2AuthorizationCode is the OAuth 2.0 authorization code flow with refresh tokens (ADR 0016): tapyr auth login runs the consent once and writes the refresh token to the secret named by RefreshToken; tapyr run renews access tokens from it and stores the refreshed pair.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `apply` | [TokenApply](#tokenapply) |  | Apply changes how the access token is sent; by default Authorization: Bearer &lt;token&gt;. |
+| `authStyle` | string |  | `authStyle` sends the client credentials in the Authorization header or in the body of token requests. Default `header`. One of `header`, `body`. |
+| `authorizeParams` | map of string to string |  | `authorizeParams` are added to the authorization URL. |
+| `authorizeURL` | [Template](#template) | yes | `authorizeURL` is the authorization endpoint the person consents at. Template. |
+| `clientId` | [Value](#value) | yes | `clientId` of the application registered at the vendor, a literal or {secret: name}. |
+| `clientSecret` | [Value](#value) |  | `clientSecret` of the application, usually {secret: name}. Optional: a public client relies on PKCE alone. |
+| `deviceAuthorizationURL` | [Template](#template) |  | `deviceAuthorizationURL` enables tapyr auth login --device, the device authorization grant (RFC 8628), when the API offers it. Template. |
+| `pkce` | string |  | `pkce` is the code challenge method: S256, or none for an API that rejects PKCE. Default `S256`. One of `S256`, `none`. |
+| `redirectURL` | [Template](#template) |  | `redirectURL` registered for the application; the person's browser is sent there after the consent. Template. Default `http://127.0.0.1:8085/callback`. |
+| `refreshBefore` | [Duration](#duration) |  | `refreshBefore` renews the access token this long before it expires. Default `5m`. |
+| `refreshToken` | [Value](#value) | yes | `refreshToken` is the bootstrap refresh token, {secret: name}, written by tapyr auth login. A changed value replaces the stored token pair. |
+| `scopeSeparator` | string |  | `scopeSeparator` joins the scopes: a space by default (RFC 6749), or what the API wants instead (a comma for some). |
+| `scopes` | list of string |  | Scopes requested at the consent. |
+| `tokenParams` | map of string to string |  | `tokenParams` are added to every token request. |
+| `tokenURL` | [Template](#template) | yes | `tokenURL` is the token endpoint. Template. |
 
 ## OAuth2ClientCredentials
 
