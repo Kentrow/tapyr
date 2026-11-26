@@ -99,6 +99,23 @@
           "if": {
             "properties": {
               "type": {
+                "const": "oauth2_authorization_code"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "oauth2AuthorizationCode"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
                 "const": "oauth2_client_credentials"
               }
             },
@@ -161,6 +178,10 @@
           "$ref": "#/$defs/HeaderAuth",
           "description": "Header sends a static value in a header (type header)."
         },
+        "oauth2AuthorizationCode": {
+          "$ref": "#/$defs/OAuth2AuthorizationCode",
+          "description": "OAuth2AuthorizationCode renews tokens from a refresh token obtained\nonce with tapyr auth login (type oauth2_authorization_code)."
+        },
         "oauth2ClientCredentials": {
           "$ref": "#/$defs/OAuth2ClientCredentials",
           "description": "OAuth2ClientCredentials obtains tokens with the OAuth 2.0 client\ncredentials grant (type oauth2_client_credentials)."
@@ -181,6 +202,7 @@
             "bearer",
             "basic",
             "oauth2_client_credentials",
+            "oauth2_authorization_code",
             "session_login",
             "plugin"
           ],
@@ -576,6 +598,100 @@
     "Name": {
       "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$",
       "type": "string"
+    },
+    "OAuth2AuthorizationCode": {
+      "additionalProperties": false,
+      "description": "OAuth2AuthorizationCode is the OAuth 2.0 authorization code flow with refresh tokens (ADR 0016): tapyr auth login runs the consent once and writes the refresh token to the secret named by RefreshToken; tapyr run renews access tokens from it and stores the refreshed pair.",
+      "properties": {
+        "apply": {
+          "$ref": "#/$defs/TokenApply",
+          "description": "Apply changes how the access token is sent; by default\nAuthorization: Bearer <token>."
+        },
+        "authStyle": {
+          "default": "header",
+          "description": "AuthStyle sends the client credentials in the Authorization header or\nin the body of token requests.",
+          "enum": [
+            "header",
+            "body"
+          ],
+          "type": "string"
+        },
+        "authorizeParams": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "AuthorizeParams are added to the authorization URL.",
+          "type": "object"
+        },
+        "authorizeURL": {
+          "$ref": "#/$defs/Template",
+          "description": "AuthorizeURL is the authorization endpoint the person consents at.\nTemplate."
+        },
+        "clientId": {
+          "$ref": "#/$defs/Value",
+          "description": "ClientID of the application registered at the vendor, a literal or\n{secret: name}."
+        },
+        "clientSecret": {
+          "$ref": "#/$defs/Value",
+          "description": "ClientSecret of the application, usually {secret: name}. Optional: a\npublic client relies on PKCE alone."
+        },
+        "deviceAuthorizationURL": {
+          "$ref": "#/$defs/Template",
+          "description": "DeviceAuthorizationURL enables tapyr auth login --device, the device\nauthorization grant (RFC 8628), when the API offers it. Template."
+        },
+        "pkce": {
+          "default": "S256",
+          "description": "PKCE is the code challenge method: S256, or none for an API that\nrejects PKCE.",
+          "enum": [
+            "S256",
+            "none"
+          ],
+          "type": "string"
+        },
+        "redirectURL": {
+          "$ref": "#/$defs/Template",
+          "default": "http://127.0.0.1:8085/callback",
+          "description": "RedirectURL registered for the application; the person's browser is\nsent there after the consent. Template."
+        },
+        "refreshBefore": {
+          "$ref": "#/$defs/Duration",
+          "default": "5m",
+          "description": "RefreshBefore renews the access token this long before it expires."
+        },
+        "refreshToken": {
+          "$ref": "#/$defs/Value",
+          "description": "RefreshToken is the bootstrap refresh token, {secret: name}, written\nby tapyr auth login. A changed value replaces the stored token pair."
+        },
+        "scopeSeparator": {
+          "description": "ScopeSeparator joins the scopes: a space by default (RFC 6749), or\nwhat the API wants instead (a comma for some).",
+          "type": "string"
+        },
+        "scopes": {
+          "description": "Scopes requested at the consent.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tokenParams": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "TokenParams are added to every token request.",
+          "type": "object"
+        },
+        "tokenURL": {
+          "$ref": "#/$defs/Template",
+          "description": "TokenURL is the token endpoint. Template."
+        }
+      },
+      "required": [
+        "authorizeURL",
+        "tokenURL",
+        "clientId",
+        "refreshToken"
+      ],
+      "type": "object"
     },
     "OAuth2ClientCredentials": {
       "additionalProperties": false,

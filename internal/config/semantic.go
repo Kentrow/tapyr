@@ -249,6 +249,7 @@ func (c *checker) checkAuth(a at, auth *Auth, p *Provider) {
 		"bearer":                  auth.Bearer != nil,
 		"basic":                   auth.Basic != nil,
 		"oauth2ClientCredentials": auth.OAuth2ClientCredentials != nil,
+		"oauth2AuthorizationCode": auth.OAuth2AuthorizationCode != nil,
 		"sessionLogin":            auth.SessionLogin != nil,
 		"plugin":                  auth.Plugin != nil,
 	}
@@ -283,6 +284,31 @@ func (c *checker) checkAuth(a at, auth *Auth, p *Provider) {
 		c.checkTemplateField(a.child("oauth2ClientCredentials", "tokenURL"), string(o.TokenURL))
 		secret(a.child("oauth2ClientCredentials", "clientId"), o.ClientID)
 		secret(a.child("oauth2ClientCredentials", "clientSecret"), o.ClientSecret)
+	case auth.Type == AuthOAuth2AuthorizationCode && auth.OAuth2AuthorizationCode != nil:
+		o := auth.OAuth2AuthorizationCode
+		oa := a.child("oauth2AuthorizationCode")
+		c.checkTemplateField(oa.child("authorizeURL"), string(o.AuthorizeURL))
+		c.checkTemplateField(oa.child("tokenURL"), string(o.TokenURL))
+		c.checkTemplateField(oa.child("deviceAuthorizationURL"), string(o.DeviceAuthorizationURL))
+		c.checkTemplateField(oa.child("redirectURL"), string(o.RedirectURL))
+		secret(oa.child("clientId"), o.ClientID)
+		if o.ClientSecret != nil {
+			secret(oa.child("clientSecret"), *o.ClientSecret)
+		}
+		if o.RefreshToken.Secret == "" && o.RefreshToken.Expr == "" {
+			// tapyr auth login writes it: a literal would never change.
+			c.errorf(oa.child("refreshToken"), "refreshToken must be a {secret: name} reference, written by tapyr auth login")
+		} else {
+			secret(oa.child("refreshToken"), o.RefreshToken)
+		}
+		if ap := o.Apply; ap != nil {
+			if (ap.Header == "") == (ap.Cookie == "") {
+				c.errorf(oa.child("apply"), "apply must set exactly one of header or cookie")
+			}
+			if ap.Format != "" && ap.Header == "" {
+				c.errorf(oa.child("apply", "format"), "format is only allowed with header")
+			}
+		}
 	case auth.Type == AuthSessionLogin && auth.SessionLogin != nil:
 		s := auth.SessionLogin
 		sa := a.child("sessionLogin")

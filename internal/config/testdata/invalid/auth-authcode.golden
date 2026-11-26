@@ -1,0 +1,5 @@
+testdata/invalid/auth-authcode.yaml:9:5: spec.auth.oauth2AuthorizationCode: missing required field "authorizeURL"
+testdata/invalid/auth-authcode.yaml:9:5: spec.auth.oauth2AuthorizationCode: missing required field "refreshToken"
+testdata/invalid/auth-authcode.yaml:9:5: spec.auth.oauth2AuthorizationCode: missing required field "tokenURL"
+testdata/invalid/auth-authcode.yaml:25:13: spec.auth.oauth2AuthorizationCode.pkce: invalid value "plain" (want one of "S256", "none")
+testdata/invalid/auth-authcode.yaml:26:18: spec.auth.oauth2AuthorizationCode.authStyle: invalid value "query" (want one of "header", "body")
