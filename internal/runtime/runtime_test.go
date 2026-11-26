@@ -238,7 +238,9 @@ spec: { account: home, template: activities }
 	}
 }
 
-func TestCompileAuthCodeNotImplemented(t *testing.T) {
+func TestCredentialKeyIgnoresBootstrap(t *testing.T) {
+	// A new tapyr auth login changes the bootstrap refresh token: the
+	// budgets scoped by credential must not start over.
 	path := writeConfig(t, authCodeProvider+`---
 apiVersion: tapyr/v1alpha1
 kind: Account
@@ -252,9 +254,20 @@ kind: Job
 metadata: { name: activities }
 spec: { account: home, template: activities }
 `)
-	_, err := Compile(load(t, path), withAuth(t, Options{Secrets: secrets(map[string]string{"ID": "id", "RT": "rt"})}))
-	if err == nil || !strings.Contains(err.Error(), "auth type not supported yet: oauth2_authorization_code") {
-		t.Fatalf("Compile() error = %v", err)
+	credential := func(env map[string]string) string {
+		t.Helper()
+		g, err := Compile(load(t, path), withAuth(t, Options{Secrets: secrets(env), CredentialSalt: []byte("salt")}))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return g.Jobs[0].Credential
+	}
+	first := credential(map[string]string{"ID": "id", "RT": "rt-1"})
+	if second := credential(map[string]string{"ID": "id", "RT": "rt-2"}); second != first {
+		t.Errorf("a new bootstrap refresh token changed the credential: %s, %s", first, second)
+	}
+	if other := credential(map[string]string{"ID": "other", "RT": "rt-1"}); other == first {
+		t.Error("another client id kept the credential")
 	}
 }
 

@@ -255,6 +255,8 @@ func (m *Manager) For(a *config.Auth, s Session) (Authenticator, error) {
 		return m.oauth2(a.OAuth2ClientCredentials, s)
 	case config.AuthSessionLogin:
 		return m.login(a.SessionLogin, s)
+	case config.AuthOAuth2AuthorizationCode:
+		return m.authCode(a.OAuth2AuthorizationCode, s)
 	case config.AuthPlugin:
 		return m.plugin(a.Plugin, s)
 	}
@@ -347,15 +349,43 @@ func (m *Manager) fetchOAuth2(ctx context.Context, scope Scope, u *url.URL, o *c
 	if err := json.Unmarshal(body, &tr); err != nil || tr.AccessToken == "" {
 		return "", 0, fmt.Errorf("token endpoint %s: no access_token in the response", u.Path)
 	}
-	ttl := DefaultTokenLifetime
-	if raw := strings.Trim(string(tr.ExpiresIn), `"`); raw != "" && raw != "null" {
-		secs, err := strconv.ParseFloat(raw, 64)
-		if err != nil || secs <= 0 {
-			return "", 0, fmt.Errorf("token endpoint %s: invalid expires_in", u.Path)
-		}
-		ttl = time.Duration(secs * float64(time.Second))
+	ttl, err := expiresIn("token endpoint "+u.Path, tr.ExpiresIn, DefaultTokenLifetime)
+	if err != nil {
+		return "", 0, err
 	}
 	return tr.AccessToken, ttl, nil
+}
+
+// expiresIn reads the expires_in member of a token response (seconds, a
+// number or a string), or returns fallback when it is absent.
+func expiresIn(what string, raw json.RawMessage, fallback time.Duration) (time.Duration, error) {
+	s := strings.Trim(string(raw), `"`)
+	if s == "" || s == "null" {
+		return fallback, nil
+	}
+	secs, err := strconv.ParseFloat(s, 64)
+	if err != nil || secs <= 0 {
+		return 0, fmt.Errorf("%s: invalid expires_in", what)
+	}
+	return time.Duration(secs * float64(time.Second)), nil
+}
+
+// tokenApplier returns how a token is attached to requests: a header with
+// its format, or a cookie.
+func tokenApplier(ap *config.TokenApply) func(req *http.Request, token string) {
+	return func(req *http.Request, token string) {
+		if ap.Cookie != "" {
+			// A request cookie: Secure, HttpOnly and SameSite are
+			// attributes of response cookies.
+			req.AddCookie(&http.Cookie{Name: ap.Cookie, Value: token}) //nolint:gosec // G124: see above.
+			return
+		}
+		format := ap.Format
+		if format == "" {
+			format = "{token}"
+		}
+		req.Header.Set(ap.Header, strings.ReplaceAll(format, "{token}", token))
+	}
 }
 
 func (m *Manager) login(l *config.SessionLogin, s Session) (Authenticator, error) {
@@ -392,19 +422,7 @@ func (m *Manager) login(l *config.SessionLogin, s Session) (Authenticator, error
 			fetch: func(ctx context.Context, now time.Time) (string, time.Duration, error) {
 				return m.fetchLogin(ctx, s, &u, l, body, exprs, now)
 			},
-			apply: func(req *http.Request, token string) {
-				if l.Apply.Cookie != "" {
-					// A request cookie: Secure, HttpOnly and SameSite are
-					// attributes of response cookies.
-					req.AddCookie(&http.Cookie{Name: l.Apply.Cookie, Value: token}) //nolint:gosec // G124: see above.
-					return
-				}
-				format := l.Apply.Format
-				if format == "" {
-					format = "{token}"
-				}
-				req.Header.Set(l.Apply.Header, strings.ReplaceAll(format, "{token}", token))
-			},
+			apply: tokenApplier(&l.Apply),
 		}
 		if l.Logout != nil {
 			out := *s.BaseURL

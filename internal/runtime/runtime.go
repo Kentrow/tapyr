@@ -498,6 +498,23 @@ func accountOnlySecrets(p *config.Provider) []string {
 	return names
 }
 
+// credentialSecrets returns the secrets that identify a credential: all of
+// them, except the bootstrap refresh token of oauth2_authorization_code,
+// which a new tapyr auth login replaces for the same client and person.
+func credentialSecrets(p *config.Provider, secrets auth.Secrets) auth.Secrets {
+	o := p.Spec.Auth.OAuth2AuthorizationCode
+	if p.Spec.Auth.Type != config.AuthOAuth2AuthorizationCode || o == nil || o.RefreshToken.Secret == "" {
+		return secrets
+	}
+	out := make(auth.Secrets, len(secrets))
+	for k, v := range secrets {
+		if k != o.RefreshToken.Secret {
+			out[k] = v
+		}
+	}
+	return out
+}
+
 // compileAccount evaluates the provider template fields with the params of
 // every target (account params overridden by target params) and resolves
 // the secrets (target secrets override account secrets).
@@ -581,7 +598,7 @@ func (c *compiler) compileAccount(a *config.Account) *accountData {
 				}
 				td.secrets[k] = v
 			}
-			td.credential = credentialKey(c.opts.CredentialSalt, td.secrets)
+			td.credential = credentialKey(c.opts.CredentialSalt, credentialSecrets(p, td.secrets))
 		}
 		if failed {
 			data.ok = false
