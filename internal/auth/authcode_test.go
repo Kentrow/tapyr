@@ -486,3 +486,160 @@ func TestAuthCodeShortLivedToken(t *testing.T) {
 		t.Errorf("after 61s: %q", got)
 	}
 }
+
+func TestAuthCodeReloginClearsStaleSession(t *testing.T) {
+	// A new login while tapyr run runs (new secret, then a reload): the
+	// authenticator of the spent token goes away, and with it the
+	// re-bootstrap condition (review of ADR 0016, finding 1).
+	rs := newRefreshServer(t, "boot-2", true)
+	m, _ := newManager(t, clock.NewFake(start), newMemStore(), "k")
+	cfg := authCodeAuth(rs.URL+"/token", "header")
+	spent := authCodeFor(t, m, cfg, authCodeSession("home", "spent"))
+	if _, err := decorate(spent); !errors.Is(err, ErrReauthRequired) {
+		t.Fatalf("spent token: %v", err)
+	}
+	fresh := authCodeFor(t, m, cfg, authCodeSession("home", "boot-2"))
+	if got := authorization(t, fresh); got != "Bearer access-1" {
+		t.Fatalf("after the new login: %q", got)
+	}
+	s := m.Sessions()
+	if len(s) != 1 || s[0].Reauth {
+		t.Errorf("Sessions() after a new login = %+v, want one session without reauth", s)
+	}
+}
+
+func TestAuthCodeClientSecretChangeKeepsPair(t *testing.T) {
+	// A changed client secret (same bootstrap) replaces the authenticator but
+	// keeps the pair it holds in memory, also one not stored yet.
+	rs := newRefreshServer(t, "boot", true)
+	store := &failingStore{memStore: newMemStore(), fail: true}
+	m, _ := newManager(t, clock.NewFake(start), store, "k")
+	cfg := authCodeAuth(rs.URL+"/token", "header")
+	if _, err := decorate(authCodeFor(t, m, cfg, authCodeSession("home", "boot"))); err == nil {
+		t.Fatal("the store accepted the pair")
+	}
+	store.mu.Lock()
+	store.fail = false
+	store.mu.Unlock()
+	s := authCodeSession("home", "boot")
+	s.Secrets["clientSecret"] = secretsOf(map[string]string{"x": "rotated-secret"})["x"]
+	if got := authorization(t, authCodeFor(t, m, cfg, s)); got != "Bearer access-1" || rs.requests() != 1 {
+		t.Fatalf("after a client secret change: %q, %d token requests", got, rs.requests())
+	}
+	if len(m.Sessions()) != 1 {
+		t.Errorf("Sessions() = %+v, want one", m.Sessions())
+	}
+}
+
+// flakyStore fails LoadToken a number of times.
+type flakyStore struct {
+	*memStore
+	mu        sync.Mutex
+	loadFails int
+}
+
+func (f *flakyStore) LoadToken(ctx context.Context, key string) ([]byte, time.Time, bool, error) {
+	f.mu.Lock()
+	fail := f.loadFails > 0
+	if fail {
+		f.loadFails--
+	}
+	f.mu.Unlock()
+	if fail {
+		return nil, time.Time{}, false, errors.New("database is locked")
+	}
+	return f.memStore.LoadToken(ctx, key)
+}
+
+func TestAuthCodeStoreReadErrorKeepsPair(t *testing.T) {
+	// A failed read of the store is not "nothing stored": starting from the
+	// spent bootstrap would get invalid_grant and overwrite the valid pair
+	// (review of ADR 0016, finding 2).
+	rs := newRefreshServer(t, "boot", true)
+	clk := clock.NewFake(start)
+	store := &flakyStore{memStore: newMemStore()}
+	m1, _ := newManager(t, clk, store, "k")
+	cfg := authCodeAuth(rs.URL+"/token", "header")
+	authorization(t, authCodeFor(t, m1, cfg, authCodeSession("home", "boot")))
+
+	store.mu.Lock()
+	store.loadFails = 1
+	store.mu.Unlock()
+	m2, _ := newManager(t, clk, store, "k")
+	a := authCodeFor(t, m2, cfg, authCodeSession("home", "boot"))
+	if _, err := decorate(a); err == nil || errors.Is(err, ErrReauthRequired) || !strings.Contains(err.Error(), "database is locked") {
+		t.Fatalf("Decorate() with a failed read = %v", err)
+	}
+	if rs.requests() != 1 {
+		t.Errorf("a token request was sent after a failed read: %d", rs.requests())
+	}
+	if got := authorization(t, a); got != "Bearer access-1" {
+		t.Errorf("the next run: %q", got)
+	}
+	if st := storedPair(t, m1, "home"); st.Refresh != "refresh-1" || st.Reauth {
+		t.Errorf("stored pair after a failed read: %+v", st)
+	}
+}
+
+func TestAuthCodeOtherStateKeyKeepsRecord(t *testing.T) {
+	// A pair stored with another TAPYR_STATE_KEY cannot be opened: with the
+	// spent bootstrap, the account needs attention, and the record stays for
+	// the right key to open it again.
+	rs := newRefreshServer(t, "boot", true)
+	rs.valid["boot-new"] = true
+	clk := clock.NewFake(start)
+	store := newMemStore()
+	m1, _ := newManager(t, clk, store, "k")
+	cfg := authCodeAuth(rs.URL+"/token", "header")
+	authorization(t, authCodeFor(t, m1, cfg, authCodeSession("home", "boot")))
+
+	m2, _ := newManager(t, clk, store, "another-key")
+	_, err := decorate(authCodeFor(t, m2, cfg, authCodeSession("home", "boot")))
+	if err == nil || !strings.Contains(err.Error(), "TAPYR_STATE_KEY") {
+		t.Fatalf("Decorate() with another key = %v", err)
+	}
+	if st := storedPair(t, m1, "home"); st.Refresh != "refresh-1" || st.Reauth {
+		t.Errorf("the record was overwritten: %+v", st)
+	}
+	// A new login starts over under the new key.
+	m3, _ := newManager(t, clk, store, "another-key")
+	if got := authorization(t, authCodeFor(t, m3, cfg, authCodeSession("home", "boot-new"))); got == "" {
+		t.Error("a new bootstrap was refused")
+	}
+}
+
+// ctxStore refuses to save with a done context, as SQLite's ExecContext.
+type ctxStore struct{ *memStore }
+
+func (c ctxStore) SaveToken(ctx context.Context, key string, sealed []byte, expiry time.Time) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return c.memStore.SaveToken(ctx, key, sealed, expiry)
+}
+
+func TestAuthCodeCanceledRunStillStoresPair(t *testing.T) {
+	// A run canceled (a reload, a SIGTERM) once the token response is read:
+	// the rotated pair is stored anyway, not lost.
+	rs := newRefreshServer(t, "boot", true)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	m, err := NewManager(ManagerOptions{
+		Clock: clock.NewFake(start), Store: ctxStore{newMemStore()}, StateKey: "k",
+		OnToken: func(token string) {
+			if strings.HasPrefix(token, "refresh-") {
+				cancel()
+			}
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.SetSender(&directSender{})
+	a := authCodeFor(t, m, authCodeAuth(rs.URL+"/token", "header"), authCodeSession("home", "boot"))
+	req := httptest.NewRequestWithContext(ctx, http.MethodGet, "http://api/x", http.NoBody)
+	_ = a.Decorate(ctx, req)
+	if st := storedPair(t, m, "home"); st.Refresh != "refresh-1" {
+		t.Errorf("stored refresh token after a cancellation = %q", st.Refresh)
+	}
+}

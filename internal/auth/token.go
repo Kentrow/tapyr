@@ -570,6 +570,32 @@ func (m *Manager) do(ctx context.Context, scope Scope, endpoint string, req *htt
 	return resp.StatusCode, data, nil
 }
 
+// errUnopenable is a stored token that cannot be opened: sealed with
+// another TAPYR_STATE_KEY, or stored before a key was set.
+var errUnopenable = errors.New("the stored token cannot be opened with TAPYR_STATE_KEY")
+
+// loadChecked returns a stored token and whether one is stored. Unlike
+// load, a failed read is an error, and a token that cannot be opened is
+// errUnopenable: callers that must not lose a stored token tell them apart
+// from nothing stored.
+func (m *Manager) loadChecked(ctx context.Context, key string) (secret.Value, bool, error) {
+	if m.store == nil {
+		return secret.Value{}, false, nil
+	}
+	sealed, _, ok, err := m.store.LoadToken(ctx, key)
+	if err != nil {
+		return secret.Value{}, false, err
+	}
+	if !ok {
+		return secret.Value{}, false, nil
+	}
+	token, err := m.open(key, sealed)
+	if err != nil {
+		return secret.Value{}, true, fmt.Errorf("%w (%w)", errUnopenable, err)
+	}
+	return secret.New(token), true, nil
+}
+
 // load returns a stored token, or false.
 func (m *Manager) load(ctx context.Context, key string) (secret.Value, time.Time, bool) {
 	if m.store == nil {

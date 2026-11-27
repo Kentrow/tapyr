@@ -91,14 +91,11 @@ spec:
 			t.Fatalf("login: exit %d\n%s%s", res.code, res.stdout, res.stderr)
 		}
 	}
-	collect := func(d time.Duration) (string, func() result) {
+	var inFlight, instances atomic.Int64
+	reload := make(chan struct{}, 1)
+	reloaded := make(chan error, 1)
+	advance := func(d time.Duration) {
 		t.Helper()
-		var inFlight, instances atomic.Int64
-		addr, stop := backgroundHooks(t, ls.vars, &env{
-			clock:       clk,
-			onRun:       func(d int) { inFlight.Add(int64(d)) },
-			onInstances: func(n int) { instances.Store(int64(n)) },
-		}, "run", "--config", ls.config)
 		until := clk.Now().Add(d)
 		for clk.Now().Before(until) {
 			deadline := time.Now().Add(10 * time.Second)
@@ -107,6 +104,19 @@ spec:
 			}
 			clk.Advance(time.Minute)
 		}
+	}
+	collect := func(d time.Duration) (string, func() result) {
+		t.Helper()
+		inFlight.Store(0)
+		instances.Store(0)
+		addr, stop := backgroundHooks(t, ls.vars, &env{
+			clock:       clk,
+			onRun:       func(d int) { inFlight.Add(int64(d)) },
+			onInstances: func(n int) { instances.Store(int64(n)) },
+			reload:      reload,
+			onReload:    func(err error) { reloaded <- err },
+		}, "run", "--config", ls.config)
+		advance(d)
 		return addr, stop
 	}
 
@@ -163,7 +173,24 @@ spec:
 	addr, stop := collect(30 * time.Minute)
 	_, metrics := httpGet(t, "http://"+addr+"/metrics/self")
 	_, accounts := httpGet(t, "http://"+addr+"/api/v1/accounts")
+
+	// 5. A new consent while tapyr run runs, then a reload: the condition
+	// clears without a restart.
+	login("--force")
+	reload <- struct{}{}
+	if err := <-reloaded; err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	advance(30 * time.Minute)
+	_, metricsAfter := httpGet(t, "http://"+addr+"/metrics/self")
+	_, accountsAfter := httpGet(t, "http://"+addr+"/api/v1/accounts")
 	res = stop()
+	if !strings.Contains(metricsAfter, `tapyr_auth_reauth_required{account="home",provider="strava"} 0`) {
+		t.Errorf("the re-bootstrap condition stays after a new login and a reload:\n%s", grepLines(metricsAfter, "tapyr_auth"))
+	}
+	if !strings.Contains(accountsAfter, `"reauth_required": false`) {
+		t.Errorf("the status API still asks for a new consent after a new login and a reload")
+	}
 	if !strings.Contains(metrics, `tapyr_auth_reauth_required{account="home",provider="strava"} 1`) {
 		t.Errorf("no re-bootstrap condition in the self-metrics:\n%s", grepLines(metrics, "tapyr_auth"))
 	}
