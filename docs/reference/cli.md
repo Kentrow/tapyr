@@ -14,6 +14,22 @@ Every command reads the configuration from `--config` (files or directories, rep
 | `--log-format string` |  | log format: json, text (env TAPYR_LOG_FORMAT) |
 | `--log-level string` |  | log level: debug, info, warn, error (env TAPYR_LOG_LEVEL) |
 
+## tapyr auth login
+
+Run the OAuth 2.0 authorization code flow of an account once, and write the refresh token it yields to --secret-file (mode 0600), for the refreshToken secret of the account (ADR 0016). It prints the URL to open in a browser, on any machine, then reads the URL the browser was redirected to (or the code) from the standard input. --listen serves the redirect itself, for a redirectURL on the loopback interface of this machine; --device uses the device authorization grant of a package that declares it. It never prints a token and never opens the state store: run it anywhere, then reload tapyr run.
+
+```text
+tapyr auth login <account> [flags]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--device` |  | use the device authorization grant (RFC 8628) |
+| `--force` |  | overwrite an existing --secret-file |
+| `--listen` |  | serve the redirect URL on this machine instead of reading a pasted URL |
+| `--provider-path string` |  | directory of provider packages, repeatable, after the providerPaths of the configuration |
+| `--secret-file string` |  | file receiving the refresh token (created with mode 0600) |
+
 ## tapyr plan
 
 Compute, offline, the effective interval of every job and the projected consumption of every quota scope over a full window. Estimates use the run history of the state store when it exists, else estimate.pagesPerRun. Exit code 3 when the plan is infeasible.

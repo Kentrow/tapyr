@@ -16,6 +16,9 @@ import (
 type env struct {
 	stdout io.Writer
 	stderr io.Writer
+	// stdin is read by interactive commands (tapyr auth login); nil reads
+	// nothing.
+	stdin  io.Reader
 	getenv func(string) string
 	// lookupEnv distinguishes unset from empty variables (secret checks).
 	lookupEnv func(string) (string, bool)
@@ -93,6 +96,7 @@ func newRootCmd(e *env) *cobra.Command {
 		newSimCmd(e),
 		newRecordCmd(e, flags),
 		newProviderCmd(e, flags),
+		newAuthCmd(e, flags),
 	)
 	return root
 }

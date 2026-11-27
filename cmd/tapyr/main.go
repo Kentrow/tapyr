@@ -15,7 +15,7 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, os.Args[1:], &env{
-		stdout: os.Stdout, stderr: os.Stderr, lookupEnv: os.LookupEnv, clock: clock.Real(), listen: (&net.ListenConfig{}).Listen,
+		stdout: os.Stdout, stderr: os.Stderr, stdin: os.Stdin, lookupEnv: os.LookupEnv, clock: clock.Real(), listen: (&net.ListenConfig{}).Listen,
 		reload: reloads(ctx),
 	})
 	stop()

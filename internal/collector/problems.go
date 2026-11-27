@@ -32,7 +32,28 @@ func runProblem(cfg *config.Config, account, target string, r state.RunRecord) *
 func reauthProblem(cfg *config.Config, account string) *api.Problem {
 	return problem.For(problem.Input{
 		Class: problem.ClassReauth, Account: account, Secrets: accountSecrets(cfg, account, ""), Version: buildinfo.Get().Version,
+		LoginSecret: loginSecret(cfg, account),
 	})
+}
+
+// loginSecret returns the bootstrap refresh token secret of an
+// oauth2_authorization_code account, which tapyr auth login renews, or "".
+func loginSecret(cfg *config.Config, account string) string {
+	if cfg == nil {
+		return ""
+	}
+	for _, a := range cfg.Accounts {
+		if string(a.Metadata.Name) != account {
+			continue
+		}
+		for _, p := range cfg.Providers {
+			if o := p.Spec.Auth.OAuth2AuthorizationCode; p.Metadata.Name == a.Spec.Provider && o != nil &&
+				p.Spec.Auth.Type == config.AuthOAuth2AuthorizationCode {
+				return o.RefreshToken.Secret
+			}
+		}
+	}
+	return ""
 }
 
 // accountSecrets returns the references of the secrets of an account, with

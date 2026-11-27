@@ -310,7 +310,7 @@ func (a *authCode) refresh(ctx context.Context) (TokenResponse, error) {
 	for k, v := range a.o.TokenParams {
 		form.Set(k, v)
 	}
-	req, err := newTokenRequest(ctx, a.tokenURL, form, a.o.AuthStyle, a.clientID, a.clientSecret)
+	req, err := NewTokenRequest(ctx, a.tokenURL, form, a.o.AuthStyle, a.clientID, a.clientSecret)
 	if err != nil {
 		return TokenResponse{}, err
 	}
@@ -321,10 +321,10 @@ func (a *authCode) refresh(ctx context.Context) (TokenResponse, error) {
 	return ParseTokenResponse("token endpoint "+a.tokenURL.Path, status, body)
 }
 
-// newTokenRequest builds a form POST to a token endpoint with the client
+// NewTokenRequest builds a form POST to a token endpoint with the client
 // authentication of authStyle: HTTP basic (header) or the body. A public
 // client (no secret) sends its id in the body.
-func newTokenRequest(ctx context.Context, u *url.URL, form url.Values, authStyle string, id, sec secret.Value) (*http.Request, error) {
+func NewTokenRequest(ctx context.Context, u *url.URL, form url.Values, authStyle string, id, sec secret.Value) (*http.Request, error) {
 	basic := authStyle != "body" && !sec.IsZero()
 	if !basic {
 		form.Set("client_id", id.Reveal())

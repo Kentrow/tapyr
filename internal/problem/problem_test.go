@@ -41,6 +41,11 @@ func TestFor(t *testing.T) {
 			action: "Create new ones as the provider README explains, update TAPYR_LAB_API_KEY (environment variable), then reload Tapyr.", docs: anchorAuth,
 		},
 		{
+			name: "re-bootstrap with a login", in: Input{Class: ClassReauth, Account: "lab", Secrets: refs, LoginSecret: "refreshToken"},
+			class: ClassReauth, title: "The credentials of lab can no longer be renewed.",
+			action: "Run tapyr auth login lab --secret-file <file>, give the file to the secret refreshToken of the account, then reload Tapyr.", docs: anchorAuth,
+		},
+		{
 			name: "rate limited", in: Input{Class: "rate_limited", Status: 429, Account: "lab"},
 			class: ClassRateLimited, title: "The provider is rate limiting the requests of lab (HTTP 429).", docs: anchorQuota,
 		},
