@@ -18,11 +18,26 @@ type SecretSource struct {
 	OnResolve func(value string)
 }
 
+// loginSecret returns the secret of an account that tapyr auth login writes:
+// the bootstrap refresh token of an oauth2_authorization_code provider.
+func loginSecret(cfg *Config, a *Account) string {
+	for _, p := range cfg.Providers {
+		if p.Metadata.Name != a.Spec.Provider || p.Spec.Auth == nil {
+			continue
+		}
+		if o := p.Spec.Auth.OAuth2AuthorizationCode; p.Spec.Auth.Type == AuthOAuth2AuthorizationCode && o != nil {
+			return o.RefreshToken.Secret
+		}
+	}
+	return ""
+}
+
 // CheckSecrets resolves every secret reference of the configuration and
 // reports the ones that are missing or empty. Secret values are never
 // included in the diagnostics.
 func CheckSecrets(cfg *Config, src SecretSource) Diagnostics {
 	var diags Diagnostics
+	hint := ""
 	check := func(s *Source, ref SecretRef, tokens ...string) {
 		var problem string
 		switch {
@@ -44,6 +59,7 @@ func CheckSecrets(cfg *Config, src SecretSource) Diagnostics {
 			}
 		}
 		if problem != "" {
+			problem += hint
 			diags = append(diags, Diagnostic{
 				Pos:     s.positions.position(tokens, false),
 				Path:    s.positions.path(tokens),
@@ -52,8 +68,13 @@ func CheckSecrets(cfg *Config, src SecretSource) Diagnostics {
 		}
 	}
 	for _, a := range cfg.Accounts {
+		login := loginSecret(cfg, a)
 		for _, k := range sortedKeys(a.Spec.Secrets) {
+			if k == login {
+				hint = fmt.Sprintf(" (run tapyr auth login %s to write it)", a.Metadata.Name)
+			}
 			check(a.Source, a.Spec.Secrets[k], "spec", "secrets", k)
+			hint = ""
 		}
 		for i, t := range a.Spec.Targets {
 			for _, k := range sortedKeys(t.Secrets) {
