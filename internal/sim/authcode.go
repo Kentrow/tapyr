@@ -29,6 +29,9 @@ type authCodeFlow struct {
 	authorize string // absolute path of the authorize endpoint
 	device    string // absolute path of the device endpoint, or empty
 	clients   []config.SimulationAuthCodeClient
+	// redirect is the redirectURL of the provider, the registered one of
+	// the clients that list none.
+	redirect string
 
 	mu      sync.Mutex
 	seq     int
@@ -52,6 +55,12 @@ func newAuthCodeFlow(o *config.OAuth2AuthorizationCode, clients []config.Simulat
 	var err error
 	if f.authorize, err = templatePath("authorizeURL", o.AuthorizeURL); err != nil {
 		return nil, err
+	}
+	if f.redirect, err = config.RenderTemplate("redirectURL", string(o.RedirectURL), map[string]string{}); err != nil {
+		return nil, fmt.Errorf("auth redirectURL: %w", err)
+	}
+	if f.redirect == "" {
+		f.redirect = config.DefaultRedirectURL
 	}
 	if o.DeviceAuthorizationURL != "" {
 		if f.device, err = templatePath("deviceAuthorizationURL", o.DeviceAuthorizationURL); err != nil {
@@ -109,23 +118,42 @@ func (f *authCodeFlow) client(req *http.Request) (*config.SimulationAuthCodeClie
 	return nil, false
 }
 
-// serveAuthorize consents at once: it redirects to redirect_uri with a code
-// and the state, as a vendor does after the person accepts.
+// registered returns the redirect URL registered for a client that equals
+// the requested one: the value of the configuration, never the request's.
+func (f *authCodeFlow) registered(client, requested string) (string, bool) {
+	for _, c := range f.clients {
+		if !equal(client, c.ClientID) {
+			continue
+		}
+		urls := c.RedirectURLs
+		if len(urls) == 0 {
+			urls = []string{f.redirect}
+		}
+		for _, u := range urls {
+			if u != "" && equal(u, requested) {
+				return u, true
+			}
+		}
+	}
+	return "", false
+}
+
+// serveAuthorize consents at once: it redirects to the registered redirect
+// URL with a code and the state, as a vendor does after the person accepts.
+// An unknown client or an unregistered redirect URL gets an error page,
+// never a redirect.
 func (is *issuer) serveAuthorize(w http.ResponseWriter, req *http.Request) {
 	f, q := is.code, req.URL.Query()
-	redirect, err := url.Parse(q.Get("redirect_uri"))
-	known := false
-	for _, c := range f.clients {
-		known = known || equal(q.Get("client_id"), c.ClientID)
-	}
-	if q.Get("response_type") != "code" || !known || err != nil || redirect.Scheme == "" || redirect.Host == "" {
+	target, ok := f.registered(q.Get("client_id"), q.Get("redirect_uri"))
+	redirect, err := url.Parse(target)
+	if q.Get("response_type") != "code" || !ok || err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_request")
 		return
 	}
 	f.mu.Lock()
 	code := f.next("code")
 	f.codes[code] = codeGrant{
-		client: q.Get("client_id"), redirect: q.Get("redirect_uri"), challenge: q.Get("code_challenge"),
+		client: q.Get("client_id"), redirect: target, challenge: q.Get("code_challenge"),
 		expiry: is.s.clock.Now().Add(codeLifetime),
 	}
 	f.mu.Unlock()

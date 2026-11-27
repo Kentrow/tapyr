@@ -206,6 +206,50 @@ func TestAuthCodeSimAuthorizeErrors(t *testing.T) {
 	if status, _ := authorize(t, srv, noRedirect); status != http.StatusBadRequest {
 		t.Errorf("no redirect_uri: %d", status)
 	}
+	// Only a redirect URL registered for the client is followed, as a
+	// vendor does: no open redirect.
+	elsewhere := url.Values{}
+	for k, v := range base {
+		elsewhere[k] = v
+	}
+	elsewhere.Set("redirect_uri", "https://attacker.example.invalid/steal")
+	if status, loc := authorize(t, srv, elsewhere); status != http.StatusBadRequest || loc.String() != "" {
+		t.Errorf("unregistered redirect_uri: %d to %v", status, loc)
+	}
+}
+
+func TestAuthCodeSimRegisteredRedirects(t *testing.T) {
+	// A client lists its redirect URLs; without a list, the redirect URL of
+	// the provider definition is the registered one.
+	accept := strings.Replace(authCodeAccept, "{ clientId: public-app,", "{ clientId: public-app, redirectURLs: [\"http://127.0.0.1:9000/cb\"],", 1)
+	doc := strings.Replace(providerDoc, "  auth: AUTH", "  secrets: [{ name: refreshToken }]\n  auth: "+authCodeProvider, 1)
+	p, err := loader(t).LoadPackage(fstest.MapFS{
+		"provider.yaml": &fstest.MapFile{Data: []byte(doc)},
+		"sim/sim.yaml":  &fstest.MapFile{Data: []byte("apiVersion: tapyr/v1alpha1\nkind: Simulation\nmetadata: { name: acme }\nspec:\n" + accept)},
+		"sim/orgs.json": &fstest.MapFile{Data: []byte(`[]`)},
+	}, "acme", "acme", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := New(p, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(s.Handler())
+	defer srv.Close()
+	try := func(client, redirect string) int {
+		status, _ := authorize(t, srv, url.Values{"response_type": {"code"}, "client_id": {client}, "redirect_uri": {redirect}, "state": {"s"}})
+		return status
+	}
+	if got := try("public-app", "http://127.0.0.1:9000/cb"); got != http.StatusFound {
+		t.Errorf("listed redirect: %d", got)
+	}
+	if got := try("public-app", "http://127.0.0.1:8085/callback"); got != http.StatusBadRequest {
+		t.Errorf("default redirect of a client with a list: %d", got)
+	}
+	if got := try("app", "http://127.0.0.1:8085/callback"); got != http.StatusFound {
+		t.Errorf("provider default redirect: %d", got)
+	}
 }
 
 func TestAuthCodeSimRefresh(t *testing.T) {

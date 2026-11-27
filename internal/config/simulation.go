@@ -122,6 +122,10 @@ type SimulationAuthCodeClient struct {
 	// Rotate makes every refresh return a new refresh token and spend the
 	// one it was given, as rotating APIs do.
 	Rotate bool `json:"rotate,omitempty"`
+	// RedirectURLs registered for the client: the authorize endpoint
+	// redirects only to one of them. Default: the redirectURL of the
+	// provider, rendered without account params.
+	RedirectURLs []string `json:"redirectURLs,omitempty"`
 }
 
 // SimulationBasicCredential is a username and password pair.

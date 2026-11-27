@@ -63,6 +63,13 @@
           "description": "ClientSecret accepted; empty for a public client, which sends its id\nin the request body.",
           "type": "string"
         },
+        "redirectURLs": {
+          "description": "RedirectURLs registered for the client: the authorize endpoint\nredirects only to one of them. Default: the redirectURL of the\nprovider, rendered without account params.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
         "refreshTokens": {
           "description": "RefreshTokens are bootstrap refresh tokens the token endpoint accepts\nfor this client, for contract tests (fake values, sim-...).",
           "items": {

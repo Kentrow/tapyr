@@ -119,6 +119,7 @@ SimulationAuthCodeClient is an OAuth 2.0 client of the authorization code flow.
 |---|---|---|---|
 | `clientId` | string | yes | `clientId` accepted. |
 | `clientSecret` | string |  | `clientSecret` accepted; empty for a public client, which sends its id in the request body. |
+| `redirectURLs` | list of string |  | `redirectURLs` registered for the client: the authorize endpoint redirects only to one of them. Default: the redirectURL of the provider, rendered without account params. |
 | `refreshTokens` | list of string |  | `refreshTokens` are bootstrap refresh tokens the token endpoint accepts for this client, for contract tests (fake values, sim-...). |
 | `rotate` | boolean |  | Rotate makes every refresh return a new refresh token and spend the one it was given, as rotating APIs do. |
 
