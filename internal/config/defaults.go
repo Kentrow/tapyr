@@ -77,7 +77,7 @@ func defaultProvider(spec *ProviderSpec) {
 	}
 	if o := spec.Auth.OAuth2AuthorizationCode; o != nil {
 		setDefault(&o.ScopeSeparator, " ")
-		setDefault(&o.RedirectURL, Template("http://127.0.0.1:8085/callback"))
+		setDefault(&o.RedirectURL, Template(DefaultRedirectURL))
 		setDefault(&o.PKCE, "S256")
 		setDefault(&o.AuthStyle, "header")
 		setDefault(&o.RefreshBefore, Duration(5*time.Minute))
@@ -254,3 +254,7 @@ func setDefault[T comparable](field *T, value T) {
 		*field = value
 	}
 }
+
+// DefaultRedirectURL is the redirect URL of oauth2_authorization_code
+// without one: the loopback listener of tapyr auth login --listen.
+const DefaultRedirectURL = "http://127.0.0.1:8085/callback"

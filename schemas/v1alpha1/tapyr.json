@@ -2779,6 +2779,42 @@
       },
       "type": "object"
     },
+    "SimulationAuthCodeClient": {
+      "additionalProperties": false,
+      "description": "SimulationAuthCodeClient is an OAuth 2.0 client of the authorization code flow.",
+      "properties": {
+        "clientId": {
+          "description": "ClientID accepted.",
+          "type": "string"
+        },
+        "clientSecret": {
+          "description": "ClientSecret accepted; empty for a public client, which sends its id\nin the request body.",
+          "type": "string"
+        },
+        "redirectURLs": {
+          "description": "RedirectURLs registered for the client: the authorize endpoint\nredirects only to one of them. Default: the redirectURL of the\nprovider, rendered without account params.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "refreshTokens": {
+          "description": "RefreshTokens are bootstrap refresh tokens the token endpoint accepts\nfor this client, for contract tests (fake values, sim-...).",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "rotate": {
+          "description": "Rotate makes every refresh return a new refresh token and spend the\none it was given, as rotating APIs do.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "clientId"
+      ],
+      "type": "object"
+    },
     "SimulationBasicCredential": {
       "additionalProperties": false,
       "description": "SimulationBasicCredential is a username and password pair.",
@@ -2821,6 +2857,13 @@
       "additionalProperties": false,
       "description": "SimulationCredentials are accepted credentials per auth type.",
       "properties": {
+        "authorizationCode": {
+          "description": "AuthorizationCode lists the clients of the authorize, token and device\nendpoints with auth type oauth2_authorization_code.",
+          "items": {
+            "$ref": "#/$defs/SimulationAuthCodeClient"
+          },
+          "type": "array"
+        },
         "basic": {
           "description": "Basic credentials accepted with auth type basic.",
           "items": {

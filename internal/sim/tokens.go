@@ -35,6 +35,8 @@ type issuer struct {
 	clients  []config.SimulationClient
 	logins   []config.SimulationBasicCredential
 	login    *config.SessionLogin // nil for OAuth2
+	apply    *config.TokenApply   // how the token is sent; nil for a bearer token
+	code     *authCodeFlow        // oauth2_authorization_code, or nil
 	response string               // login response template
 	logout   string               // absolute logout path, or empty
 	logoutM  string
@@ -52,7 +54,8 @@ type issuedToken struct {
 
 // newIssuer returns the issuer of a token-based auth type, or nil.
 func (s *Server) newIssuer(a *config.Auth, sa *config.SimulationAuth) (*issuer, error) {
-	if a == nil || (a.Type != config.AuthOAuth2ClientCredentials && a.Type != config.AuthSessionLogin) {
+	if a == nil || (a.Type != config.AuthOAuth2ClientCredentials && a.Type != config.AuthSessionLogin &&
+		a.Type != config.AuthOAuth2AuthorizationCode) {
 		return nil, nil
 	}
 	is := &issuer{s: s, lifetime: defaultTokenLifetime, tokens: map[string]issuedToken{}, method: http.MethodPost}
@@ -69,6 +72,21 @@ func (s *Server) newIssuer(a *config.Auth, sa *config.SimulationAuth) (*issuer, 
 			is.response = string(data)
 		}
 	}
+	if o := a.OAuth2AuthorizationCode; a.Type == config.AuthOAuth2AuthorizationCode && o != nil {
+		var clients []config.SimulationAuthCodeClient
+		if sa != nil {
+			clients = sa.Accept.AuthorizationCode
+		}
+		path, err := templatePath("tokenURL", o.TokenURL)
+		if err != nil {
+			return nil, err
+		}
+		is.path, is.endpoint, is.apply = path, path, o.Apply
+		if is.code, err = newAuthCodeFlow(o, clients); err != nil {
+			return nil, err
+		}
+		return is, nil
+	}
 	if a.Type == config.AuthOAuth2ClientCredentials {
 		// The token URL renders without account params: its defaults point
 		// to the simulator.
@@ -84,7 +102,7 @@ func (s *Server) newIssuer(a *config.Auth, sa *config.SimulationAuth) (*issuer, 
 		return is, nil
 	}
 	l := a.SessionLogin
-	is.login = l
+	is.login, is.apply = l, &l.Apply
 	if l.Request.Method != "" {
 		is.method = l.Request.Method
 	}
@@ -102,7 +120,8 @@ func (s *Server) newIssuer(a *config.Auth, sa *config.SimulationAuth) (*issuer, 
 // endpoint.
 func (is *issuer) handles(req *http.Request) bool {
 	return is != nil && ((req.URL.Path == is.path && req.Method == is.method) ||
-		(is.logout != "" && req.URL.Path == is.logout && req.Method == is.logoutM))
+		(is.logout != "" && req.URL.Path == is.logout && req.Method == is.logoutM) ||
+		(is.code != nil && is.code.handles(req)))
 }
 
 // serveLogout closes the session of the token the request carries. wait
@@ -175,6 +194,14 @@ func (is *issuer) open() int64 {
 // scenario after the limits counted the request (see Server.serve).
 func (is *issuer) serve(w http.ResponseWriter, req *http.Request, wait func() bool) {
 	s := is.s
+	if is.code != nil {
+		if req.Method == http.MethodGet && req.URL.Path == is.code.authorize {
+			is.serveAuthorize(w, req)
+		} else {
+			is.serveAuthCode(w, req, wait)
+		}
+		return
+	}
 	if is.logout != "" && req.URL.Path == is.logout && req.Method == is.logoutM {
 		is.serveLogout(w, req, wait)
 		return
@@ -284,11 +311,11 @@ func (is *issuer) valid(token string) (string, bool) {
 
 // tokenOf extracts the token a request carries, as the provider applies it.
 func (is *issuer) tokenOf(req *http.Request) string {
-	if is.login == nil {
+	if is.apply == nil {
 		token, _ := strings.CutPrefix(req.Header.Get("Authorization"), "Bearer ")
 		return token
 	}
-	apply := is.login.Apply
+	apply := *is.apply
 	if apply.Cookie != "" {
 		c, err := req.Cookie(apply.Cookie)
 		if err != nil {
