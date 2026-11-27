@@ -643,3 +643,22 @@ func TestAuthCodeCanceledRunStillStoresPair(t *testing.T) {
 		t.Errorf("stored refresh token after a cancellation = %q", st.Refresh)
 	}
 }
+
+func TestAuthCodeReadOnlyRejectionNoRetry(t *testing.T) {
+	// Read-only, a rejected access token cannot be renewed: asking for a
+	// retry would only fail again.
+	rs := newRefreshServer(t, "boot", true)
+	clk := clock.NewFake(start)
+	store := newMemStore()
+	m, _ := newManager(t, clk, store, "k")
+	authorization(t, authCodeFor(t, m, authCodeAuth(rs.URL+"/token", "header"), authCodeSession("home", "boot")))
+	ro, err := NewManager(ManagerOptions{Clock: clk, Store: store, StateKey: "k", ReadOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := authCodeFor(t, ro, authCodeAuth(rs.URL+"/token", "header"), authCodeSession("home", "boot"))
+	authorization(t, a)
+	if retry, _ := a.OnAuthFailure(context.Background(), nil); retry {
+		t.Error("read-only OnAuthFailure asks for a retry")
+	}
+}

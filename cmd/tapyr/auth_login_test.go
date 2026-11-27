@@ -499,3 +499,46 @@ func TestDeviceLoginSendsTokenParams(t *testing.T) {
 		}
 	}
 }
+
+func TestCodeFromPercentEncoded(t *testing.T) {
+	// A code copied from the address bar may be percent-encoded: it is
+	// decoded before the exchange, which encodes it again.
+	got, err := codeFrom("  4/0AY0e-g7%2Fabc%3D  ", "st")
+	if err != nil || got != "4/0AY0e-g7/abc=" {
+		t.Errorf("codeFrom() = %q, %v", got, err)
+	}
+}
+
+func TestAuthLoginListenIgnoresStrayRequests(t *testing.T) {
+	// A request on the callback path without code nor error (a favicon, a
+	// prefetch, another local process) does not end the login.
+	l, err := (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	redirect := fmt.Sprintf("http://127.0.0.1:%d/callback", port)
+	ls := newLoginSetup(t, redirect, "")
+	browser := func(line string, _ io.Writer) {
+		u := strings.TrimSpace(line)
+		if !strings.Contains(u, "/oauth/authorize?") {
+			return
+		}
+		for _, stray := range []string{redirect, redirect + "?foo=bar"} {
+			req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, stray, http.NoBody)
+			if resp, err := http.DefaultClient.Do(req); err == nil {
+				resp.Body.Close()
+			}
+		}
+		req, _ := http.NewRequestWithContext(context.Background(), http.MethodGet, u, http.NoBody)
+		if resp, err := http.DefaultClient.Do(req); err == nil {
+			resp.Body.Close()
+		}
+	}
+	res := runLogin(t, ls, clock.Real(), browser, "--listen")
+	if res.code != 0 {
+		t.Fatalf("exit %d\n%s%s", res.code, res.stdout, res.stderr)
+	}
+	refreshWorks(t, ls)
+}
