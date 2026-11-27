@@ -311,7 +311,12 @@ func codeFrom(input, state string) (string, error) {
 		return "", errors.New("no code pasted")
 	}
 	if !strings.Contains(input, "code=") && !strings.Contains(input, "error=") {
-		return input, nil // the code alone
+		// The code alone, maybe percent-encoded from the address bar: the
+		// exchange encodes it again.
+		if decoded, err := url.QueryUnescape(input); err == nil {
+			input = decoded
+		}
+		return input, nil
 	}
 	raw := input
 	if i := strings.IndexByte(raw, '#'); i >= 0 {
@@ -367,6 +372,12 @@ func (f *loginFlow) listenRedirect(ctx context.Context, e *env, authorize, state
 		path = "/"
 	}
 	mux.HandleFunc(path, func(w http.ResponseWriter, req *http.Request) {
+		if q := req.URL.Query(); !q.Has("code") && !q.Has("error") {
+			// Not the redirect of the consent (a favicon, a prefetch,
+			// another local process): keep waiting.
+			http.Error(w, "Tapyr is waiting for the redirect of the consent.", http.StatusNotFound)
+			return
+		}
 		code, err := codeOf(req.URL.Query(), state)
 		msg := "Tapyr received the authorization. You can close this window."
 		if err != nil {

@@ -414,6 +414,12 @@ func (a *authCode) OnAuthFailure(context.Context, *http.Response) (bool, error) 
 	if a.st.Reauth {
 		return false, nil
 	}
+	if a.m.readOnly {
+		// The refresh token may rotate: read-only, it is never spent.
+		a.m.logger.Warn("the access token was rejected and cannot be renewed read-only, next to tapyr run", "component", "auth",
+			"provider", a.scope.Provider, "account", a.scope.Account)
+		return false, nil
+	}
 	a.st.Access, a.st.Expiry, a.st.Lifetime = "", time.Time{}, 0
 	return true, nil
 }

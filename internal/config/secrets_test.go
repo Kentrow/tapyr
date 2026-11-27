@@ -96,3 +96,47 @@ spec:
 		t.Fatal("a secret value leaked into the diagnostics")
 	}
 }
+
+func TestCheckSecretsNamesLogin(t *testing.T) {
+	// The bootstrap refresh token of oauth2_authorization_code is written
+	// by tapyr auth login: a missing one says so (ADR 0016).
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	write(t, path, `apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata: { name: athletes, version: 0.1.0 }
+spec:
+  baseURL: https://api.example.invalid
+  secrets: [{ name: clientId }, { name: refreshToken }]
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      authorizeURL: https://auth.example.invalid/authorize
+      tokenURL: https://auth.example.invalid/token
+      clientId: { secret: clientId }
+      refreshToken: { secret: refreshToken }
+---
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: home }
+spec:
+  provider: athletes
+  secrets:
+    clientId: { env: TAPYR_UNSET_ID }
+    refreshToken: { file: refresh-token }
+`)
+	cfg, err := newTestLoader(t).Load([]string{path})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := CheckSecrets(cfg, SecretSource{
+		LookupEnv: func(string) (string, bool) { return "", false },
+		ReadFile:  func(string) ([]byte, error) { return nil, fs.ErrNotExist },
+	}).Error()
+	if !strings.Contains(got, "refresh-token: no such file (run tapyr auth login home to write it)") {
+		t.Errorf("refresh token diagnostic:\n%s", got)
+	}
+	if strings.Contains(got, "TAPYR_UNSET_ID is not set (run tapyr auth login") {
+		t.Errorf("the client id diagnostic names the login:\n%s", got)
+	}
+}
