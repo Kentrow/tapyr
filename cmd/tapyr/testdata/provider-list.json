@@ -670,6 +670,122 @@
       ]
     },
     {
+      "name": "strava",
+      "version": "0.1.0",
+      "displayName": "Strava",
+      "description": "Strava API v3 - the activity totals of an athlete (rides, runs, swims over 4 weeks, the year and all time), for their own dashboards",
+      "docs": "https://developers.strava.com/docs/reference/",
+      "categories": [
+        "sport"
+      ],
+      "maintainers": [
+        "Kentrow"
+      ],
+      "tier": "official",
+      "validation": {
+        "status": "simulator",
+        "notes": "Written from the Strava API documentation; the first package of the oauth2_authorization_code auth type"
+      },
+      "origin": "builtin",
+      "status": "active",
+      "readme": "providers/strava/README.md",
+      "simulator": true,
+      "auth": "oauth2_authorization_code",
+      "params": [
+        {
+          "name": "baseURL",
+          "required": false,
+          "description": "Base URL of the API, https://www.strava.com/api/v3 by default"
+        },
+        {
+          "name": "oauthBaseURL",
+          "required": false,
+          "description": "Base URL of the OAuth endpoints, https://www.strava.com by default"
+        },
+        {
+          "name": "redirectURL",
+          "required": false,
+          "description": "Redirect URL of the consent, within the Authorization Callback Domain of the application (127.0.0.1 and localhost are allowed); http://127.0.0.1:8085/callback by default"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "clientId",
+          "required": true,
+          "description": "Client ID of your API application (strava.com/settings/api)"
+        },
+        {
+          "name": "clientSecret",
+          "required": true,
+          "description": "Client Secret of your API application"
+        },
+        {
+          "name": "refreshToken",
+          "required": true,
+          "description": "Bootstrap refresh token, written by tapyr auth login"
+        }
+      ],
+      "templates": [
+        {
+          "name": "strava-athlete",
+          "path": "/athlete",
+          "defaultInterval": "6h",
+          "defaultPriority": "low",
+          "role": "both",
+          "metrics": [
+            "strava_athlete_info"
+          ]
+        },
+        {
+          "name": "strava-stats",
+          "path": "/athletes/{athleteId}/stats",
+          "defaultInterval": "30m",
+          "defaultPriority": "normal",
+          "role": "metrics",
+          "forEach": "strava-athlete",
+          "metrics": [
+            "strava_activities",
+            "strava_biggest_climb_elevation_gain_meters",
+            "strava_biggest_ride_distance_meters",
+            "strava_distance_meters",
+            "strava_elapsed_time_seconds",
+            "strava_elevation_gain_meters",
+            "strava_moving_time_seconds"
+          ]
+        }
+      ],
+      "limits": [
+        {
+          "name": "read-15min",
+          "kind": "quota",
+          "value": "100 per rolling 15m",
+          "scope": [
+            "credential"
+          ],
+          "description": "Read requests per application every 15 minutes (100 by default, 200 with upgraded access); Strava resets it at 0, 15, 30 and 45 minutes past the hour, Tapyr counts it over a rolling 15 minutes, which never exceeds a fixed window",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developers.strava.com/docs/rate-limits/",
+            "date": "2026-11-27"
+          }
+        },
+        {
+          "name": "read-daily",
+          "kind": "quota",
+          "value": "1000 per day, reset at 00:00 UTC",
+          "scope": [
+            "credential"
+          ],
+          "description": "Read requests per application per day (1000 by default, 2000 with upgraded access), reset at midnight UTC",
+          "source": {
+            "kind": "vendor-docs",
+            "url": "https://developers.strava.com/docs/rate-limits/",
+            "date": "2026-11-27"
+          }
+        }
+      ]
+    },
+    {
       "name": "teltonika-rms",
       "version": "0.1.0",
       "displayName": "Teltonika RMS",

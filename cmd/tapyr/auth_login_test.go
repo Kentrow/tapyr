@@ -13,11 +13,14 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/kentrow/tapyr/internal/clock"
+	"github.com/kentrow/tapyr/internal/config"
 	"github.com/kentrow/tapyr/internal/provider"
+	"github.com/kentrow/tapyr/internal/secret"
 	"github.com/kentrow/tapyr/internal/sim"
 )
 
@@ -218,8 +221,7 @@ func pasteBrowser(t *testing.T, edit func(redirect string) string) func(string, 
 		if !strings.Contains(u, "/oauth/authorize?") {
 			return
 		}
-		if parsed, err := url.Parse(u); err != nil || parsed.Query().Get("scope") != "read,activity:read_all" ||
-			parsed.Query().Get("code_challenge_method") != "S256" || parsed.Query().Get("state") == "" {
+		if parsed, err := url.Parse(u); err != nil || parsed.Query().Get("state") == "" {
 			t.Errorf("authorize URL %s", u)
 		}
 		_, _ = io.WriteString(stdin, edit(consentURL(t, u))+"\n")
@@ -254,7 +256,20 @@ func refreshWorks(t *testing.T, ls *loginSetup) {
 
 func TestAuthLoginPaste(t *testing.T) {
 	ls := newLoginSetup(t, "http://127.0.0.1:8085/callback", "")
-	res := runLogin(t, ls, clock.Real(), pasteBrowser(t, func(r string) string { return r }))
+	paste := pasteBrowser(t, func(r string) string { return r })
+	var authorizeURL atomic.Value
+	browser := func(line string, stdin io.Writer) {
+		if strings.Contains(line, "/oauth/authorize?") {
+			authorizeURL.Store(strings.TrimSpace(line))
+		}
+		paste(line, stdin)
+	}
+	res := runLogin(t, ls, clock.Real(), browser)
+	u, _ := url.Parse(fmt.Sprint(authorizeURL.Load()))
+	if q := u.Query(); q.Get("scope") != "read,activity:read_all" || q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "" ||
+		q.Get("client_id") != "app" || q.Get("response_type") != "code" {
+		t.Errorf("authorize URL %s", u)
+	}
 	if res.code != 0 {
 		t.Fatalf("exit %d\n%s%s", res.code, res.stdout, res.stderr)
 	}
@@ -432,3 +447,55 @@ func TestAuthLoginDeviceNotDeclared(t *testing.T) {
 }
 
 func slicesClone(s []string) []string { return append([]string(nil), s...) }
+
+func TestDeviceLoginSendsTokenParams(t *testing.T) {
+	// tokenParams go with every token request, the device polls included.
+	var mu sync.Mutex
+	var forms []url.Values
+	polls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = r.ParseForm()
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/device" {
+			_, _ = io.WriteString(w, `{"device_code": "dc", "user_code": "uc", "verification_uri": "http://example.invalid/activate", "interval": 5}`)
+			return
+		}
+		mu.Lock()
+		forms = append(forms, r.PostForm)
+		polls++
+		n := polls
+		mu.Unlock()
+		if n == 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"error": "authorization_pending"}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"access_token": "a", "refresh_token": "r", "expires_in": 3600}`)
+	}))
+	defer srv.Close()
+	tokenURL, _ := url.Parse(srv.URL + "/token")
+	deviceURL, _ := url.Parse(srv.URL + "/device")
+	clk := clock.NewFake(time.Date(2026, time.November, 27, 9, 0, 0, 0, time.UTC))
+	done := make(chan struct{})
+	go driveClock(context.Background(), clk, done)
+	defer close(done)
+	f := &loginFlow{
+		block:    &config.OAuth2AuthorizationCode{TokenParams: map[string]string{"tenant": "t1"}, AuthStyle: "body", ScopeSeparator: " "},
+		tokenURL: tokenURL, deviceURL: deviceURL, clientID: secret.New("app"), clock: clk,
+		send: func(_ context.Context, _ string, req *http.Request) (*http.Response, error) {
+			return http.DefaultClient.Do(req)
+		},
+	}
+	tr, err := f.deviceLogin(context.Background(), &env{stdout: io.Discard})
+	if err != nil || tr.Refresh.Reveal() != "r" {
+		t.Fatalf("deviceLogin() = %v, %v", tr, err)
+	}
+	if len(forms) != 2 {
+		t.Fatalf("%d token requests, want 2", len(forms))
+	}
+	for i, f := range forms {
+		if f.Get("tenant") != "t1" || f.Get("grant_type") != deviceGrant {
+			t.Errorf("poll %d: form %v", i+1, f)
+		}
+	}
+}

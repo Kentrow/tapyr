@@ -1,0 +1,12 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: bad-day
+  description: Another app of the same client spends 20 read requests an hour, then the stats endpoint fails 30% of the time for 20 minutes.
+spec:
+  steps:
+    - at: 0s
+      externalConsumption: { limit: read-daily, ratePerHour: 20 }
+    - at: 2h
+      for: 20m
+      errors: { routes: ["/athletes/{athleteId}/stats"], status: 503, ratio: 0.3 }

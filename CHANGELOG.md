@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The `strava` provider package: the activity totals of a Strava athlete (rides, runs and swims over 4 weeks, the year and all time) for their own dashboards, the first package of the `oauth2_authorization_code` auth type, validated against its simulator.
 - `tapyr auth login <account>` runs the consent of an `oauth2_authorization_code` account once (pasted redirect URL, `--listen` or `--device`) and writes its refresh token to a file, never to the screen; the status API names the command when an account needs a new consent.
 - The simulator serves the OAuth 2.0 authorization code flow (authorize, token and device authorization endpoints, PKCE, rotating refresh tokens) for packages with the `oauth2_authorization_code` auth type.
 - The `oauth2_authorization_code` auth type renews access tokens from a refresh token, rotated or not, for APIs that use the OAuth 2.0 authorization code flow, starting from a refresh token given as an account secret ([ADR 0016](docs/adr/0016-oauth2-authorization-code.md)).

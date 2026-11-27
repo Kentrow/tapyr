@@ -11,6 +11,7 @@ The built-in provider packages. Each section was checked against the vendor docu
 | `juniper-mist` | Cloud, hourly quota per token, regional clouds | Simulator only (docs + public OpenAPI spec) | Validates header auth with a format, page pagination, hourly windows |
 | `cisco-thousandeyes` | Cloud, per-minute quota per organization starting at the first request | Simulator only (docs + official SDKs) | Validates windows followed through the reset header, source timestamps per round, optional query params |
 | `unifi-site-manager` | Cloud, one API key for every console of a UI account, rate limit per key | Real account, read-only (November 2026) + simulator | Validates cursor pagination in the body, windows published late with source timestamps, several item kinds from one response |
+| `strava` | Cloud, OAuth 2.0 authorization code with rotating refresh tokens, 15-minute and daily quotas per application | Simulator only (docs) | Validates `oauth2_authorization_code` and `tapyr auth login`, a package beyond networks |
 
 ---
 
@@ -152,6 +153,21 @@ UniFi Site Manager API v1. Checked in November 2026 against the [Getting Started
   - `unifi-isp-metrics` (`GET /v1/isp-metrics/5m?beginTimestamp=<now - 1h>`, windows published about 30 minutes late, stamped with their start);
   - `unifi-isp-metrics-hourly` (`GET /v1/isp-metrics/1h`, optional).
 - **Deliverables**: provider package, synthetic simulator (the lists paginate themselves with a body cursor), scenarios, dashboard, contract test. No e2e test.
+
+## strava
+
+Strava API v3. Checked in November 2026 against the [rate limits](https://developers.strava.com/docs/rate-limits/), [authentication](https://developers.strava.com/docs/authentication/) and [reference](https://developers.strava.com/docs/reference/) pages and the [API Agreement](https://www.strava.com/legal/api).
+
+- **Auth**: OAuth 2.0 authorization code ([ADR 0016](../adr/0016-oauth2-authorization-code.md)): authorize at `https://www.strava.com/oauth/authorize`, tokens at `https://www.strava.com/oauth/token`, client id and secret in the body, comma-separated scopes (`read` only), `approval_prompt=force`; access tokens valid 6 hours, a new refresh token at every refresh with the previous one invalidated at once; no PKCE documented. Redirect URLs within the Authorization Callback Domain of the application, `127.0.0.1` and `localhost` allowed.
+- **Base URL**: `https://www.strava.com/api/v3` (account param `baseURL`), the OAuth endpoints from `oauthBaseURL`.
+- **Rate limits**: per application, read ("non-upload") requests 100 every 15 minutes (reset at 0, 15, 30 and 45 past the hour, declared as a rolling 15-minute quota, which never exceeds a fixed window) and 1000 a day (reset at midnight UTC), doubled with upgraded access; scope `credential` (the client, not the refresh token); `429` when exceeded. The usage headers (`X-ReadRateLimit-Usage: <15 minutes>,<day>`) are not synced: the engine reads one number per header.
+- **Pagination**: none (two single-object endpoints).
+- **Budget strategy**: the athlete every 6 hours, its totals every 30 minutes: 52 of the 1000 daily requests for one athlete.
+- **Templates** (metrics in the [package README](../../providers/strava/README.md)):
+  - `strava-athlete` (`GET /athlete`), the inventory of the stats job;
+  - `strava-stats` (`GET /athletes/{id}/stats`, one item per period and sport).
+- **Terms**: the API Agreement lets an application show the data of a user to that user only; the package is for one's own dashboards.
+- **Deliverables**: provider package, simulator with the authorization code flow and rotation, scenarios, dashboard, contract test, an end-to-end test of the login and the rotations (`cmd/tapyr`). No e2e test against the real API.
 
 ## Provider package checklist (definition of done)
 

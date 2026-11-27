@@ -466,7 +466,11 @@ func (f *loginFlow) deviceLogin(ctx context.Context, e *env) (auth.TokenResponse
 		if err := f.clock.Sleep(ctx, interval); err != nil {
 			return auth.TokenResponse{}, fmt.Errorf("waiting for the authorization: %w", err)
 		}
-		status, body, err := f.post(ctx, f.tokenURL, url.Values{"grant_type": {deviceGrant}, "device_code": {d.DeviceCode}})
+		form := url.Values{"grant_type": {deviceGrant}, "device_code": {d.DeviceCode}}
+		for k, v := range f.block.TokenParams {
+			form.Set(k, v)
+		}
+		status, body, err := f.post(ctx, f.tokenURL, form)
 		if err != nil {
 			return auth.TokenResponse{}, err
 		}

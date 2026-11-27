@@ -1,0 +1,19 @@
+# Contract test of strava: tapyr provider lint runs the stats job once
+# against the simulator and compares the samples with expected.prom. The
+# athlete template runs as its implicit parent. The OAuth endpoints are
+# outside the API base path, hence oauthBaseURL from $SIM_ADDR.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: contract }
+spec:
+  provider: strava
+  params: { baseURL: "$SIM_URL", oauthBaseURL: "$SIM_ADDR" }
+  secrets:
+    clientId: { env: STRAVA_CLIENT_ID }
+    clientSecret: { env: STRAVA_CLIENT_SECRET }
+    refreshToken: { env: STRAVA_REFRESH_TOKEN }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: stats }
+spec: { account: contract, template: strava-stats }

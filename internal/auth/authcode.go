@@ -83,6 +83,10 @@ type authCodeState struct {
 	Reauth bool `json:"reauth,omitempty"`
 }
 
+// storeTimeout bounds the storage of a refreshed pair, which outlives the
+// cancellation of its run.
+const storeTimeout = 10 * time.Second
+
 // authCodeLifetime is how long a stored pair is kept: refresh tokens of
 // most APIs live for weeks or months without use.
 const authCodeLifetime = 365 * 24 * time.Hour
@@ -113,7 +117,10 @@ type authCode struct {
 	st     authCodeState
 	// unsaved is set when the pair in memory could not be stored: it is
 	// stored before its access token is used.
-	unsaved    bool
+	unsaved bool
+	// unopenable is set when the stored pair could not be opened (another
+	// TAPYR_STATE_KEY): it is replaced only by a pair that works.
+	unopenable bool
 	rejections int
 	retryAt    time.Time
 	rejection  error
@@ -164,6 +171,22 @@ func (m *Manager) authCode(o *config.OAuth2AuthorizationCode, s Session) (Authen
 	if ps, ok := m.pluginSessions[session]; ok {
 		return ps.auth, nil
 	}
+	// Changed secrets (a new login, a rotated client secret) replace the
+	// authenticator of the account: its re-bootstrap condition must not
+	// linger. With the same bootstrap, the pair it holds carries over, also
+	// one not stored yet.
+	for k, ps := range m.pluginSessions {
+		old, isAuthCode := ps.auth.(*authCode)
+		if !isAuthCode || old.key != a.key {
+			continue
+		}
+		old.mu.Lock()
+		if old.bootHash == a.bootHash {
+			a.loaded, a.st, a.unsaved, a.unopenable = old.loaded, old.st, old.unsaved, old.unopenable
+		}
+		old.mu.Unlock()
+		delete(m.pluginSessions, k)
+	}
 	m.pluginSessions[session] = &pluginSession{scope: s.Scope, auth: a}
 	return a, nil
 }
@@ -179,24 +202,47 @@ func (a *authCode) Status() (time.Time, bool) {
 }
 
 // loadLocked reads the stored pair, or starts from the bootstrap secret
-// when none is stored or the bootstrap changed.
-func (a *authCode) loadLocked(ctx context.Context) {
+// when none is stored or the bootstrap changed. A failed read is returned
+// and retried at the next use: taken for "nothing stored", it would start
+// from a spent bootstrap and overwrite a valid pair.
+func (a *authCode) loadLocked(ctx context.Context) error {
 	if a.loaded {
-		return
+		return nil
 	}
-	a.loaded = true
-	if v, _, ok := a.m.load(ctx, a.key); ok {
+	v, found, err := a.m.loadChecked(ctx, a.key)
+	switch {
+	case errors.Is(err, errUnopenable):
+		a.unopenable = true
+		a.m.logger.Warn("the stored token pair cannot be opened with TAPYR_STATE_KEY: starting from the bootstrap refresh token, "+
+			"the stored pair is kept unless the bootstrap works", "component", "auth", "provider", a.scope.Provider, "account", a.scope.Account)
+	case err != nil:
+		return err
+	case found:
 		var st authCodeState
 		if err := json.Unmarshal([]byte(v.Reveal()), &st); err == nil && st.Bootstrap == a.bootHash {
-			a.st = st
+			a.loaded, a.st = true, st
 			a.m.onTok(st.Access)
 			a.m.onTok(st.Refresh)
-			return
+			return nil
 		}
 		a.m.logger.Info("the bootstrap refresh token changed: the stored token pair is replaced", "component", "auth",
 			"provider", a.scope.Provider, "account", a.scope.Account)
 	}
-	a.st = authCodeState{Refresh: a.bootstrap.Reveal(), Bootstrap: a.bootHash}
+	a.loaded, a.st = true, authCodeState{Refresh: a.bootstrap.Reveal(), Bootstrap: a.bootHash}
+	return nil
+}
+
+// storeLocked stores the pair even when the run that obtained it is
+// canceled (a reload, a shutdown): a rotated refresh token that is not
+// stored is lost at the next restart.
+func (a *authCode) storeLocked(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), storeTimeout)
+	defer cancel()
+	err := a.saveLocked(ctx)
+	if err == nil {
+		a.unopenable = false
+	}
+	return err
 }
 
 // saveLocked stores the pair; read-only or without a store, it keeps it in
@@ -237,13 +283,15 @@ func (a *authCode) Decorate(ctx context.Context, req *http.Request) error {
 func (a *authCode) current(ctx context.Context) (string, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	a.loadLocked(ctx)
+	if err := a.loadLocked(ctx); err != nil {
+		return "", fmt.Errorf("reading the stored token pair: %w", err)
+	}
 	if a.st.Reauth {
 		return "", fmt.Errorf("account %s: %w (run tapyr auth login %s)", a.scope.Account, ErrReauthRequired, a.scope.Account)
 	}
 	now := a.m.clock.Now()
 	if a.unsaved {
-		if err := a.saveLocked(ctx); err != nil {
+		if err := a.storeLocked(ctx); err != nil {
 			return "", fmt.Errorf("storing the refreshed token pair: %w", err)
 		}
 	}
@@ -267,9 +315,18 @@ func (a *authCode) current(ctx context.Context) (string, error) {
 	if err != nil {
 		a.m.obs.TokenRequest(a.scope.Provider, a.scope.Account, "failed")
 		switch re, isRejected := errors.AsType[*rejectedError](err); {
+		case errors.Is(err, ErrInvalidGrant) && a.unopenable:
+			// The pair stored under another key may still work: it is
+			// kept, and the condition stays in memory.
+			a.st.Access, a.st.Expiry, a.st.Lifetime, a.st.Reauth = "", time.Time{}, 0, true
+			a.m.logger.Error("the bootstrap refresh token was refused and the stored pair cannot be opened: set the TAPYR_STATE_KEY "+
+				"it was stored with, or run tapyr auth login for this account", "component", "auth",
+				"provider", a.scope.Provider, "account", a.scope.Account)
+			return "", fmt.Errorf("account %s: %w: the stored token pair cannot be opened with TAPYR_STATE_KEY "+
+				"(set the key it was stored with, or run tapyr auth login %s)", a.scope.Account, ErrReauthRequired, a.scope.Account)
 		case errors.Is(err, ErrInvalidGrant):
 			a.st.Access, a.st.Expiry, a.st.Lifetime, a.st.Reauth = "", time.Time{}, 0, true
-			if serr := a.saveLocked(ctx); serr != nil {
+			if serr := a.storeLocked(ctx); serr != nil {
 				a.m.logger.Warn("storing the re-bootstrap condition", "component", "auth", "error", serr)
 			}
 			a.m.logger.Error("the refresh token was refused: run tapyr auth login for this account", "component", "auth",
@@ -298,7 +355,10 @@ func (a *authCode) current(ctx context.Context) (string, error) {
 	}
 	// The pair is stored before the access token is used: a rotated
 	// refresh token lost in a crash means a new tapyr auth login.
-	if err := a.saveLocked(ctx); err != nil {
+	if err := a.storeLocked(ctx); err != nil {
+		a.m.logger.Error("the refreshed token pair could not be stored: it is kept in memory and stored before its use; "+
+			"a restart before then needs tapyr auth login", "component", "auth",
+			"provider", a.scope.Provider, "account", a.scope.Account, "error", err)
 		return "", fmt.Errorf("storing the refreshed token pair: %w", err)
 	}
 	return a.st.Access, nil
