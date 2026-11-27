@@ -78,6 +78,7 @@ Browse them in the [provider catalog](https://tapyr.eu/providers/), with what ea
 | [`example-sim`](providers/example-sim/README.md) | Vendor-neutral example API, served by tapyr sim, for development, tests and demos | Official | Simulator only |
 | [`juniper-mist`](providers/juniper-mist/README.md) | Juniper Mist cloud REST API (access points, switches, WAN edge) | Official | Simulator only |
 | [`meraki-dashboard`](providers/meraki-dashboard/README.md) | Cisco Meraki Dashboard API v1 | Official | Real platform (Dashboard API v1, 2026-11-07) and simulator |
+| [`strava`](providers/strava/README.md) | Strava API v3 - the activity totals of an athlete (rides, runs, swims over 4 weeks, the year and all time), for their own dashboards | Official | Simulator only |
 | [`teltonika-rms`](providers/teltonika-rms/README.md) | Teltonika Remote Management System (RMS) cloud API | Official | Real platform (RMS API v3-BETA, 2026-11) and simulator |
 | [`teltonika-rutos`](providers/teltonika-rutos/README.md) | Local REST API of Teltonika routers running RutOS 07.06 or later | Official | Real platform (RutOS 07.24.5, 2026-11) and simulator |
 | [`unifi-site-manager`](providers/unifi-site-manager/README.md) | UniFi Site Manager API v1 (the consoles, sites, devices and ISP metrics of every console of a UI account) | Official | Real platform (Site Manager API 1.0.0, 2026-11-13) and simulator |

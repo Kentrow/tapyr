@@ -1,0 +1,10 @@
+apiVersion: tapyr/v1alpha1
+kind: Scenario
+metadata:
+  name: quota-tight
+  description: A daily read quota of 40 requests, below the 52 the default intervals need, which forces Tapyr to stretch the athlete and stats jobs.
+spec:
+  steps:
+    - at: 0s
+      limits:
+        read-daily: { max: 40 }

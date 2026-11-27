@@ -1,0 +1,15 @@
+{
+  "id": 4000001,
+  "username": "sim-athlete",
+  "resource_state": 3,
+  "firstname": "Sim",
+  "lastname": "Athlete",
+  "city": "Example City",
+  "country": "Example Country",
+  "sex": "F",
+  "premium": false,
+  "summit": false,
+  "created_at": "2020-03-14T09:00:00Z",
+  "updated_at": "2026-11-20T18:30:00Z",
+  "measurement_preference": "meters"
+}

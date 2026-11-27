@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -218,8 +219,7 @@ func pasteBrowser(t *testing.T, edit func(redirect string) string) func(string, 
 		if !strings.Contains(u, "/oauth/authorize?") {
 			return
 		}
-		if parsed, err := url.Parse(u); err != nil || parsed.Query().Get("scope") != "read,activity:read_all" ||
-			parsed.Query().Get("code_challenge_method") != "S256" || parsed.Query().Get("state") == "" {
+		if parsed, err := url.Parse(u); err != nil || parsed.Query().Get("state") == "" {
 			t.Errorf("authorize URL %s", u)
 		}
 		_, _ = io.WriteString(stdin, edit(consentURL(t, u))+"\n")
@@ -254,7 +254,20 @@ func refreshWorks(t *testing.T, ls *loginSetup) {
 
 func TestAuthLoginPaste(t *testing.T) {
 	ls := newLoginSetup(t, "http://127.0.0.1:8085/callback", "")
-	res := runLogin(t, ls, clock.Real(), pasteBrowser(t, func(r string) string { return r }))
+	paste := pasteBrowser(t, func(r string) string { return r })
+	var authorizeURL atomic.Value
+	browser := func(line string, stdin io.Writer) {
+		if strings.Contains(line, "/oauth/authorize?") {
+			authorizeURL.Store(strings.TrimSpace(line))
+		}
+		paste(line, stdin)
+	}
+	res := runLogin(t, ls, clock.Real(), browser)
+	u, _ := url.Parse(fmt.Sprint(authorizeURL.Load()))
+	if q := u.Query(); q.Get("scope") != "read,activity:read_all" || q.Get("code_challenge_method") != "S256" || q.Get("code_challenge") == "" ||
+		q.Get("client_id") != "app" || q.Get("response_type") != "code" {
+		t.Errorf("authorize URL %s", u)
+	}
 	if res.code != 0 {
 		t.Fatalf("exit %d\n%s%s", res.code, res.stdout, res.stderr)
 	}

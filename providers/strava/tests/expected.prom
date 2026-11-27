@@ -1,0 +1,56 @@
+# TYPE strava_activities gauge
+strava_activities{athlete_id="4000001",period="all",sport="ride"} 612
+strava_activities{athlete_id="4000001",period="all",sport="run"} 845
+strava_activities{athlete_id="4000001",period="all",sport="swim"} 133
+strava_activities{athlete_id="4000001",period="recent_4w",sport="ride"} 6
+strava_activities{athlete_id="4000001",period="recent_4w",sport="run"} 9
+strava_activities{athlete_id="4000001",period="recent_4w",sport="swim"} 2
+strava_activities{athlete_id="4000001",period="ytd",sport="ride"} 88
+strava_activities{athlete_id="4000001",period="ytd",sport="run"} 121
+strava_activities{athlete_id="4000001",period="ytd",sport="swim"} 24
+# TYPE strava_athlete_info gauge
+strava_athlete_info{athlete_id="4000001",username="sim-athlete"} 1
+# TYPE strava_biggest_climb_elevation_gain_meters gauge
+strava_biggest_climb_elevation_gain_meters{athlete_id="4000001"} 1286
+# TYPE strava_biggest_ride_distance_meters gauge
+strava_biggest_ride_distance_meters{athlete_id="4000001"} 142318.4
+# TYPE strava_distance_meters gauge
+strava_distance_meters{athlete_id="4000001",period="all",sport="ride"} 2.711093e+07
+strava_distance_meters{athlete_id="4000001",period="all",sport="run"} 7.65021e+06
+strava_distance_meters{athlete_id="4000001",period="all",sport="swim"} 239400
+strava_distance_meters{athlete_id="4000001",period="recent_4w",sport="ride"} 241830.2
+strava_distance_meters{athlete_id="4000001",period="recent_4w",sport="run"} 83412.7
+strava_distance_meters{athlete_id="4000001",period="recent_4w",sport="swim"} 3600
+strava_distance_meters{athlete_id="4000001",period="ytd",sport="ride"} 3.912455e+06
+strava_distance_meters{athlete_id="4000001",period="ytd",sport="run"} 1.10438e+06
+strava_distance_meters{athlete_id="4000001",period="ytd",sport="swim"} 43200
+# TYPE strava_elapsed_time_seconds gauge
+strava_elapsed_time_seconds{athlete_id="4000001",period="all",sport="ride"} 3.95021e+06
+strava_elapsed_time_seconds{athlete_id="4000001",period="all",sport="run"} 2.64312e+06
+strava_elapsed_time_seconds{athlete_id="4000001",period="all",sport="swim"} 319200
+strava_elapsed_time_seconds{athlete_id="4000001",period="recent_4w",sport="ride"} 35210
+strava_elapsed_time_seconds{athlete_id="4000001",period="recent_4w",sport="run"} 28650
+strava_elapsed_time_seconds{athlete_id="4000001",period="recent_4w",sport="swim"} 4800
+strava_elapsed_time_seconds{athlete_id="4000001",period="ytd",sport="ride"} 566300
+strava_elapsed_time_seconds{athlete_id="4000001",period="ytd",sport="run"} 381040
+strava_elapsed_time_seconds{athlete_id="4000001",period="ytd",sport="swim"} 57600
+# TYPE strava_elevation_gain_meters gauge
+strava_elevation_gain_meters{athlete_id="4000001",period="all",sport="ride"} 290410
+strava_elevation_gain_meters{athlete_id="4000001",period="all",sport="run"} 61240
+strava_elevation_gain_meters{athlete_id="4000001",period="all",sport="swim"} 0
+strava_elevation_gain_meters{athlete_id="4000001",period="recent_4w",sport="ride"} 2814
+strava_elevation_gain_meters{athlete_id="4000001",period="recent_4w",sport="run"} 611
+strava_elevation_gain_meters{athlete_id="4000001",period="recent_4w",sport="swim"} 0
+strava_elevation_gain_meters{athlete_id="4000001",period="ytd",sport="ride"} 41250
+strava_elevation_gain_meters{athlete_id="4000001",period="ytd",sport="run"} 8930
+strava_elevation_gain_meters{athlete_id="4000001",period="ytd",sport="swim"} 0
+# TYPE strava_moving_time_seconds gauge
+strava_moving_time_seconds{athlete_id="4000001",period="all",sport="ride"} 3.61248e+06
+strava_moving_time_seconds{athlete_id="4000001",period="all",sport="run"} 2.58143e+06
+strava_moving_time_seconds{athlete_id="4000001",period="all",sport="swim"} 292600
+strava_moving_time_seconds{athlete_id="4000001",period="recent_4w",sport="ride"} 32460
+strava_moving_time_seconds{athlete_id="4000001",period="recent_4w",sport="run"} 27840
+strava_moving_time_seconds{athlete_id="4000001",period="recent_4w",sport="swim"} 4320
+strava_moving_time_seconds{athlete_id="4000001",period="ytd",sport="ride"} 520140
+strava_moving_time_seconds{athlete_id="4000001",period="ytd",sport="run"} 371920
+strava_moving_time_seconds{athlete_id="4000001",period="ytd",sport="swim"} 52800

@@ -1,0 +1,23 @@
+# Example configuration for strava. Create an API application at
+# https://www.strava.com/settings/api (Authorization Callback Domain:
+# 127.0.0.1), export its client id and secret, then run once:
+#
+#   tapyr auth login me --config strava.yaml --secret-file ./strava-refresh-token
+#
+# Against the simulator (tapyr sim --provider strava --listen
+# 127.0.0.1:8081), set baseURL to http://127.0.0.1:8081/api/v3 and
+# oauthBaseURL to http://127.0.0.1:8081.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: me }
+spec:
+  provider: strava
+  secrets:
+    clientId: { env: TAPYR_STRAVA_CLIENT_ID }
+    clientSecret: { env: TAPYR_STRAVA_CLIENT_SECRET }
+    refreshToken: { file: ./strava-refresh-token }   # written by tapyr auth login
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: stats }
+spec: { account: me, template: strava-stats }

@@ -77,7 +77,7 @@ configuration is invalid: 1 error
 
 $ export TAPYR_EXAMPLE_API_KEY=sim-api-key
 $ tapyr validate --config . --check-secrets
-configuration is valid: 1 account, 2 jobs, 1 output (8 provider packages and 32 job templates available)
+configuration is valid: 1 account, 2 jobs, 1 output (9 provider packages and 34 job templates available)
 ```
 
 `plan` projects the calls of every job against every quota, before a single request. Discovery has not run yet, so tell it how many instances to expect: 3 sites, and 5 networks in all.
