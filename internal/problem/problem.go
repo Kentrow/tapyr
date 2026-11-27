@@ -64,6 +64,10 @@ type Input struct {
 	// Version is the version of the running Tapyr, for the link to the
 	// guide.
 	Version string
+	// LoginSecret, for an oauth2_authorization_code account, is the secret
+	// that tapyr auth login renews: the action of a re-bootstrap names the
+	// command.
+	LoginSecret string
 }
 
 // For returns the problem of a failed or skipped run. Nothing in it comes
@@ -88,6 +92,10 @@ func For(in Input) *api.Problem {
 		p.Class, anchor = ClassReauth, anchorAuth
 		p.Title = fmt.Sprintf("The credentials of %s can no longer be renewed.", account)
 		p.Action = fmt.Sprintf("Create new ones as the provider README explains, update %s, then reload Tapyr.", secretsShort(in.Secrets))
+		if in.LoginSecret != "" {
+			p.Action = fmt.Sprintf("Run tapyr auth login %s --secret-file <file>, give the file to the secret %s of the account, then reload Tapyr.",
+				account, in.LoginSecret)
+		}
 	case "rate_limited":
 		p.Class, anchor = ClassRateLimited, anchorQuota
 		p.Title = fmt.Sprintf("The provider is rate limiting the requests of %s%s.", account, status(in.Status))
