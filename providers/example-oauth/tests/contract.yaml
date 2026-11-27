@@ -1,0 +1,19 @@
+# Contract test of example-oauth: tapyr provider lint runs the usage job once
+# against the simulator and compares the samples with expected.prom. The
+# user template runs as its implicit parent. The OAuth endpoints are outside
+# the API base path, hence oauthBaseURL from $SIM_ADDR.
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: contract }
+spec:
+  provider: example-oauth
+  params: { baseURL: "$SIM_URL", oauthBaseURL: "$SIM_ADDR" }
+  secrets:
+    clientId: { env: EXAMPLE_OAUTH_CLIENT_ID }
+    clientSecret: { env: EXAMPLE_OAUTH_CLIENT_SECRET }
+    refreshToken: { env: EXAMPLE_OAUTH_REFRESH_TOKEN }
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: usage }
+spec: { account: contract, template: example-oauth-usage }

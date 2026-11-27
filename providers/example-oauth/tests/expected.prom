@@ -1,0 +1,14 @@
+# TYPE example_oauth_project_info gauge
+example_oauth_project_info{name="alpha",project_id="p-1",user_id="u-1001"} 1
+example_oauth_project_info{name="beta",project_id="p-2",user_id="u-1001"} 1
+example_oauth_project_info{name="gamma",project_id="p-3",user_id="u-1001"} 1
+# TYPE example_oauth_project_items gauge
+example_oauth_project_items{project_id="p-1",user_id="u-1001"} 1280
+example_oauth_project_items{project_id="p-2",user_id="u-1001"} 342
+example_oauth_project_items{project_id="p-3",user_id="u-1001"} 57
+# TYPE example_oauth_storage_quota_bytes gauge
+example_oauth_storage_quota_bytes{user_id="u-1001"} 1.073741824e+10
+# TYPE example_oauth_storage_used_bytes gauge
+example_oauth_storage_used_bytes{user_id="u-1001"} 7.340032e+09
+# TYPE example_oauth_user_info gauge
+example_oauth_user_info{plan="team",user_id="u-1001"} 1

@@ -1,0 +1,27 @@
+# The user the token belongs to, and the inventory of the usage job (the
+# usage endpoint takes the user id).
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: example-oauth-me
+spec:
+  provider: example-oauth
+  defaultInterval: 6h
+  defaultPriority: low
+  role: both
+  request:
+    path: /me
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: "[response.body]"
+    inventory:
+      key: item.id
+      fields:
+        userId: item.id
+    info:
+      - name: example_oauth_user_info
+        help: The user the token belongs to
+        labels:
+          user_id: item.id
+          plan: item.plan

@@ -36,8 +36,8 @@ nav:
       - providers/juniper-mist/README.md
       - providers/cisco-thousandeyes/README.md
       - providers/unifi-site-manager/README.md
-      - providers/strava/README.md
       - providers/example-sim/README.md
+      - providers/example-oauth/README.md
       - docs/provider-ideas.md
   - Reference:
       - docs/reference/README.md

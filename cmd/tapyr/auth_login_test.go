@@ -104,7 +104,7 @@ func newLoginSetup(t *testing.T, redirect string, extraAccounts string) *loginSe
 	srv := httptest.NewServer(s.Handler())
 	t.Cleanup(srv.Close)
 	ls := &loginSetup{
-		providers: filepath.Join(dir, "providers"), server: s, url: srv.URL, secretFile: filepath.Join(dir, "strava-refresh-token"),
+		providers: filepath.Join(dir, "providers"), server: s, url: srv.URL, secretFile: filepath.Join(dir, "lab-refresh-token"),
 		vars: map[string]string{"ATHLETES_CLIENT_ID": "app", "ATHLETES_CLIENT_SECRET": "s3cr3t"},
 	}
 	ls.config = filepath.Join(dir, "config.yaml")

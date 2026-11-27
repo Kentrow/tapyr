@@ -1,0 +1,19 @@
+# Example configuration for example-oauth, against tapyr sim --provider
+# example-oauth --listen 127.0.0.1:8081. Run the consent once, then tapyr run:
+#
+#   export TAPYR_LAB_CLIENT_ID=sim-client TAPYR_LAB_CLIENT_SECRET=sim-client-secret
+#   tapyr auth login lab --config example-oauth.yaml --secret-file ./lab-refresh-token
+apiVersion: tapyr/v1alpha1
+kind: Account
+metadata: { name: lab }
+spec:
+  provider: example-oauth
+  secrets:
+    clientId: { env: TAPYR_LAB_CLIENT_ID }
+    clientSecret: { env: TAPYR_LAB_CLIENT_SECRET }
+    refreshToken: { file: ./lab-refresh-token }   # written by tapyr auth login
+---
+apiVersion: tapyr/v1alpha1
+kind: Job
+metadata: { name: usage }
+spec: { account: lab, template: example-oauth-usage }

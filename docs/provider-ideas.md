@@ -55,7 +55,7 @@ Juniper Mist and Cisco ThousandEyes, ideas of this page, are built-in packages s
 | SolarEdge | Solar production | 300 requests/day | Tight daily quota |
 | Netatmo | Weather, indoor air quality | Per-user and per-app limits, verify | |
 | OpenWeatherMap | Weather | Per-minute and monthly limits depending on plan, verify | |
-| Strava | Activities, training load | Read: 100 per 15 min (reset at :00, :15, :30, :45) and 1000 per day (reset at midnight UTC); both values packed in one header (`X-ReadRateLimit-Usage: 15min,daily`) | Needs 15-minute aligned windows and quota sync from expressions |
+| Strava | Activities, training load | Read: 100 per 15 min (reset at :00, :15, :30, :45) and 1000 per day (reset at midnight UTC); both values packed in one header (`X-ReadRateLimit-Usage: 15min,daily`) | Not a fit, checked 2026-11-27: API access needs a paid Strava subscription since June 2026, and the [API Policy](https://www.strava.com/legal/api_policy) caps caching at seven days and forbids accumulating Strava data, which a metrics store does. A package was written and withdrawn before release. |
 
 ## Engine gaps
 
