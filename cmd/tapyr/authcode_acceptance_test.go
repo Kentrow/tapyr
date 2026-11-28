@@ -13,7 +13,7 @@ import (
 	"github.com/kentrow/tapyr/internal/clock"
 )
 
-// TestAuthCodeEndToEnd runs the strava package as a user would (ADR 0016):
+// TestAuthCodeEndToEnd runs the example-oauth package as a user would (ADR 0016):
 // tapyr auth login against its simulator writes the bootstrap refresh
 // token, tapyr run collects for 24 simulated hours while the access token
 // (6 hours) is renewed and the refresh token rotated, a restart continues
@@ -26,12 +26,12 @@ func TestAuthCodeEndToEnd(t *testing.T) {
 	}
 	start := time.Date(2026, time.November, 2, 9, 0, 0, 0, time.UTC)
 	clk := clock.NewFake(start)
-	simAddr, stopSim := backgroundWith(t, nil, clk, "sim", "--provider", "strava")
+	simAddr, stopSim := backgroundWith(t, nil, clk, "sim", "--provider", "example-oauth")
 	defer func() { stopSim() }()
 	dir := t.TempDir()
 	ls := &loginSetup{
-		config: filepath.Join(dir, "config.yaml"), providers: t.TempDir(), secretFile: filepath.Join(dir, "strava-refresh-token"),
-		vars: map[string]string{"TAPYR_STRAVA_CLIENT_ID": "sim-client", "TAPYR_STRAVA_CLIENT_SECRET": "sim-client-secret"},
+		config: filepath.Join(dir, "config.yaml"), providers: t.TempDir(), secretFile: filepath.Join(dir, "lab-refresh-token"),
+		vars: map[string]string{"TAPYR_LAB_CLIENT_ID": "sim-client", "TAPYR_LAB_CLIENT_SECRET": "sim-client-secret"},
 	}
 	writeConfig := func(sim string) {
 		t.Helper()
@@ -39,17 +39,17 @@ func TestAuthCodeEndToEnd(t *testing.T) {
 kind: Account
 metadata: { name: home }
 spec:
-  provider: strava
-  params: { baseURL: "http://%[1]s/api/v3", oauthBaseURL: "http://%[1]s" }
+  provider: example-oauth
+  params: { baseURL: "http://%[1]s/api/v1", oauthBaseURL: "http://%[1]s" }
   secrets:
-    clientId: { env: TAPYR_STRAVA_CLIENT_ID }
-    clientSecret: { env: TAPYR_STRAVA_CLIENT_SECRET }
+    clientId: { env: TAPYR_LAB_CLIENT_ID }
+    clientSecret: { env: TAPYR_LAB_CLIENT_SECRET }
     refreshToken: { file: %[2]q }
 ---
 apiVersion: tapyr/v1alpha1
 kind: Job
-metadata: { name: stats }
-spec: { account: home, template: strava-stats }
+metadata: { name: usage }
+spec: { account: home, template: example-oauth-usage }
 ---
 apiVersion: tapyr/v1alpha1
 kind: Output
@@ -132,11 +132,11 @@ spec:
 		t.Fatalf("run exited with %d:\n%s", res.code, tail(res.stderr, 40))
 	}
 	routes, issued := simStats(simAddr)
-	stats := routes["GET /athletes/{athleteId}/stats"]
-	// 48 stats runs a day, about 5 access tokens (one every 5h50) besides
+	stats := routes["GET /users/{userId}/usage"]
+	// 48 usage runs a day, about 5 access tokens (one every 5h50) besides
 	// the one of the login.
 	if stats < 45 || stats > 50 {
-		t.Errorf("%d stats requests in 24 hours, want about 48", stats)
+		t.Errorf("%d usage requests in 24 hours, want about 48", stats)
 	}
 	if issued < 5 || issued > 7 {
 		t.Errorf("%d tokens issued in 24 hours (login included), want about 6", issued)
@@ -154,8 +154,8 @@ spec:
 	if res := stop(); grepLines(res.stderr, "level=ERROR") != "" || grepLines(res.stderr, "refresh token was refused") != "" {
 		t.Errorf("after a restart:\n%s", tail(res.stderr, 30))
 	}
-	if routes2, issued2 := simStats(simAddr); routes2["GET /athletes/{athleteId}/stats"] < stats+13 || issued2 <= issued {
-		t.Errorf("after a restart: %d stats requests (was %d), %d tokens (was %d)", routes2["GET /athletes/{athleteId}/stats"], stats, issued2, issued)
+	if routes2, issued2 := simStats(simAddr); routes2["GET /users/{userId}/usage"] < stats+13 || issued2 <= issued {
+		t.Errorf("after a restart: %d usage requests (was %d), %d tokens (was %d)", routes2["GET /users/{userId}/usage"], stats, issued2, issued)
 	}
 
 	// 3. A new login replaces the stored pair.
@@ -168,7 +168,7 @@ spec:
 	// 4. The API forgets the refresh token (a revoked access, here a new
 	// simulator): the account needs a new consent, and says so.
 	stopSim()
-	simAddr, stopSim = backgroundWith(t, nil, clk, "sim", "--provider", "strava")
+	simAddr, stopSim = backgroundWith(t, nil, clk, "sim", "--provider", "example-oauth")
 	writeConfig(simAddr)
 	addr, stop := collect(30 * time.Minute)
 	_, metrics := httpGet(t, "http://"+addr+"/metrics/self")
@@ -185,13 +185,13 @@ spec:
 	_, metricsAfter := httpGet(t, "http://"+addr+"/metrics/self")
 	_, accountsAfter := httpGet(t, "http://"+addr+"/api/v1/accounts")
 	res = stop()
-	if !strings.Contains(metricsAfter, `tapyr_auth_reauth_required{account="home",provider="strava"} 0`) {
+	if !strings.Contains(metricsAfter, `tapyr_auth_reauth_required{account="home",provider="example-oauth"} 0`) {
 		t.Errorf("the re-bootstrap condition stays after a new login and a reload:\n%s", grepLines(metricsAfter, "tapyr_auth"))
 	}
 	if !strings.Contains(accountsAfter, `"reauth_required": false`) {
 		t.Errorf("the status API still asks for a new consent after a new login and a reload")
 	}
-	if !strings.Contains(metrics, `tapyr_auth_reauth_required{account="home",provider="strava"} 1`) {
+	if !strings.Contains(metrics, `tapyr_auth_reauth_required{account="home",provider="example-oauth"} 1`) {
 		t.Errorf("no re-bootstrap condition in the self-metrics:\n%s", grepLines(metrics, "tapyr_auth"))
 	}
 	if !strings.Contains(accounts, `"reauth_required": true`) {

@@ -27,7 +27,7 @@ With systemd, put the variables in the environment file of the unit ([systemd](.
 Some APIs (the `oauth2_authorization_code` auth type, [ADR 0016](adr/0016-oauth2-authorization-code.md)) only give a refresh token after a person accepts in a browser. Run the consent once with `tapyr auth login`, anywhere (your laptop is fine), with the configuration and the client id and secret of the account:
 
 ```sh
-tapyr auth login strava-home --config config.yaml --secret-file ./strava-refresh-token
+tapyr auth login my-account --config config.yaml --secret-file ./my-account-refresh-token
 ```
 
 It prints a URL: open it in any browser, accept, and paste back the address the browser was sent to (the page itself may fail to load). `--listen` serves that address on the machine that runs the command instead, when the redirect URL of the package is on `127.0.0.1`; `--device` asks for a code to enter on a page, for packages whose API offers it. The refresh token goes to the file (mode 0600), never to the screen. Give it to the account like any secret (`refreshToken: { file: ... }`, an environment variable or a Kubernetes Secret), then reload Tapyr.

@@ -1,0 +1,9 @@
+{
+  "storageUsedBytes": 7340032000,
+  "storageQuotaBytes": 10737418240,
+  "projects": [
+    { "id": "p-1", "name": "alpha", "items": 1280 },
+    { "id": "p-2", "name": "beta", "items": 342 },
+    { "id": "p-3", "name": "gamma", "items": 57 }
+  ]
+}

@@ -1,0 +1,40 @@
+# The usage of the user (GET /users/{id}/usage): storage, and the items of
+# each project.
+apiVersion: tapyr/v1alpha1
+kind: JobTemplate
+metadata:
+  name: example-oauth-usage
+spec:
+  provider: example-oauth
+  defaultInterval: 30m
+  defaultPriority: normal
+  forEach:
+    template: example-oauth-me
+    vars:
+      userId: parent.userId
+  request:
+    path: /users/{userId}/usage
+  estimate:
+    pagesPerRun: 1
+  extract:
+    items: response.body.projects
+    metrics:
+      - name: example_oauth_project_items
+        help: Items of a project
+        value: double(item.items)
+        labels: { user_id: vars.userId, project_id: item.id }
+    info:
+      - name: example_oauth_project_info
+        help: Descriptive attributes of a project
+        labels: { user_id: vars.userId, project_id: item.id, name: item.name }
+    post:
+      - name: example_oauth_storage_used_bytes
+        help: Storage used by the user
+        unit: bytes
+        value: double(responses[0].body.storageUsedBytes)
+        labels: { user_id: vars.userId }
+      - name: example_oauth_storage_quota_bytes
+        help: Storage quota of the user
+        unit: bytes
+        value: double(responses[0].body.storageQuotaBytes)
+        labels: { user_id: vars.userId }

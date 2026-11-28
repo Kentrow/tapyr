@@ -1,0 +1,72 @@
+apiVersion: tapyr/v1alpha1
+kind: Provider
+metadata:
+  name: example-oauth
+  version: 0.1.0
+  description: Vendor-neutral example of the oauth2_authorization_code auth type, served by tapyr sim, for development, tests and demos
+  docs: https://github.com/kentrow/tapyr/blob/main/docs/adr/0016-oauth2-authorization-code.md
+  displayName: Example OAuth
+  categories: [example]
+  maintainers: [Kentrow]
+  tier: official
+  validation:
+    status: simulator
+    notes: Synthetic data, by design; the reference package of the oauth2_authorization_code auth type
+spec:
+  baseURL: '{{ .params.baseURL | default "http://127.0.0.1:8081/api/v1" | trimSuffix "/" }}'
+  params:
+    - name: baseURL
+      description: Base URL of the API, for example the address of tapyr sim with /api/v1
+    - name: oauthBaseURL
+      description: Base URL of the OAuth endpoints, for example the address of tapyr sim
+    - name: redirectURL
+      description: Redirect URL of the consent; http://127.0.0.1:8085/callback by default
+  secrets:
+    - name: clientId
+      required: true
+      description: Client ID of the application (the simulator accepts sim-client)
+    - name: clientSecret
+      required: true
+      description: Client Secret of the application (the simulator accepts sim-client-secret)
+    - name: refreshToken
+      required: true
+      description: Bootstrap refresh token, written by tapyr auth login (the simulator also accepts sim-refresh-token)
+  # OAuth 2.0 authorization code (ADR 0016): a consent once with tapyr auth
+  # login, then access tokens valid 6 hours and a new refresh token at every
+  # refresh, the previous one spent (rotation, handled by Tapyr).
+  auth:
+    type: oauth2_authorization_code
+    oauth2AuthorizationCode:
+      authorizeURL: '{{ .params.oauthBaseURL | default "http://127.0.0.1:8081" | trimSuffix "/" }}/oauth/authorize'
+      tokenURL: '{{ .params.oauthBaseURL | default "http://127.0.0.1:8081" | trimSuffix "/" }}/oauth/token'
+      deviceAuthorizationURL: '{{ .params.oauthBaseURL | default "http://127.0.0.1:8081" | trimSuffix "/" }}/oauth/device'
+      redirectURL: '{{ .params.redirectURL | default "http://127.0.0.1:8085/callback" }}'
+      clientId: { secret: clientId }
+      clientSecret: { secret: clientSecret }
+      refreshToken: { secret: refreshToken }
+      scopes: [read, usage:read]
+      refreshBefore: 10m
+  defaults:
+    headers:
+      Accept: application/json
+    timeout: 10s
+  limits:
+    - name: rate-15min
+      description: Requests per application every 15 minutes, counted over a rolling 15 minutes (assumed, example only)
+      source:
+        kind: assumed
+      kind: quota
+      max: 100
+      window: { rolling: 15m }
+      scope: { by: [credential] }
+    - name: daily
+      description: Requests per application per day, reset at midnight UTC (assumed, example only)
+      source:
+        kind: assumed
+      kind: quota
+      max: 1000
+      window: { period: day, resetAt: "00:00", timezone: UTC }
+      scope: { by: [credential] }
+  errors:
+    rateLimited:
+      statuses: [429]

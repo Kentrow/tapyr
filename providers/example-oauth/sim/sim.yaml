@@ -1,14 +1,14 @@
-# Simulator of the Strava API v3: the athlete and its stats, behind the OAuth
-# 2.0 authorization code flow with rotating refresh tokens, 6-hour access
-# tokens and the read limits of provider.yaml. Synthetic data.
+# Simulator of example-oauth: the user and its usage, behind the OAuth 2.0
+# authorization code flow (immediate consent, PKCE, rotating refresh tokens,
+# device code) with 6-hour access tokens. Synthetic data.
 apiVersion: tapyr/v1alpha1
 kind: Simulation
 metadata:
-  name: strava
+  name: example-oauth
 spec:
   # tapyr sim --all serves this simulator at --listen-base plus this offset.
   portOffset: 8
-  basePath: /api/v3
+  basePath: /api/v1
   auth:
     accept:
       authorizationCode:
@@ -18,9 +18,9 @@ spec:
           rotate: true
     tokenLifetime: 6h
   routes:
-    - path: /athlete
+    - path: /me
       response:
-        file: fixtures/athlete.json
-    - path: /athletes/{athleteId}/stats
+        file: fixtures/me.json
+    - path: /users/{userId}/usage
       response:
-        file: fixtures/stats.json
+        file: fixtures/usage.json
